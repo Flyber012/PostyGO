@@ -1,9 +1,9 @@
 
 
 import React, { useState, useRef, useEffect } from 'react';
-import { PostSize, BrandKit, LayoutTemplate, User } from '../types';
+import { PostSize, BrandKit, LayoutTemplate } from '../types';
 import { POST_SIZES } from '../constants';
-import { FileDown, Image, Save, Download, Sparkles, Upload, X, Trash2, Plus, File, Files, BrainCircuit, ShieldCheck, Copy, Package, Check, LayoutTemplate as LayoutIcon, ChevronDown, User as UserIcon } from 'lucide-react';
+import { FileDown, Image, Save, Download, Sparkles, Upload, X, Trash2, Plus, File, Files, BrainCircuit, ShieldCheck, Copy, Package, Check, LayoutTemplate as LayoutIcon, ChevronDown } from 'lucide-react';
 import AdvancedColorPicker from './ColorPicker';
 import { toast } from 'react-hot-toast';
 
@@ -78,7 +78,7 @@ const Accordion: React.FC<{ title: React.ReactNode; children: React.ReactNode; d
 
 interface ControlPanelProps {
     isLoading: boolean;
-    onGenerate: (topic: string, count: number, type: 'post' | 'carousel', useUploadedBgs: boolean, contentLevel: 'mínimo' | 'médio' | 'detalhado') => void;
+    onGenerate: (topic: string, count: number, type: 'post' | 'carousel', contentLevel: 'mínimo' | 'médio' | 'detalhado') => void;
     onExport: (format: 'png' | 'jpeg' | 'zip') => void;
     onSaveBrandKit: (name: string) => void;
     onAddLayoutToActiveKit: () => void;
@@ -111,24 +111,20 @@ interface ControlPanelProps {
     setSelectedLayoutId: (id: string | null) => void;
     useLayoutToFill: boolean;
     setUseLayoutToFill: (use: boolean) => void;
-    currentUser: User | null;
 }
 
 const ControlPanel: React.FC<ControlPanelProps> = (props) => {
     const { 
         isLoading, onGenerate, onExport, onSaveBrandKit, onAddLayoutToActiveKit, brandKits, activeBrandKit,
-        postSize, setPostSize, hasPosts, referenceImages, customBackgrounds, styleImages,
+        postSize, setPostSize, hasPosts, customBackgrounds, styleImages,
         onFileChange, onRemoveImage, onImportBrandKit, onExportBrandKit, onDeleteBrandKit, onApplyBrandKit,
         onAddPostFromLayout, onUpdateLayoutName, onDeleteLayoutFromKit,
         colorMode, setColorMode, customPalette, setCustomPalette,
         styleGuide, useStyleGuide, setUseStyleGuide, onAnalyzeStyle,
         selectedLayoutId, setSelectedLayoutId, useLayoutToFill, setUseLayoutToFill,
-        currentUser
      } = props;
     const [topic, setTopic] = useState('Productivity Hacks');
-    const [postCount, setPostCount] = useState(3);
     const [generationType, setGenerationType] = useState<'post' | 'carousel'>('post');
-    const [creationMode, setCreationMode] = useState<'ai' | 'custom'>('ai');
     const [contentLevel, setContentLevel] = useState<'mínimo' | 'médio' | 'detalhado'>('médio');
     const [newKitName, setNewKitName] = useState('');
     const importKitRef = useRef<HTMLInputElement>(null);
@@ -162,10 +158,9 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
             return;
         }
         
-        const useUploadedBgs = creationMode === 'custom';
-        const finalCount = useUploadedBgs ? customBackgrounds.length : postCount;
+        const finalCount = customBackgrounds.length;
         
-        if (useUploadedBgs && finalCount === 0) {
+        if (finalCount === 0) {
             toast.error("Por favor, suba suas imagens de fundo antes de gerar.");
             return;
         }
@@ -175,7 +170,7 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
             return;
         }
         
-        onGenerate(topic, finalCount, generationType, useUploadedBgs, contentLevel);
+        onGenerate(topic, finalCount, generationType, contentLevel);
     };
 
     const handleSaveKitClick = () => {
@@ -235,13 +230,6 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
 
     return (
         <aside className="w-96 bg-zinc-900 p-6 flex flex-col h-full overflow-y-auto shadow-2xl flex-shrink-0 relative">
-            {!currentUser && (
-                <div className="absolute inset-0 bg-zinc-900/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center text-center p-8">
-                    <UserIcon className="w-12 h-12 text-purple-400 mb-4" />
-                    <h3 className="text-lg font-bold text-white">Bem-vindo ao Posty</h3>
-                    <p className="text-zinc-400 text-sm">Faça login para começar a criar e gerenciar seu conteúdo.</p>
-                </div>
-            )}
             {colorPickerState.isOpen && (
                 <AdvancedColorPicker 
                     color={colorPickerState.color}
@@ -334,36 +322,7 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
                 </Accordion>
                 
                 <Accordion title={<>3. Fundos</>} defaultOpen>
-                     <div className="flex bg-zinc-900/70 p-1 rounded-lg">
-                        <button 
-                            onClick={() => setCreationMode('ai')}
-                            className={`flex-1 text-center text-sm py-2 rounded-md transition-all duration-300 ${creationMode === 'ai' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:bg-zinc-700'}`}
-                        >
-                            Gerar com IA
-                        </button>
-                        <button 
-                            onClick={() => setCreationMode('custom')}
-                            className={`flex-1 text-center text-sm py-2 rounded-md transition-all duration-300 ${creationMode === 'custom' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:bg-zinc-700'}`}
-                        >
-                            Usar Minhas Imagens
-                        </button>
-                    </div>
-
-                    {creationMode === 'ai' && (
-                        <div className="space-y-4 mt-4">
-                            <ImageUploader 
-                                title="Imagens de Referência (Opcional)"
-                                images={referenceImages}
-                                onFileChange={(e) => onFileChange(e, 'reference')}
-                                onRemove={(index) => onRemoveImage(index, 'reference')}
-                                limit={10}
-                                idPrefix="ref"
-                            />
-                        </div>
-                    )}
-
-                    {creationMode === 'custom' && (
-                        <div className="space-y-2 mt-4">
+                     <div className="space-y-2 mt-4">
                             <p className="text-xs text-center text-gray-400">A IA cria o texto sobre os fundos que você subir.</p>
                             <ImageUploader 
                                 title="Seus Fundos"
@@ -374,7 +333,6 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
                                 idPrefix="bg"
                             />
                         </div>
-                    )}
                 </Accordion>
                 
                 <Accordion title={<>4. Formato e Geração</>} defaultOpen>
@@ -386,22 +344,13 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
                             <Files className="w-4 h-4 mr-2"/> Carrossel
                         </button>
                     </div>
-                     {creationMode === 'ai' || useLayoutToFill ? (
-                        <div>
-                            <label htmlFor="post-count" className="block text-sm font-medium text-gray-300 mb-1">
-                                {generationType === 'post' ? 'Número de Posts' : 'Número de Slides'}
-                            </label>
-                            <input type="number" id="post-count" value={postCount} min="1" max="10" onChange={(e) => setPostCount(parseInt(e.target.value))} className="w-full bg-black/50 border border-zinc-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-purple-500 focus:outline-none" />
-                        </div>
-                    ) : (
-                        <div>
-                            <label htmlFor="post-count-disabled" className="block text-sm font-medium text-gray-300 mb-1">
-                                {generationType === 'post' ? 'Número de Posts' : 'Número de Slides'}
-                            </label>
-                            <input type="number" id="post-count-disabled" value={customBackgrounds.length} disabled className="w-full bg-black/30 border border-zinc-700 rounded-md px-3 py-2 text-gray-400 focus:outline-none cursor-not-allowed" />
-                            <p className="text-xs text-zinc-400 mt-1">O número é definido pela quantidade de imagens que você subiu.</p>
-                        </div>
-                    )}
+                    <div>
+                        <label htmlFor="post-count-disabled" className="block text-sm font-medium text-gray-300 mb-1">
+                            {generationType === 'post' ? 'Número de Posts' : 'Número de Slides'}
+                        </label>
+                        <input type="number" id="post-count-disabled" value={customBackgrounds.length} disabled className="w-full bg-black/30 border border-zinc-700 rounded-md px-3 py-2 text-gray-400 focus:outline-none cursor-not-allowed" />
+                        <p className="text-xs text-zinc-400 mt-1">O número é definido pela quantidade de imagens que você subiu.</p>
+                    </div>
                     <div>
                         <label htmlFor="post-size" className="block text-sm font-medium text-gray-300 mb-1">Tamanho do Post</label>
                         <select id="post-size" value={postSize.name} onChange={(e) => setPostSize(POST_SIZES.find(s => s.name === e.target.value) || POST_SIZES[0])} className="w-full bg-black/50 border border-zinc-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-purple-500 focus:outline-none appearance-none">

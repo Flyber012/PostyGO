@@ -1,36 +1,38 @@
 
 
+
 import { GoogleGenAI, Type, Part } from "@google/genai";
 import { AIGeneratedTextElement, PaletteExtractionResult, AIGeneratedCarouselScriptSlide, TextElement, BrandKit } from '../types';
 
-const getAIClient = (apiKey: string) => {
-    // A chave DEVE ser fornecida pelo usuário. Se não, a biblioteca lidará com o erro.
-    return new GoogleGenAI({ apiKey });
+const API_KEY = 'AIzaSyCUAgZxn4OERywBC_R21kJA6SbMQJc73CY';
+
+const getAIClient = () => {
+    return new GoogleGenAI({ apiKey: API_KEY });
 };
 
-/**
- * Verifica se a chave de API do Google Gemini é válida.
- * @param apiKey A chave de API a ser verificada.
- * @returns true se a chave for válida, false caso contrário.
- */
 export async function verifyApiKey(apiKey: string): Promise<boolean> {
+    if (!apiKey) return false;
+    const ai = new GoogleGenAI({ apiKey });
     try {
-        const ai = getAIClient(apiKey);
-        // Faz uma chamada muito leve para verificar se a chave é válida e tem permissões.
+        // This is a lightweight call to check if the API key is valid.
+        // It will throw an error for an invalid key which we can catch.
         await ai.models.generateContent({
             model: 'gemini-2.5-flash',
-            contents: 'hi' // Um prompt mínimo para validar a autenticação.
+            contents: 'hi',
+            config: {
+                maxOutputTokens: 1, // Minimize token usage for verification
+                thinkingConfig: { thinkingBudget: 0 } // Disable thinking for faster response
+            }
         });
         return true;
     } catch (error) {
-        console.error("Falha na verificação da chave de API do Google Gemini:", error);
+        console.error("Gemini API key verification failed:", error);
         return false;
     }
 }
 
-
-export async function analyzeStyleFromImages(apiKey: string, base64Images: string[]): Promise<string> {
-    const ai = getAIClient(apiKey);
+export async function analyzeStyleFromImages(base64Images: string[]): Promise<string> {
+    const ai = getAIClient();
     const parts: Part[] = [];
 
     const prompt = `Você é um diretor de arte sênior e especialista em branding. Sua tarefa é analisar as imagens de design fornecidas e criar um "Guia de Estilo" (Style Guide) conciso e acionável em texto. Este guia será usado por outra IA para gerar novos designs que correspondam a este estilo.
@@ -64,8 +66,8 @@ export async function analyzeStyleFromImages(apiKey: string, base64Images: strin
 }
 
 
-export async function generateImagePrompts(apiKey: string, topic: string, count: number, referenceImages: string[], styleGuide: string | null): Promise<string[]> {
-    const ai = getAIClient(apiKey);
+export async function generateImagePrompts(topic: string, count: number, referenceImages: string[], styleGuide: string | null): Promise<string[]> {
+    const ai = getAIClient();
     let prompt: string;
     const parts: Part[] = [];
     const basePrompt = `Gere uma lista de ${count} prompts de imagem únicos e distintos para um gerador de imagens de IA. Cada prompt deve ser para um fundo de postagem de mídia social sobre o tópico "${topic}". Os prompts devem ser detalhados, artísticos e visualmente descritivos (por exemplo, 'Fundo abstrato com gradientes de cores pastel, foco suave, minimalista').`;
@@ -136,8 +138,8 @@ Com base no guia de estilo acima, gere uma lista de ${count} prompts de imagem �
 }
 
 
-export async function generateLayoutAndContentForImage(apiKey: string, base64Image: string, topic: string, contentLevel: 'mínimo' | 'médio' | 'detalhado', brandKit: BrandKit | null): Promise<AIGeneratedTextElement[]> {
-    const ai = getAIClient(apiKey);
+export async function generateLayoutAndContentForImage(base64Image: string, topic: string, contentLevel: 'mínimo' | 'médio' | 'detalhado', brandKit: BrandKit | null): Promise<AIGeneratedTextElement[]> {
+    const ai = getAIClient();
     const [header, data] = base64Image.split(',');
     if (!header || !data) throw new Error("Formato de imagem base64 inválido.");
     const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
@@ -233,8 +235,8 @@ export async function generateLayoutAndContentForImage(apiKey: string, base64Ima
     }
 }
 
-export async function generateCarouselScript(apiKey: string, topic: string, slideCount: number, contentLevel: 'mínimo' | 'médio' | 'detalhado', styleGuide: string | null): Promise<AIGeneratedCarouselScriptSlide[]> {
-    const ai = getAIClient(apiKey);
+export async function generateCarouselScript(topic: string, slideCount: number, contentLevel: 'mínimo' | 'médio' | 'detalhado', styleGuide: string | null): Promise<AIGeneratedCarouselScriptSlide[]> {
+    const ai = getAIClient();
     const contentLevelInstructions = {
         mínimo: 'Seja muito sucinto em cada slide. Use frases curtas e palavras de impacto. Ideal para mensagens rápidas.',
         médio: 'Forneça uma quantidade equilibrada de informação em cada slide. Um título e uma breve explicação ou 1-2 pontos principais.',
@@ -319,8 +321,8 @@ export async function generateCarouselScript(apiKey: string, topic: string, slid
     }
 }
 
-export async function generateLayoutForProvidedText(apiKey: string, base64Image: string, textContent: string, topic: string, brandKit: BrandKit | null): Promise<AIGeneratedTextElement[]> {
-    const ai = getAIClient(apiKey);
+export async function generateLayoutForProvidedText(base64Image: string, textContent: string, topic: string, brandKit: BrandKit | null): Promise<AIGeneratedTextElement[]> {
+    const ai = getAIClient();
     const [header, data] = base64Image.split(',');
     if (!header || !data) throw new Error("Formato de imagem base64 inválido.");
     const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
@@ -406,13 +408,12 @@ export async function generateLayoutForProvidedText(apiKey: string, base64Image:
 }
 
 export async function generateTextForLayout(
-    apiKey: string,
     textElements: {id: string, description: string, exampleContent: string}[], 
     topic: string, 
     contentLevel: 'mínimo' | 'médio' | 'detalhado', 
     styleGuide: string | null
 ): Promise<Record<string, string>> {
-    const ai = getAIClient(apiKey);
+    const ai = getAIClient();
     
     const contentLevelInstructions = {
         mínimo: 'Gere um texto muito conciso. Uma frase curta ou um título de impacto.',
@@ -496,8 +497,8 @@ export async function generateTextForLayout(
     }
 }
 
-export async function extractPaletteFromImage(apiKey: string, base64Image: string): Promise<PaletteExtractionResult> {
-    const ai = getAIClient(apiKey);
+export async function extractPaletteFromImage(base64Image: string): Promise<PaletteExtractionResult> {
+    const ai = getAIClient();
     const [header, data] = base64Image.split(',');
     if (!header || !data) throw new Error("Formato de imagem base64 inválido.");
     const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';

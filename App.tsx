@@ -3,52 +3,20 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import { createRoot } from 'react-dom/client';
-import { Post, BrandKit, PostSize, AnyElement, TextElement, ImageElement, GradientElement, BackgroundElement, ShapeElement, QRCodeElement, FontDefinition, LayoutTemplate, BrandAsset, User } from './types';
+import { Post, BrandKit, PostSize, AnyElement, TextElement, ImageElement, GradientElement, BackgroundElement, ShapeElement, QRCodeElement, FontDefinition, LayoutTemplate, BrandAsset } from './types';
 import { POST_SIZES, INITIAL_FONTS, PRESET_BRAND_KITS } from './constants';
 import * as geminiService from './services/geminiService';
-import * as runwareService from './services/runwareService';
 import ControlPanel from './components/ControlPanel';
 import CanvasEditor from './components/CanvasEditor';
 import PostGallery from './components/PostGallery';
 import LayersPanel from './components/LayersPanel';
 import StaticPost from './components/StaticPost';
-import UserProfile from './components/UserProfile';
-import AccountManagerModal from './components/AccountManagerModal';
 import saveAs from 'file-saver';
 import { v4 as uuidv4 } from 'uuid';
 import * as htmlToImage from 'html-to-image';
 import JSZip from 'jszip';
 import { ZoomIn, ZoomOut, Maximize, AlignHorizontalJustifyStart, AlignHorizontalJustifyCenter, AlignHorizontalJustifyEnd, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Copy, Trash2, ChevronLeft, ChevronRight, Eye, EyeOff, Lock, Unlock, X } from 'lucide-react';
 
-
-declare global {
-    interface Window {
-        google: any;
-    }
-}
-
-interface DecodedJwt {
-    sub: string;
-    name: string;
-    email: string;
-    picture: string;
-}
-
-function decodeJwtResponse(token: string): DecodedJwt {
-     try {
-        const base64Url = token.split('.')[1];
-        if (!base64Url) throw new Error("Invalid JWT token");
-        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
-            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-        }).join(''));
-
-        return JSON.parse(jsonPayload);
-    } catch (e) {
-        console.error("Error decoding JWT", e);
-        throw new Error("Could not decode JWT");
-    }
-}
 
 const AddLayoutModal: React.FC<{
     isOpen: boolean;
@@ -148,7 +116,6 @@ const AddLayoutModal: React.FC<{
 
 
 const App: React.FC = () => {
-    const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [posts, setPosts] = useState<Post[]>([]);
     const [brandKits, setBrandKits] = useState<BrandKit[]>([]);
     const [activeBrandKitId, setActiveBrandKitId] = useState<string | null>(null);
@@ -172,130 +139,21 @@ const App: React.FC = () => {
 
     const [zoom, setZoom] = useState(1);
     const [isAddLayoutModalOpen, setAddLayoutModalOpen] = useState(false);
-    const [isAccountModalOpen, setAccountModalOpen] = useState(false);
 
 
     const editorRef = useRef<HTMLDivElement>(null);
     const viewportRef = useRef<HTMLElement>(null);
 
-    // --- User Authentication and Data Management ---
     useEffect(() => {
-        // Check for a logged-in user in localStorage on initial load
-        const savedUser = localStorage.getItem('postyUser');
-        if (savedUser) {
-            const user = JSON.parse(savedUser) as User;
-            setCurrentUser(user);
-            // Load user-specific brand kits
-            const savedKits = localStorage.getItem(`brandKits_${user.id}`);
-            setBrandKits(savedKits ? JSON.parse(savedKits) : PRESET_BRAND_KITS);
-        }
-    }, []);
-    
-    const handleCredentialResponse = useCallback((response: any /* CredentialResponse */) => {
-        if (!response.credential) {
-            console.error("Google Sign-In failed: No credential returned.");
-            toast.error("Falha no login com Google. Tente novamente.");
-            return;
-        }
-        
-        try {
-            const decoded: DecodedJwt = decodeJwtResponse(response.credential);
-            
-            const realUser: User = {
-                id: decoded.sub,
-                name: decoded.name,
-                email: decoded.email,
-                avatar: decoded.picture,
-                linkedAccounts: {},
-            };
-    
-            // Check for previously saved profile data (like linked API keys)
-            const userProfile = localStorage.getItem(`user_profile_${realUser.id}`);
-            if (userProfile) {
-                realUser.linkedAccounts = JSON.parse(userProfile).linkedAccounts || {};
-            }
-    
-            localStorage.setItem('postyUser', JSON.stringify(realUser));
-            
-            const savedKits = localStorage.getItem(`brandKits_${realUser.id}`);
-            setBrandKits(savedKits ? JSON.parse(savedKits) : PRESET_BRAND_KITS);
-            if (!savedKits) {
-                 localStorage.setItem(`brandKits_${realUser.id}`, JSON.stringify(PRESET_BRAND_KITS));
-            }
-            
-            setCurrentUser(realUser);
-            toast.success(`Bem-vindo, ${realUser.name.split(' ')[0]}!`);
-        } catch (error) {
-            console.error("Error processing Google login:", error);
-            toast.error("Ocorreu um erro ao processar seu login.");
-        }
-    }, []);
-
-    useEffect(() => {
-        // Initialize Google Identity Services
-        if (window.google) {
-            window.google.accounts.id.initialize({
-                client_id: '730562602445-6a2gav1iki25ppretrf8da1p95esm5ra.apps.googleusercontent.com',
-                callback: handleCredentialResponse
-            });
+        const savedKits = localStorage.getItem('brandKits');
+        if (savedKits) {
+            setBrandKits(JSON.parse(savedKits));
         } else {
-            console.warn("Google Identity Services script not loaded yet.");
+            setBrandKits(PRESET_BRAND_KITS);
+            localStorage.setItem('brandKits', JSON.stringify(PRESET_BRAND_KITS));
         }
-    }, [handleCredentialResponse]);
-
-
-    const handleLogin = () => {
-        if (!window.google) {
-            toast.error("Serviço de login do Google não está disponível. Tente recarregar a página.");
-            return;
-        }
-        // Triggers the Google One Tap prompt
-        window.google.accounts.id.prompt();
-    };
-
-    const handleLogout = () => {
-        if (window.google) {
-            window.google.accounts.id.disableAutoSelect();
-        }
-        localStorage.removeItem('postyUser');
-        setCurrentUser(null);
-        setPosts([]);
-        setBrandKits([]);
-        setActiveBrandKitId(null);
-        toast('Você saiu.', { icon: '👋' });
-    };
-
-    const handleLinkAccount = (service: 'google' | 'chatgpt' | 'envato' | 'runware', apiKey: string) => {
-        if (!currentUser) return;
-        const updatedUser: User = {
-            ...currentUser,
-            linkedAccounts: {
-                ...currentUser.linkedAccounts,
-                [service]: { apiKey, status: 'connected' }
-            }
-        };
-        setCurrentUser(updatedUser);
-        localStorage.setItem('postyUser', JSON.stringify(updatedUser));
-        // Persist linked accounts separately to survive logouts
-        localStorage.setItem(`user_profile_${updatedUser.id}`, JSON.stringify({ linkedAccounts: updatedUser.linkedAccounts }));
-        toast.success(`Conta ${service.charAt(0).toUpperCase() + service.slice(1)} conectada!`);
-    };
+    }, []);
     
-    const handleUnlinkAccount = (service: 'google' | 'chatgpt' | 'envato' | 'runware') => {
-        if (!currentUser) return;
-        const { [service]: _, ...remainingAccounts } = currentUser.linkedAccounts;
-        const updatedUser: User = {
-            ...currentUser,
-            linkedAccounts: remainingAccounts
-        };
-        setCurrentUser(updatedUser);
-        localStorage.setItem('postyUser', JSON.stringify(updatedUser));
-        // Persist linked accounts separately to survive logouts
-        localStorage.setItem(`user_profile_${updatedUser.id}`, JSON.stringify({ linkedAccounts: updatedUser.linkedAccounts }));
-        toast.success(`Conta ${service.charAt(0).toUpperCase() + service.slice(1)} desconectada.`);
-    };
-
-    // --- END User ---
 
     const handleAddFont = (font: FontDefinition) => {
         if (!availableFonts.some(f => f.name === font.name)) {
@@ -361,12 +219,6 @@ const App: React.FC = () => {
     };
 
     const handleAnalyzeStyle = async () => {
-        const apiKey = currentUser?.linkedAccounts.google?.apiKey;
-        if (!apiKey) {
-            toast.error("Por favor, conecte sua chave de API do Google Gemini em 'Gerenciar Contas'.");
-            setAccountModalOpen(true);
-            return;
-        }
         if (styleImages.length === 0) {
             toast.error("Por favor, envie pelo menos uma imagem de design para análise.");
             return;
@@ -375,7 +227,7 @@ const App: React.FC = () => {
         const toastId = toast.loading("Analisando seu estilo...");
         setLoadingMessage("IA está estudando seus designs...");
         try {
-            const generatedGuide = await geminiService.analyzeStyleFromImages(apiKey, styleImages);
+            const generatedGuide = await geminiService.analyzeStyleFromImages(styleImages);
             setStyleGuide(generatedGuide);
             setUseStyleGuide(true); // Automatically enable it after generation
             toast.success("Guia de Estilo criado e ativado!", { id: toastId });
@@ -389,26 +241,7 @@ const App: React.FC = () => {
     };
 
 
-    const handleGeneratePosts = async (topic: string, count: number, type: 'post' | 'carousel', useUploadedBgs: boolean, contentLevel: 'mínimo' | 'médio' | 'detalhado') => {
-        if (!currentUser) {
-            toast.error("Faça login para gerar conteúdo.");
-            return;
-        }
-
-        const googleApiKey = currentUser.linkedAccounts.google?.apiKey;
-        if (!googleApiKey) {
-            toast.error("Conecte sua chave de API do Google Gemini para gerar conteúdo.");
-            setAccountModalOpen(true);
-            return;
-        }
-
-        const runwareApiKey = currentUser.linkedAccounts.runware?.apiKey;
-        if (!useUploadedBgs && !runwareApiKey) {
-            toast.error("Conecte sua chave de API da Runware AI para gerar imagens.");
-            setAccountModalOpen(true);
-            return;
-        }
-        
+    const handleGeneratePosts = async (topic: string, count: number, type: 'post' | 'carousel', contentLevel: 'mínimo' | 'médio' | 'detalhado') => {
         setIsLoading(true);
         setPosts([]);
         setSelectedPostId(null);
@@ -420,7 +253,6 @@ const App: React.FC = () => {
         const activeStyleGuide = useStyleGuide ? styleGuide : null;
 
         try {
-            // NEW: Combined "Fill Layout" workflow
             if (useLayoutToFill && selectedLayoutId && activeBrandKitId) {
                 const kit = brandKits.find(k => k.id === activeBrandKitId);
                 const layout = kit?.layouts.find(l => l.id === selectedLayoutId);
@@ -429,28 +261,11 @@ const App: React.FC = () => {
                     throw new Error("Layout ou Brand Kit selecionado não foi encontrado.");
                 }
 
-                // Step 1: Get the backgrounds from the chosen source
-                let backgroundSources: { src: string, prompt?: string }[] = [];
-                if (useUploadedBgs) {
-                    if (customBackgrounds.length === 0) {
-                        throw new Error("Por favor, envie as imagens de fundo que você deseja usar com este layout.");
-                    }
-                    backgroundSources = customBackgrounds.map(src => ({ src }));
-                } else {
-                    if (!runwareApiKey) throw new Error("A chave de API da Runware é necessária para gerar fundos.");
-                    setLoadingMessage('Gerando novos fundos para seu layout...');
-                    toast.loading('Gerando novos fundos...', { id: toastId });
-                    const backgroundPrompts = await geminiService.generateImagePrompts(googleApiKey, topic, count, referenceImages, activeStyleGuide);
-                    
-                    const aiBackgroundData = await runwareService.generateBackgroundImages(runwareApiKey, backgroundPrompts);
-
-                    backgroundSources = aiBackgroundData.map((data, i) => ({
-                        src: `data:image/png;base64,${data}`,
-                        prompt: backgroundPrompts[i]
-                    }));
+                if (customBackgrounds.length === 0) {
+                    throw new Error("Por favor, envie as imagens de fundo que você deseja usar com este layout.");
                 }
+                const backgroundSources = customBackgrounds.map(src => ({ src }));
                 
-                // Step 2: Prepare for content generation
                 setLoadingMessage(`Preenchendo seu layout com conteúdo...`);
                 toast.loading(`Preenchendo seu layout...`, { id: toastId });
 
@@ -469,21 +284,19 @@ const App: React.FC = () => {
                         return { id: el.id, description, exampleContent: textEl.content };
                     });
 
-                // Step 3: Loop through backgrounds and create each post
                 for (let i = 0; i < backgroundSources.length; i++) {
                     const bgData = backgroundSources[i];
                     
                     let newContentMap: Record<string, string> = {};
                     if (textElementsToFill.length > 0) {
                         setLoadingMessage(`Gerando texto para o post ${i + 1}/${backgroundSources.length}...`);
-                        newContentMap = await geminiService.generateTextForLayout(googleApiKey, textElementsToFill, topic, contentLevel, activeStyleGuide);
+                        newContentMap = await geminiService.generateTextForLayout(textElementsToFill, topic, contentLevel, activeStyleGuide);
                     }
                     
                     const newPostId = uuidv4();
                     
                     const backgroundElement: BackgroundElement = {
-                        id: `${newPostId}-background`, type: 'background', src: bgData.src, prompt: bgData.prompt,
-                        provider: useUploadedBgs ? undefined : 'runware',
+                        id: `${newPostId}-background`, type: 'background', src: bgData.src,
                     };
 
                     const clonedForegroundElements: AnyElement[] = JSON.parse(JSON.stringify(
@@ -509,7 +322,7 @@ const App: React.FC = () => {
                 if (newPosts.length > 0) setSelectedPostId(newPosts[0].id);
                 toast.success(`${newPosts.length} posts criados com seu layout!`, { id: toastId });
 
-            } else if (useUploadedBgs) { // Existing "Use My Images" Mode (without a layout)
+            } else { 
                 setLoadingMessage('Analisando suas imagens...');
                 toast.loading('Analisando suas imagens...', { id: toastId });
 
@@ -521,7 +334,7 @@ const App: React.FC = () => {
                 toast.loading('Criando layouts inteligentes...', { id: toastId });
 
                 const layoutPromises = customBackgrounds.map(bgSrc => 
-                    geminiService.generateLayoutAndContentForImage(googleApiKey, bgSrc, topic, contentLevel, activeKit)
+                    geminiService.generateLayoutAndContentForImage(bgSrc, topic, contentLevel, activeKit)
                 );
                 const allLayouts = await Promise.all(layoutPromises);
 
@@ -566,9 +379,16 @@ const App: React.FC = () => {
                         return newElement;
                     });
                     
+                    let postPalette: string[] | undefined;
+                    if(colorMode === 'extract'){
+                        const { palette } = await geminiService.extractPaletteFromImage(bgSrc);
+                        postPalette = palette;
+                    }
+
                     const post: Post = {
                         id: postId,
                         elements: [backgroundElement, ...textElements],
+                        palette: postPalette
                     };
                     
                     if (carouselId) {
@@ -582,177 +402,6 @@ const App: React.FC = () => {
                 setPosts(newPosts);
                 if (newPosts.length > 0) setSelectedPostId(newPosts[0].id);
                 toast.success('Posts criados com sucesso!', { id: toastId });
-
-            } else {
-                if (!runwareApiKey) throw new Error("A chave de API da Runware é necessária para gerar fundos.");
-                // Full AI-based generation
-                setLoadingMessage('Aquecendo a IA...');
-                toast.loading('Aquecendo a IA...', { id: toastId });
-
-                if (type === 'carousel') {
-                    // Step 1: Generate the script and image prompts
-                    setLoadingMessage('Criando roteiro do carrossel...');
-                    toast.loading('Criando roteiro do carrossel...', { id: toastId });
-                    const carouselScript = await geminiService.generateCarouselScript(googleApiKey, topic, count, contentLevel, activeStyleGuide);
-        
-                    // Step 2: Generate background images
-                    const imagePrompts = carouselScript.map(slide => slide.imagePrompt);
-                    setLoadingMessage(`Gerando ${count} visuais coesos...`);
-                    toast.loading(`Gerando ${count} visuais coesos...`, { id: toastId });
-                    
-                    const aiBackgroundsBase64 = await runwareService.generateBackgroundImages(runwareApiKey, imagePrompts);
-                    const backgroundSrcs = aiBackgroundsBase64.map(b64 => `data:image/png;base64,${b64}`);
-        
-                    // Step 3: Generate layout for each image based on the script
-                    setLoadingMessage('Criando layouts inteligentes...');
-                    toast.loading('Criando layouts inteligentes...', { id: toastId });
-                    const layoutPromises = backgroundSrcs.map((bgSrc, index) => {
-                        const scriptItem = carouselScript[index];
-                        if (!scriptItem) {
-                            return Promise.resolve(null);
-                        }
-                        return geminiService.generateLayoutForProvidedText(googleApiKey, bgSrc, scriptItem.slideContent, topic, activeKit);
-                    });
-                    const allLayouts = await Promise.all(layoutPromises);
-
-                    // Step 4: Assemble the posts
-                    const newPosts: Post[] = [];
-                    const carouselId = uuidv4();
-                    
-                    for (let i = 0; i < backgroundSrcs.length; i++) {
-                        const layoutData = allLayouts[i];
-                        const backgroundSrc = backgroundSrcs[i];
-                        const scriptData = carouselScript[i];
-                        
-                        if (!layoutData || !backgroundSrc || !scriptData) continue;
-                        
-                        const postId = uuidv4();
-                        const backgroundElement: BackgroundElement = {
-                            id: `${postId}-background`,
-                            type: 'background',
-                            src: backgroundSrc,
-                            prompt: scriptData.imagePrompt,
-                            provider: 'runware',
-                        };
-            
-                        const fontSizeMap: Record<string, number> = { large: 48, medium: 28, small: 18, cta: 22 };
-            
-                        const textElements: TextElement[] = layoutData.map(aiEl => {
-                            const textColor = aiEl.backgroundTone === 'dark' ? '#FFFFFF' : '#0F172A';
-                            const newElement: TextElement = {
-                                 id: `${postId}-${uuidv4()}`,
-                                 type: 'text',
-                                 content: aiEl.content,
-                                 x: (aiEl.x / 100) * postSize.width,
-                                 y: (aiEl.y / 100) * postSize.height,
-                                 width: (aiEl.width / 100) * postSize.width,
-                                 height: (aiEl.height / 100) * postSize.height,
-                                 rotation: aiEl.rotation || 0,
-                                 opacity: 1,
-                                 locked: false,
-                                 visible: true,
-                                 fontSize: fontSizeMap[aiEl.fontSize] || 24,
-                                 fontFamily: aiEl.fontFamily || 'Poppins',
-                                 accentFontFamily: aiEl.accentFontFamily,
-                                 color: aiEl.color || textColor,
-                                 textAlign: aiEl.textAlign,
-                                 verticalAlign: 'middle',
-                                 letterSpacing: 0,
-                                 lineHeight: aiEl.lineHeight || 1.4,
-                                 highlightColor: aiEl.highlightColor,
-                                 backgroundColor: aiEl.backgroundColor,
-                            };
-                            if (aiEl.fontSize === 'cta' && aiEl.backgroundColor) {
-                                newElement.padding = 10;
-                                newElement.borderRadius = 8;
-                            }
-                            return newElement;
-                        });
-                        
-                        newPosts.push({
-                            id: postId,
-                            elements: [backgroundElement, ...textElements],
-                            carouselId,
-                            slideIndex: i,
-                        });
-                    }
-                    setPosts(newPosts);
-                    if (newPosts.length > 0) setSelectedPostId(newPosts[0].id);
-                    toast.success('Carrossel gerado com sucesso!', { id: toastId });
-    
-                } else { // Single Post Generation
-                    setLoadingMessage('Gerando conceitos visuais...');
-                    toast.loading('Gerando conceitos visuais...', { id: toastId });
-                    const backgroundPrompts = await geminiService.generateImagePrompts(googleApiKey, topic, count, referenceImages, activeStyleGuide);
-        
-                    setLoadingMessage('Projetando visuais deslumbrantes...');
-                    toast.loading('Projetando visuais deslumbrantes...', { id: toastId });
-                    
-                    const aiBackgroundData = await runwareService.generateBackgroundImages(runwareApiKey, backgroundPrompts);
-                    
-                    const finalBackgrounds = aiBackgroundData.map((data, i) => ({
-                        src: `data:image/png;base64,${data}`,
-                        prompt: backgroundPrompts[i]
-                    }));
-            
-                    setLoadingMessage('Criando layouts inteligentes...');
-                    toast.loading('Criando layouts inteligentes...', { id: toastId });
-            
-                    const layoutPromises = finalBackgrounds.map(bgData => 
-                        geminiService.generateLayoutAndContentForImage(googleApiKey, bgData.src, topic, contentLevel, activeKit)
-                    );
-                    const allLayouts = await Promise.all(layoutPromises);
-            
-                    let newPosts: Post[] = [];
-            
-                    for (let i = 0; i < finalBackgrounds.length; i++) {
-                        const bgData = finalBackgrounds[i];
-                        const layoutData = allLayouts[i];
-                        const postId = uuidv4();
-                        
-                        const backgroundElement: BackgroundElement = {
-                            id: `${postId}-background`, type: 'background', src: bgData.src, prompt: bgData.prompt, provider: 'runware',
-                        };
-            
-                        const fontSizeMap: Record<string, number> = { large: 48, medium: 28, small: 18, cta: 22 };
-            
-                        const textElements: TextElement[] = layoutData.map(aiEl => {
-                            const textColor = aiEl.backgroundTone === 'dark' ? '#FFFFFF' : '#0F172A';
-                            const newElement: TextElement = {
-                                 id: `${postId}-${uuidv4()}`,
-                                 type: 'text',
-                                 content: aiEl.content,
-                                 x: (aiEl.x / 100) * postSize.width,
-                                 y: (aiEl.y / 100) * postSize.height,
-                                 width: (aiEl.width / 100) * postSize.width,
-                                 height: (aiEl.height / 100) * postSize.height,
-                                 rotation: aiEl.rotation || 0, opacity: 1, locked: false, visible: true,
-                                 fontSize: fontSizeMap[aiEl.fontSize] || 24,
-                                 fontFamily: aiEl.fontFamily || 'Poppins', accentFontFamily: aiEl.accentFontFamily,
-                                 color: aiEl.color || textColor, textAlign: aiEl.textAlign, verticalAlign: 'middle',
-                                 letterSpacing: 0, lineHeight: aiEl.lineHeight || 1.4,
-                                 highlightColor: aiEl.highlightColor, backgroundColor: aiEl.backgroundColor,
-                            };
-                            if (aiEl.fontSize === 'cta' && aiEl.backgroundColor) {
-                                newElement.padding = 10;
-                                newElement.borderRadius = 8;
-                            }
-                            return newElement;
-                        });
-                        
-                        let postPalette: string[] | undefined;
-                        if(colorMode === 'extract'){
-                            const { palette } = await geminiService.extractPaletteFromImage(googleApiKey, bgData.src);
-                            postPalette = palette;
-                        }
-                        
-                        newPosts.push({ id: postId, elements: [...textElements, backgroundElement], palette: postPalette });
-                    }
-            
-                    setPosts(newPosts);
-                    if (newPosts.length > 0) setSelectedPostId(newPosts[0].id);
-                    toast.success('Posts gerados com sucesso!', { id: toastId });
-                }
             }
         } catch (error) {
             console.error(error);
@@ -887,7 +536,6 @@ const App: React.FC = () => {
     };
 
     const handleSaveBrandKit = (name: string) => {
-        if (!currentUser) return;
         if (!selectedPostId) {
             toast.error("Selecione um post para usar seu layout no Brand Kit.");
             return;
@@ -921,7 +569,7 @@ const App: React.FC = () => {
     
         const updatedKits = [...brandKits, newBrandKit];
         setBrandKits(updatedKits);
-        localStorage.setItem(`brandKits_${currentUser.id}`, JSON.stringify(updatedKits));
+        localStorage.setItem(`brandKits`, JSON.stringify(updatedKits));
         toast.success(`Brand Kit "${name}" salvo!`);
     };
 
@@ -938,8 +586,8 @@ const App: React.FC = () => {
     };
 
     const handleSaveLayoutToActiveKit = (layoutName: string) => {
-        if (!currentUser || !activeBrandKitId || !selectedPostId) {
-            toast.error("Erro: Usuário, kit ou post não selecionado.");
+        if (!activeBrandKitId || !selectedPostId) {
+            toast.error("Erro: kit ou post não selecionado.");
             return;
         }
         
@@ -979,12 +627,12 @@ const App: React.FC = () => {
         });
 
         setBrandKits(updatedKits);
-        localStorage.setItem(`brandKits_${currentUser.id}`, JSON.stringify(updatedKits));
+        localStorage.setItem(`brandKits`, JSON.stringify(updatedKits));
         setAddLayoutModalOpen(false);
     };
     
     const handleUpdateLayoutName = (layoutId: string, newName: string) => {
-        if (!currentUser || !activeBrandKitId) {
+        if (!activeBrandKitId) {
             toast.error("Nenhum Brand Kit está ativo.");
             return;
         }
@@ -1005,12 +653,12 @@ const App: React.FC = () => {
             };
         });
         setBrandKits(updatedKits);
-        localStorage.setItem(`brandKits_${currentUser.id}`, JSON.stringify(updatedKits));
+        localStorage.setItem(`brandKits`, JSON.stringify(updatedKits));
         toast.success("Nome do layout atualizado!");
     };
     
     const handleDeleteLayoutFromKit = (layoutId: string) => {
-        if (!currentUser || !activeBrandKitId) {
+        if (!activeBrandKitId) {
             toast.error("Nenhum Brand Kit está ativo.");
             return;
         }
@@ -1032,7 +680,7 @@ const App: React.FC = () => {
         });
 
         setBrandKits(newKits);
-        localStorage.setItem(`brandKits_${currentUser.id}`, JSON.stringify(newKits));
+        localStorage.setItem(`brandKits`, JSON.stringify(newKits));
         toast.success("Layout removido do kit.");
     };
 
@@ -1086,7 +734,6 @@ const App: React.FC = () => {
     };
     
     const handleImportBrandKit = (event: React.ChangeEvent<HTMLInputElement>) => {
-        if (!currentUser) return;
         const file = event.target.files?.[0];
         if (!file) return;
     
@@ -1100,7 +747,7 @@ const App: React.FC = () => {
                     const newKit: BrandKit = { ...importedData, id: uuidv4() };
                     const updatedKits = [...brandKits, newKit];
                     setBrandKits(updatedKits);
-                    localStorage.setItem(`brandKits_${currentUser.id}`, JSON.stringify(updatedKits));
+                    localStorage.setItem(`brandKits`, JSON.stringify(updatedKits));
                     loadFontsFromKit(newKit);
                     toast.success(`Brand Kit "${newKit.name}" importado com sucesso!`);
                 } else {
@@ -1116,11 +763,10 @@ const App: React.FC = () => {
     };
 
     const handleDeleteBrandKit = (kitId: string) => {
-        if (!currentUser) return;
         if(activeBrandKitId === kitId) setActiveBrandKitId(null);
         const updatedKits = brandKits.filter(k => k.id !== kitId);
         setBrandKits(updatedKits);
-        localStorage.setItem(`brandKits_${currentUser.id}`, JSON.stringify(updatedKits));
+        localStorage.setItem(`brandKits`, JSON.stringify(updatedKits));
         toast.success("Brand Kit removido.");
     };
 
@@ -1181,28 +827,6 @@ const App: React.FC = () => {
         updatePostElement(selectedElementId, { x: Math.round(newX), y: Math.round(newY) });
     };
 
-    const handleRegenerateBackground = async (elementId: string, prompt: string) => {
-        const post = posts.find(p => p.id === selectedPostId);
-        const bgElement = post?.elements.find(e => e.id === elementId) as BackgroundElement | undefined;
-        if (!bgElement || !currentUser) return;
-
-        const apiKey = currentUser.linkedAccounts.runware?.apiKey;
-        if (!apiKey) {
-            toast.error(`Conecte sua chave de API da Runware AI para gerar um novo fundo.`);
-            setAccountModalOpen(true);
-            return;
-        }
-
-        const toastId = toast.loading(`Gerando novo fundo com Runware AI...`);
-        try {
-            const newSrc = await runwareService.generateSingleBackgroundImage(apiKey, prompt);
-            updatePostElement(elementId, { src: newSrc });
-            toast.success("Fundo atualizado!", { id: toastId });
-        } catch (e) {
-            toast.error("Falha ao gerar novo fundo.", { id: toastId });
-        }
-    };
-    
     const handleUpdateBackgroundSrc = (elementId: string, src: string) => {
         updatePostElement(elementId, { src, provider: undefined }); // User provided, so clear provider
     };
@@ -1362,22 +986,8 @@ const App: React.FC = () => {
                 postToPreview={selectedPost}
                 postSize={postSize}
             />
-            <AccountManagerModal
-                isOpen={isAccountModalOpen}
-                onClose={() => setAccountModalOpen(false)}
-                user={currentUser}
-                onLinkAccount={handleLinkAccount}
-                onUnlinkAccount={handleUnlinkAccount}
-            />
             <div className="flex flex-col h-screen font-sans bg-gray-950 text-gray-100" style={{ minWidth: '1400px' }}>
-                <header className="w-full bg-zinc-900 border-b border-zinc-800 px-6 py-2 flex justify-end items-center flex-shrink-0">
-                    <UserProfile 
-                        user={currentUser}
-                        onLogin={handleLogin}
-                        onLogout={handleLogout}
-                        onManageAccounts={() => setAccountModalOpen(true)}
-                    />
-                </header>
+                <header className="w-full bg-zinc-900 border-b border-zinc-800 px-6 py-4 flex-shrink-0" />
                 <div className="flex flex-row flex-grow min-h-0">
                     <ControlPanel
                         isLoading={isLoading}
@@ -1414,7 +1024,6 @@ const App: React.FC = () => {
                         setSelectedLayoutId={setSelectedLayoutId}
                         useLayoutToFill={useLayoutToFill}
                         setUseLayoutToFill={setUseLayoutToFill}
-                        currentUser={currentUser}
                     />
                     <main 
                         className="flex-1 flex flex-col items-center justify-center bg-black/30 overflow-hidden relative"
@@ -1431,19 +1040,13 @@ const App: React.FC = () => {
                                 <p className="text-gray-400">Aguarde, a mágica está acontecendo...</p>
                             </div>
                         )}
-                        {!isLoading && !currentUser && (
-                             <div className="text-center text-gray-400">
-                                 <h2 className="text-2xl font-bold mb-2">Bem-vindo ao Posty</h2>
-                                 <p>Faça login para começar a criar seu conteúdo.</p>
-                             </div>
-                        )}
-                        {!isLoading && currentUser && posts.length === 0 && (
+                        {!isLoading && posts.length === 0 && (
                              <div className="text-center text-gray-400">
                                  <h2 className="text-2xl font-bold mb-2">Tudo pronto!</h2>
                                  <p>Selecione um Brand Kit ou preencha os detalhes para gerar conteúdo.</p>
                              </div>
                         )}
-                        {selectedPost && currentUser && (
+                        {selectedPost && (
                              <div 
                                 className="flex items-center justify-center transition-transform duration-100 ease-out"
                                 style={{ 
@@ -1500,7 +1103,7 @@ const App: React.FC = () => {
                                     <button onClick={() => handleRemoveElement(selectedElement.id)} className="p-2 text-red-400 hover:bg-red-500/20 rounded-md" aria-label="Remove Element"><Trash2 className="w-4 h-4"/></button>
                                 </div>
                             )}
-                             {posts.length > 0 && !isLoading && currentUser && (
+                             {posts.length > 0 && !isLoading && (
                                 <div className="flex items-center space-x-2">
                                     <button onClick={handleZoomOut} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Zoom Out"><ZoomOut className="w-5 h-5"/></button>
                                     <span className="text-sm font-mono w-16 text-center">{Math.round(zoom * 100)}%</span>
@@ -1511,7 +1114,7 @@ const App: React.FC = () => {
                         </div>
                     </main>
                     <aside className="w-80 bg-zinc-900 flex flex-col h-full shadow-lg transition-all duration-300 flex-shrink-0">
-                        {posts.length > 0 && !isLoading && currentUser && (
+                        {posts.length > 0 && !isLoading && (
                             <>
                                 <PostGallery
                                     posts={posts}
@@ -1531,7 +1134,7 @@ const App: React.FC = () => {
                                     onToggleVisibility={handleToggleElementVisibility}
                                     onToggleLock={handleToggleElementLock}
                                     onReorderElements={handleReorderElements}
-                                    onRegenerateBackground={handleRegenerateBackground}
+                                    onRegenerateBackground={() => {}}
                                     onUpdateBackgroundSrc={handleUpdateBackgroundSrc}
                                     availableFonts={availableFonts}
                                     onAddFont={handleAddFont}

@@ -142,6 +142,19 @@ export interface BrandKit {
     assets: BrandAsset[]; // For storing logos, icons, etc.
 }
 
+export interface User {
+    id: string;
+    name: string;
+    email: string;
+    avatar: string;
+    linkedAccounts: {
+        [key in 'google' | 'chatgpt' | 'envato' | 'runware']?: {
+            status: 'connected' | 'disconnected';
+            apiKey?: string;
+        }
+    };
+}
+
 
 export interface AIGeneratedTextElement {
     content: string;
@@ -174,24 +187,4 @@ export interface AIGeneratedCarouselScriptSlide {
 export interface PaletteExtractionResult {
     palette: string[];
     imageTone: 'light' | 'dark';
-}
-
-// --- User and Account Management ---
-
-export interface LinkedAccount {
-    apiKey: string;
-    status: 'connected';
-}
-
-export interface User {
-    id: string;
-    name: string;
-    email: string;
-    avatar: string;
-    linkedAccounts: {
-        google?: LinkedAccount;
-        envato?: LinkedAccount;
-        chatgpt?: LinkedAccount;
-        runware?: LinkedAccount;
-    };
 }
