@@ -1,0 +1,29 @@
+{
+  "name": "copy-of-posty-google-singup",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@google/genai": "^1.15.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "lucide-react": "^0.541.0",
+    "uuid": "^11.1.0",
+    "file-saver": "^2.0.5",
+    "react-draggable": "^4.5.0",
+    "react-hot-toast": "^2.6.0",
+    "html-to-image": "^1.11.11",
+    "jszip": "^3.10.1",
+    "qrcode": "^1.5.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.0",
+    "typescript": "~5.8.2",
+    "vite": "^6.2.0"
+  }
+}
