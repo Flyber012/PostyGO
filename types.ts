@@ -148,11 +148,13 @@ export interface User {
     email: string;
     avatar: string;
     linkedAccounts: {
-        [key in 'google' | 'chatgpt' | 'envato' | 'runware']?: {
+        [key in 'google' | 'chatgpt' | 'runware']?: {
             status: 'connected' | 'disconnected';
             apiKey?: string;
         }
     };
+    generationsToday?: number;
+    lastGenerationDate?: string; // Store as 'YYYY-MM-DD'
 }
 
 

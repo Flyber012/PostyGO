@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { User } from '../types';
-import { LogIn, LogOut, Settings, ChevronDown, User as UserIcon } from 'lucide-react';
+import { LogIn, LogOut, Settings, ChevronDown } from 'lucide-react';
 
 interface UserProfileProps {
     user: User | null;
@@ -26,13 +26,15 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onLogin, onLogout, onMa
 
     if (!user) {
         return (
-            <button
-                onClick={onLogin}
-                className="flex items-center justify-center bg-zinc-700 hover:bg-zinc-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
-            >
-                <LogIn className="w-4 h-4 mr-2" />
-                Fazer Login com Google
-            </button>
+            <div id="signInDiv">
+                 <button
+                    onClick={onLogin}
+                    className="flex items-center justify-center bg-zinc-700 hover:bg-zinc-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+                >
+                    <LogIn className="w-4 h-4 mr-2" />
+                    Fazer Login com Google
+                </button>
+            </div>
         );
     }
 

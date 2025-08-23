@@ -1,27 +1,31 @@
 
 
 
+
+
 import { GoogleGenAI, Type, Part } from "@google/genai";
 import { AIGeneratedTextElement, PaletteExtractionResult, AIGeneratedCarouselScriptSlide, TextElement, BrandKit } from '../types';
 
-const API_KEY = 'AIzaSyCUAgZxn4OERywBC_R21kJA6SbMQJc73CY';
+const HARDCODED_API_KEY = 'AIzaSyCUAgZxn4OERywBC_R21kJA6SbMQJc73CY';
 
-const getAIClient = () => {
-    return new GoogleGenAI({ apiKey: API_KEY });
+const getAIClient = (userApiKey?: string) => {
+    const apiKey = userApiKey || HARDCODED_API_KEY;
+    if (!apiKey) {
+        throw new Error("API Key não encontrada. Por favor, configure sua chave de API.");
+    }
+    return new GoogleGenAI({ apiKey });
 };
 
 export async function verifyApiKey(apiKey: string): Promise<boolean> {
     if (!apiKey) return false;
     const ai = new GoogleGenAI({ apiKey });
     try {
-        // This is a lightweight call to check if the API key is valid.
-        // It will throw an error for an invalid key which we can catch.
         await ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: 'hi',
             config: {
-                maxOutputTokens: 1, // Minimize token usage for verification
-                thinkingConfig: { thinkingBudget: 0 } // Disable thinking for faster response
+                maxOutputTokens: 1, 
+                thinkingConfig: { thinkingBudget: 0 }
             }
         });
         return true;
@@ -31,8 +35,8 @@ export async function verifyApiKey(apiKey: string): Promise<boolean> {
     }
 }
 
-export async function analyzeStyleFromImages(base64Images: string[]): Promise<string> {
-    const ai = getAIClient();
+export async function analyzeStyleFromImages(base64Images: string[], userApiKey?: string): Promise<string> {
+    const ai = getAIClient(userApiKey);
     const parts: Part[] = [];
 
     const prompt = `Você é um diretor de arte sênior e especialista em branding. Sua tarefa é analisar as imagens de design fornecidas e criar um "Guia de Estilo" (Style Guide) conciso e acionável em texto. Este guia será usado por outra IA para gerar novos designs que correspondam a este estilo.
@@ -65,81 +69,53 @@ export async function analyzeStyleFromImages(base64Images: string[]): Promise<st
     return response.text.trim();
 }
 
+export async function generateImagePrompts(topic: string, count: number, styleGuide: string | null, userApiKey?: string): Promise<string[]> {
+    const ai = getAIClient(userApiKey);
+    let prompt = `Você é um diretor de arte criativo. Sua tarefa é gerar ${count} prompts de imagem distintos, visualmente interessantes e artísticos para um gerador de imagens de IA, todos baseados no tópico principal: "${topic}".
 
-export async function generateImagePrompts(topic: string, count: number, referenceImages: string[], styleGuide: string | null): Promise<string[]> {
-    const ai = getAIClient();
-    let prompt: string;
-    const parts: Part[] = [];
-    const basePrompt = `Gere uma lista de ${count} prompts de imagem únicos e distintos para um gerador de imagens de IA. Cada prompt deve ser para um fundo de postagem de mídia social sobre o tópico "${topic}". Os prompts devem ser detalhados, artísticos e visualmente descritivos (por exemplo, 'Fundo abstrato com gradientes de cores pastel, foco suave, minimalista').`;
+    **Instruções:**
+    1.  **Diversidade Temática:** Cada prompt deve explorar um ângulo ou subtema diferente relacionado ao tópico principal. Evite repetições.
+    2.  **Riqueza Visual:** Descreva a cena, os objetos, as cores, a iluminação e a composição. Use adjetivos evocativos.
+    3.  **Consistência de Estilo:** Todos os prompts devem seguir um estilo visual coeso.`;
 
-    if (styleGuide && referenceImages.length > 0) {
-        prompt = `**REGRA CRÍTICA: Use as duas fontes de inspiração a seguir.**
-1.  **Guia de Estilo (para a estética geral):** Siga estritamente as regras de vibe, paleta de cores e elementos gráficos do Guia de Estilo para garantir coesão.
-2.  **Imagens de Referência (para o tema e composição):** Use as imagens fornecidas como a PRINCIPAL inspiração para o tema, assunto, cores e composição dos novos fundos.
-
----
-**GUIA DE ESTILO:**
-${styleGuide}
----
-Com base no guia de estilo E inspirado pelas imagens de referência, gere uma lista de ${count} prompts de imagem únicos e coesos sobre "${topic}".`;
-
-        referenceImages.forEach(base64Image => {
-            const [header, data] = base64Image.split(',');
-            if (!header || !data) return;
-            const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
-            parts.push({ inlineData: { mimeType, data } });
-        });
-
-    } else if (styleGuide) {
-        prompt = `**REGRA CRÍTICA: Siga estritamente o Guia de Estilo abaixo.**
----
-**GUIA DE ESTILO:**
-${styleGuide}
----
-Com base no guia de estilo acima, gere uma lista de ${count} prompts de imagem únicos e coesos para um gerador de imagens de IA. Cada prompt deve ser para um fundo de postagem de mídia social sobre o tópico "${topic}".`;
-
-    } else if (referenceImages.length > 0) {
-        prompt = `Usando as imagens fornecidas como inspiração estilística e temática, gere uma lista de ${count} prompts de imagem únicos e distintos para um gerador de imagens de IA. Cada prompt deve ser para um fundo de postagem de mídia social sobre o tópico "${topic}" e deve se alinhar ao estilo das imagens de referência.`;
-        
-        referenceImages.forEach(base64Image => {
-            const [header, data] = base64Image.split(',');
-            if (!header || !data) return;
-            const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
-            parts.push({ inlineData: { mimeType, data } });
-        });
+    if (styleGuide) {
+        prompt += `\n\n**DIRETRIZES DE ESTILO OBRIGATÓRIAS (do Brand Kit):**\n${styleGuide}\n\nAdapte o estilo dos prompts (ex: 'fotografia cinematográfica', 'ilustração 3D minimalista', 'arte abstrata com gradientes') para corresponder a essas diretrizes.`;
     } else {
-        prompt = basePrompt;
+        prompt += `\n\n**Estilo Padrão:** Vise um estilo de fotografia limpo, moderno e profissional com iluminação suave e natural.`;
     }
 
-    parts.unshift({ text: prompt });
+    prompt += `\n\nRetorne um array JSON contendo exatamente ${count} strings, onde cada string é um prompt de imagem completo.`;
 
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: { parts },
+        contents: { parts: [{ text: prompt }] },
         config: {
             responseMimeType: "application/json",
             responseSchema: {
                 type: Type.ARRAY,
-                items: { type: Type.STRING }
+                items: {
+                    type: Type.STRING,
+                    description: "Um prompt de imagem detalhado e artístico."
+                }
             }
         }
     });
 
     try {
-        const parsedResponse = JSON.parse(response.text.trim());
-        if (Array.isArray(parsedResponse) && parsedResponse.every(p => typeof p === 'string')) {
-            return parsedResponse;
+        const result = JSON.parse(response.text.trim());
+        if (Array.isArray(result) && result.length > 0) {
+            return result as string[];
         }
-        throw new Error("Formato de resposta de prompts inválido da IA.");
+        throw new Error("Formato de prompts de imagem inválido na resposta da IA.");
     } catch (e) {
-        console.error("Falha ao analisar os prompts da IA:", response.text);
-        throw new Error("A IA retornou uma resposta inesperada para os prompts. Por favor, tente novamente.");
+        console.error("Falha ao analisar os prompts de imagem da IA:", response.text);
+        throw new Error("Não foi possível gerar prompts de imagem.");
     }
 }
 
 
-export async function generateLayoutAndContentForImage(base64Image: string, topic: string, contentLevel: 'mínimo' | 'médio' | 'detalhado', brandKit: BrandKit | null): Promise<AIGeneratedTextElement[]> {
-    const ai = getAIClient();
+export async function generateLayoutAndContentForImage(base64Image: string, topic: string, contentLevel: 'mínimo' | 'médio' | 'detalhado', brandKit: BrandKit | null, userApiKey?: string): Promise<AIGeneratedTextElement[]> {
+    const ai = getAIClient(userApiKey);
     const [header, data] = base64Image.split(',');
     if (!header || !data) throw new Error("Formato de imagem base64 inválido.");
     const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
@@ -235,8 +211,8 @@ export async function generateLayoutAndContentForImage(base64Image: string, topi
     }
 }
 
-export async function generateCarouselScript(topic: string, slideCount: number, contentLevel: 'mínimo' | 'médio' | 'detalhado', styleGuide: string | null): Promise<AIGeneratedCarouselScriptSlide[]> {
-    const ai = getAIClient();
+export async function generateCarouselScript(topic: string, slideCount: number, contentLevel: 'mínimo' | 'médio' | 'detalhado', styleGuide: string | null, userApiKey?: string): Promise<AIGeneratedCarouselScriptSlide[]> {
+    const ai = getAIClient(userApiKey);
     const contentLevelInstructions = {
         mínimo: 'Seja muito sucinto em cada slide. Use frases curtas e palavras de impacto. Ideal para mensagens rápidas.',
         médio: 'Forneça uma quantidade equilibrada de informação em cada slide. Um título e uma breve explicação ou 1-2 pontos principais.',
@@ -321,8 +297,8 @@ export async function generateCarouselScript(topic: string, slideCount: number, 
     }
 }
 
-export async function generateLayoutForProvidedText(base64Image: string, textContent: string, topic: string, brandKit: BrandKit | null): Promise<AIGeneratedTextElement[]> {
-    const ai = getAIClient();
+export async function generateLayoutForProvidedText(base64Image: string, textContent: string, topic: string, brandKit: BrandKit | null, userApiKey?: string): Promise<AIGeneratedTextElement[]> {
+    const ai = getAIClient(userApiKey);
     const [header, data] = base64Image.split(',');
     if (!header || !data) throw new Error("Formato de imagem base64 inválido.");
     const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
@@ -411,9 +387,10 @@ export async function generateTextForLayout(
     textElements: {id: string, description: string, exampleContent: string}[], 
     topic: string, 
     contentLevel: 'mínimo' | 'médio' | 'detalhado', 
-    styleGuide: string | null
+    styleGuide: string | null,
+    userApiKey?: string
 ): Promise<Record<string, string>> {
-    const ai = getAIClient();
+    const ai = getAIClient(userApiKey);
     
     const contentLevelInstructions = {
         mínimo: 'Gere um texto muito conciso. Uma frase curta ou um título de impacto.',
@@ -497,8 +474,8 @@ export async function generateTextForLayout(
     }
 }
 
-export async function extractPaletteFromImage(base64Image: string): Promise<PaletteExtractionResult> {
-    const ai = getAIClient();
+export async function extractPaletteFromImage(base64Image: string, userApiKey?: string): Promise<PaletteExtractionResult> {
+    const ai = getAIClient(userApiKey);
     const [header, data] = base64Image.split(',');
     if (!header || !data) throw new Error("Formato de imagem base64 inválido.");
     const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';

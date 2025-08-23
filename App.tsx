@@ -1,22 +1,31 @@
 
 
+
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import { createRoot } from 'react-dom/client';
-import { Post, BrandKit, PostSize, AnyElement, TextElement, ImageElement, GradientElement, BackgroundElement, ShapeElement, QRCodeElement, FontDefinition, LayoutTemplate, BrandAsset } from './types';
+import { Post, BrandKit, PostSize, AnyElement, TextElement, ImageElement, BackgroundElement, FontDefinition, LayoutTemplate, BrandAsset, User } from './types';
 import { POST_SIZES, INITIAL_FONTS, PRESET_BRAND_KITS } from './constants';
 import * as geminiService from './services/geminiService';
+import * as runwareService from './services/runwareService';
 import ControlPanel from './components/ControlPanel';
 import CanvasEditor from './components/CanvasEditor';
 import PostGallery from './components/PostGallery';
 import LayersPanel from './components/LayersPanel';
 import StaticPost from './components/StaticPost';
+import UserProfile from './components/UserProfile';
+import AccountManagerModal from './components/AccountManagerModal';
 import saveAs from 'file-saver';
 import { v4 as uuidv4 } from 'uuid';
 import * as htmlToImage from 'html-to-image';
 import JSZip from 'jszip';
 import { ZoomIn, ZoomOut, Maximize, AlignHorizontalJustifyStart, AlignHorizontalJustifyCenter, AlignHorizontalJustifyEnd, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Copy, Trash2, ChevronLeft, ChevronRight, Eye, EyeOff, Lock, Unlock, X } from 'lucide-react';
 
+declare global {
+    const google: any;
+}
+
+const DAILY_GENERATION_LIMIT = 10;
 
 const AddLayoutModal: React.FC<{
     isOpen: boolean;
@@ -116,6 +125,8 @@ const AddLayoutModal: React.FC<{
 
 
 const App: React.FC = () => {
+    const [user, setUser] = useState<User | null>(null);
+    const [isAccountModalOpen, setAccountModalOpen] = useState(false);
     const [posts, setPosts] = useState<Post[]>([]);
     const [brandKits, setBrandKits] = useState<BrandKit[]>([]);
     const [activeBrandKitId, setActiveBrandKitId] = useState<string | null>(null);
@@ -125,7 +136,6 @@ const App: React.FC = () => {
     const [loadingMessage, setLoadingMessage] = useState('');
     const [postSize, setPostSize] = useState<PostSize>(POST_SIZES[0]);
     
-    const [referenceImages, setReferenceImages] = useState<string[]>([]);
     const [customBackgrounds, setCustomBackgrounds] = useState<string[]>([]);
     const [styleImages, setStyleImages] = useState<string[]>([]);
     const [styleGuide, setStyleGuide] = useState<string | null>(null);
@@ -140,20 +150,103 @@ const App: React.FC = () => {
     const [zoom, setZoom] = useState(1);
     const [isAddLayoutModalOpen, setAddLayoutModalOpen] = useState(false);
 
-
     const editorRef = useRef<HTMLDivElement>(null);
     const viewportRef = useRef<HTMLElement>(null);
 
-    useEffect(() => {
-        const savedKits = localStorage.getItem('brandKits');
-        if (savedKits) {
-            setBrandKits(JSON.parse(savedKits));
+    const updateUser = (updatedUser: User | null) => {
+        setUser(updatedUser);
+        if (updatedUser) {
+            localStorage.setItem('user', JSON.stringify(updatedUser));
         } else {
-            setBrandKits(PRESET_BRAND_KITS);
-            localStorage.setItem('brandKits', JSON.stringify(PRESET_BRAND_KITS));
+            localStorage.removeItem('user');
+        }
+    };
+
+    const handleLogin = useCallback((response: any) => {
+        try {
+            const payload = JSON.parse(atob(response.credential.split('.')[1]));
+            const newUser: User = {
+                id: payload.sub,
+                name: payload.name,
+                email: payload.email,
+                avatar: payload.picture,
+                linkedAccounts: {},
+                generationsToday: 0,
+                lastGenerationDate: new Date().toISOString().split('T')[0],
+            };
+            updateUser(newUser);
+            toast.success(`Bem-vindo(a), ${newUser.name}!`);
+        } catch (error) {
+            console.error("Failed to decode JWT or create user:", error);
+            toast.error("Falha no login. Tente novamente.");
         }
     }, []);
     
+    const handleLogout = () => {
+        updateUser(null);
+        google.accounts.id.disableAutoSelect();
+        toast.success("Você saiu com sucesso.");
+    };
+
+    const handleManageAccounts = () => setAccountModalOpen(true);
+    
+    const handleLinkAccount = (service: 'google' | 'runware', apiKey: string) => {
+        if (!user) return;
+        const updatedUser: User = {
+            ...user,
+            linkedAccounts: {
+                ...user.linkedAccounts,
+                [service]: { status: 'connected', apiKey },
+            },
+        };
+        updateUser(updatedUser);
+    };
+
+    const handleUnlinkAccount = (service: 'google' | 'runware') => {
+        if (!user) return;
+        const updatedUser: User = { ...user, linkedAccounts: { ...user.linkedAccounts } };
+        delete updatedUser.linkedAccounts[service];
+        updateUser(updatedUser);
+        toast.success(`${service.charAt(0).toUpperCase() + service.slice(1)} desconectado.`);
+    };
+
+     useEffect(() => {
+        const savedUserJson = localStorage.getItem('user');
+        if (savedUserJson) {
+            const savedUser: User = JSON.parse(savedUserJson);
+            const today = new Date().toISOString().split('T')[0];
+            if (savedUser.lastGenerationDate !== today) {
+                savedUser.generationsToday = 0;
+                savedUser.lastGenerationDate = today;
+            }
+            updateUser(savedUser);
+        }
+
+        if (typeof google !== 'undefined') {
+            google.accounts.id.initialize({
+                client_id: '108152206708-vka3b584t2st4k5b6k4pn82s7l7ea9j2.apps.googleusercontent.com',
+                callback: handleLogin,
+            });
+            google.accounts.id.renderButton(
+                document.getElementById('signInDiv'),
+                { theme: 'outline', size: 'large', type: 'standard', text: 'signin_with' }
+            );
+        }
+    }, [handleLogin]);
+
+    useEffect(() => {
+        if (user) {
+            const savedKits = localStorage.getItem(`brandKits_${user.id}`);
+            if (savedKits) {
+                setBrandKits(JSON.parse(savedKits));
+            } else {
+                setBrandKits(PRESET_BRAND_KITS);
+            }
+        } else {
+            setBrandKits(PRESET_BRAND_KITS);
+            setActiveBrandKitId(null);
+        }
+    }, [user]);
 
     const handleAddFont = (font: FontDefinition) => {
         if (!availableFonts.some(f => f.name === font.name)) {
@@ -163,12 +256,12 @@ const App: React.FC = () => {
 
     const handleSelectPost = (postId: string) => {
         setSelectedPostId(postId);
-        setSelectedElementId(null); // Deselect element when changing post
+        setSelectedElementId(null);
     };
 
     const handleFileChange = (
         event: React.ChangeEvent<HTMLInputElement>,
-        type: 'reference' | 'background' | 'style'
+        type: 'background' | 'style'
     ) => {
         const files = event.target.files;
         if (!files) return;
@@ -177,10 +270,6 @@ const App: React.FC = () => {
         let currentState: string[];
 
         switch (type) {
-            case 'reference':
-                setState = setReferenceImages;
-                currentState = referenceImages;
-                break;
             case 'background':
                 setState = setCustomBackgrounds;
                 currentState = customBackgrounds;
@@ -206,13 +295,11 @@ const App: React.FC = () => {
             reader.readAsDataURL(file);
         });
     
-        // Clear the input value to allow re-uploading the same file
         event.target.value = '';
     };
 
-    const handleRemoveImage = (indexToRemove: number, type: 'reference' | 'background' | 'style') => {
+    const handleRemoveImage = (indexToRemove: number, type: 'background' | 'style') => {
         switch (type) {
-            case 'reference': setReferenceImages(prev => prev.filter((_, index) => index !== indexToRemove)); break;
             case 'background': setCustomBackgrounds(prev => prev.filter((_, index) => index !== indexToRemove)); break;
             case 'style': setStyleImages(prev => prev.filter((_, index) => index !== indexToRemove)); break;
         }
@@ -227,9 +314,9 @@ const App: React.FC = () => {
         const toastId = toast.loading("Analisando seu estilo...");
         setLoadingMessage("IA está estudando seus designs...");
         try {
-            const generatedGuide = await geminiService.analyzeStyleFromImages(styleImages);
+            const generatedGuide = await geminiService.analyzeStyleFromImages(styleImages, user?.linkedAccounts?.google?.apiKey);
             setStyleGuide(generatedGuide);
-            setUseStyleGuide(true); // Automatically enable it after generation
+            setUseStyleGuide(true);
             toast.success("Guia de Estilo criado e ativado!", { id: toastId });
         } catch (error) {
             console.error(error);
@@ -240,8 +327,34 @@ const App: React.FC = () => {
         }
     };
 
+    const handleGeneratePosts = async (
+        topic: string, 
+        count: number, 
+        type: 'post' | 'carousel', 
+        contentLevel: 'mínimo' | 'médio' | 'detalhado',
+        backgroundSource: 'upload' | 'ai'
+    ) => {
+        if (!user) {
+            toast.error("Por favor, faça login para gerar conteúdo.");
+            return;
+        }
 
-    const handleGeneratePosts = async (topic: string, count: number, type: 'post' | 'carousel', contentLevel: 'mínimo' | 'médio' | 'detalhado') => {
+        const userApiKey = user.linkedAccounts?.google?.apiKey;
+        const isFreeTierUser = !userApiKey;
+
+        if (isFreeTierUser) {
+            const generationsToday = user.generationsToday || 0;
+            if (generationsToday >= DAILY_GENERATION_LIMIT) {
+                toast.error("Você atingiu seu limite diário de gerações. Conecte sua própria API para uso ilimitado.");
+                return;
+            }
+             const generationsLeft = DAILY_GENERATION_LIMIT - generationsToday;
+            if (count > generationsLeft) {
+                toast.error(`Você só tem ${generationsLeft} gerações restantes hoje. Por favor, ajuste a contagem.`);
+                return;
+            }
+        }
+        
         setIsLoading(true);
         setPosts([]);
         setSelectedPostId(null);
@@ -257,32 +370,24 @@ const App: React.FC = () => {
                 const kit = brandKits.find(k => k.id === activeBrandKitId);
                 const layout = kit?.layouts.find(l => l.id === selectedLayoutId);
 
-                if (!kit || !layout) {
-                    throw new Error("Layout ou Brand Kit selecionado não foi encontrado.");
-                }
-
-                if (customBackgrounds.length === 0) {
-                    throw new Error("Por favor, envie as imagens de fundo que você deseja usar com este layout.");
-                }
+                if (!kit || !layout) throw new Error("Layout ou Brand Kit selecionado não foi encontrado.");
+                if (customBackgrounds.length === 0) throw new Error("Por favor, envie as imagens de fundo que você deseja usar com este layout.");
+                
                 const backgroundSources = customBackgrounds.map(src => ({ src }));
                 
                 setLoadingMessage(`Preenchendo seu layout com conteúdo...`);
                 toast.loading(`Preenchendo seu layout...`, { id: toastId });
 
                 const newPosts: Post[] = [];
-                const textElementsToFill = layout.elements
-                    .filter(el => el.type === 'text')
-                    .map(el => {
-                        const textEl = el as TextElement;
-                        let description = 'corpo de texto ou subtítulo';
-                        if (textEl.fontSize > 48) description = 'título principal';
-                        else if (textEl.fontSize < 20) description = 'texto de rodapé ou detalhe';
-                        const lowerContent = textEl.content.toLowerCase();
-                        if (lowerContent.includes('comprar') || lowerContent.includes('saiba mais') || lowerContent.includes('arraste')) {
-                             description = 'chamada para ação (CTA)';
-                        }
-                        return { id: el.id, description, exampleContent: textEl.content };
-                    });
+                const textElementsToFill = layout.elements.filter(el => el.type === 'text').map(el => {
+                    const textEl = el as TextElement;
+                    let description = 'corpo de texto ou subtítulo';
+                    if (textEl.fontSize > 48) description = 'título principal';
+                    else if (textEl.fontSize < 20) description = 'texto de rodapé ou detalhe';
+                    const lowerContent = textEl.content.toLowerCase();
+                    if (lowerContent.includes('comprar') || lowerContent.includes('saiba mais') || lowerContent.includes('arraste')) description = 'chamada para ação (CTA)';
+                    return { id: el.id, description, exampleContent: textEl.content };
+                });
 
                 for (let i = 0; i < backgroundSources.length; i++) {
                     const bgData = backgroundSources[i];
@@ -290,31 +395,21 @@ const App: React.FC = () => {
                     let newContentMap: Record<string, string> = {};
                     if (textElementsToFill.length > 0) {
                         setLoadingMessage(`Gerando texto para o post ${i + 1}/${backgroundSources.length}...`);
-                        newContentMap = await geminiService.generateTextForLayout(textElementsToFill, topic, contentLevel, activeStyleGuide);
+                        newContentMap = await geminiService.generateTextForLayout(textElementsToFill, topic, contentLevel, activeStyleGuide, userApiKey);
                     }
                     
                     const newPostId = uuidv4();
-                    
-                    const backgroundElement: BackgroundElement = {
-                        id: `${newPostId}-background`, type: 'background', src: bgData.src,
-                    };
-
-                    const clonedForegroundElements: AnyElement[] = JSON.parse(JSON.stringify(
-                        layout.elements.filter(el => el.type !== 'background')
-                    ));
-
+                    const backgroundElement: BackgroundElement = { id: `${newPostId}-background`, type: 'background', src: bgData.src };
+                    const clonedForegroundElements: AnyElement[] = JSON.parse(JSON.stringify(layout.elements.filter(el => el.type !== 'background')));
                     const newElements: AnyElement[] = clonedForegroundElements.map(el => {
                         const newEl = { ...el, id: `${newPostId}-${el.id}` };
-                        if (newEl.type === 'text' && newContentMap[el.id]) {
-                            (newEl as TextElement).content = newContentMap[el.id];
-                        }
+                        if (newEl.type === 'text' && newContentMap[el.id]) (newEl as TextElement).content = newContentMap[el.id];
                         if (newEl.type === 'image' && newEl.assetId) {
                             const asset = kit.assets.find(a => a.id === newEl.assetId);
                             if (asset) newEl.src = asset.dataUrl;
                         }
                         return newEl as AnyElement;
                     });
-
                     newPosts.push({ id: newPostId, elements: [backgroundElement, ...newElements] });
                 }
 
@@ -323,54 +418,60 @@ const App: React.FC = () => {
                 toast.success(`${newPosts.length} posts criados com seu layout!`, { id: toastId });
 
             } else { 
-                setLoadingMessage('Analisando suas imagens...');
-                toast.loading('Analisando suas imagens...', { id: toastId });
+                let backgroundSources: { src: string; prompt?: string; provider?: 'runware' }[] = [];
 
-                if (customBackgrounds.length === 0) {
-                    throw new Error("Nenhuma imagem de fundo foi enviada.");
+                if (backgroundSource === 'ai') {
+                    const runwareApiKey = user.linkedAccounts?.runware?.apiKey;
+                    if (!runwareApiKey) throw new Error("Conecte sua conta Runware AI para gerar fundos.");
+
+                    setLoadingMessage('Gerando ideias para imagens...');
+                    toast.loading('Gerando ideias para imagens...', { id: toastId });
+                    const imagePrompts = await geminiService.generateImagePrompts(topic, count, activeStyleGuide, userApiKey);
+    
+                    setLoadingMessage('Criando imagens de fundo com IA...');
+                    toast.loading('Criando imagens de fundo com IA...', { id: toastId });
+                    const generatedBase64Images = await runwareService.generateBackgroundImages(runwareApiKey, imagePrompts);
+                    
+                    backgroundSources = generatedBase64Images.map((b64, index) => ({
+                        src: `data:image/png;base64,${b64}`,
+                        prompt: imagePrompts[index],
+                        provider: 'runware'
+                    }));
+
+                } else {
+                    if (customBackgrounds.length === 0) throw new Error("Nenhuma imagem de fundo foi enviada.");
+                    backgroundSources = customBackgrounds.map(src => ({ src }));
                 }
 
                 setLoadingMessage('Criando layouts inteligentes...');
                 toast.loading('Criando layouts inteligentes...', { id: toastId });
 
-                const layoutPromises = customBackgrounds.map(bgSrc => 
-                    geminiService.generateLayoutAndContentForImage(bgSrc, topic, contentLevel, activeKit)
-                );
+                const layoutPromises = backgroundSources.map(bg => geminiService.generateLayoutAndContentForImage(bg.src, topic, contentLevel, activeKit, userApiKey));
                 const allLayouts = await Promise.all(layoutPromises);
 
                 const newPosts: Post[] = [];
                 const carouselId = type === 'carousel' ? uuidv4() : undefined;
 
-                for (let i = 0; i < customBackgrounds.length; i++) {
-                    const bgSrc = customBackgrounds[i];
+                for (let i = 0; i < backgroundSources.length; i++) {
+                    const bgData = backgroundSources[i];
                     const layoutData = allLayouts[i];
                     const postId = uuidv4();
                     
-                    const backgroundElement: BackgroundElement = {
-                        id: `${postId}-background`,
-                        type: 'background',
-                        src: bgSrc,
-                        provider: undefined, // User provided
-                    };
-
+                    const backgroundElement: BackgroundElement = { id: `${postId}-background`, type: 'background', src: bgData.src, prompt: bgData.prompt, provider: bgData.provider };
                     const fontSizeMap: Record<string, number> = { large: 48, medium: 28, small: 18, cta: 22 };
 
                     const textElements: TextElement[] = layoutData.map(aiEl => {
                         const textColor = aiEl.backgroundTone === 'dark' ? '#FFFFFF' : '#0F172A';
                         const newElement: TextElement = {
-                            id: `${postId}-${uuidv4()}`,
-                            type: 'text',
-                            content: aiEl.content,
-                            x: (aiEl.x / 100) * postSize.width,
-                            y: (aiEl.y / 100) * postSize.height,
-                            width: (aiEl.width / 100) * postSize.width,
-                            height: (aiEl.height / 100) * postSize.height,
+                            id: `${postId}-${uuidv4()}`, type: 'text', content: aiEl.content,
+                            x: (aiEl.x / 100) * postSize.width, y: (aiEl.y / 100) * postSize.height,
+                            width: (aiEl.width / 100) * postSize.width, height: (aiEl.height / 100) * postSize.height,
                             rotation: aiEl.rotation || 0, opacity: 1, locked: false, visible: true,
-                            fontSize: fontSizeMap[aiEl.fontSize] || 24,
-                            fontFamily: aiEl.fontFamily || 'Poppins', accentFontFamily: aiEl.accentFontFamily,
-                            color: aiEl.color || textColor, textAlign: aiEl.textAlign, verticalAlign: 'middle',
-                            letterSpacing: 0, lineHeight: aiEl.lineHeight || 1.4,
-                            highlightColor: aiEl.highlightColor, backgroundColor: aiEl.backgroundColor,
+                            fontSize: fontSizeMap[aiEl.fontSize] || 24, fontFamily: aiEl.fontFamily || 'Poppins',
+                            accentFontFamily: aiEl.accentFontFamily, color: aiEl.color || textColor,
+                            textAlign: aiEl.textAlign, verticalAlign: 'middle', letterSpacing: 0,
+                            lineHeight: aiEl.lineHeight || 1.4, highlightColor: aiEl.highlightColor,
+                            backgroundColor: aiEl.backgroundColor,
                         };
                         if (aiEl.fontSize === 'cta' && aiEl.backgroundColor) {
                             newElement.padding = 10;
@@ -381,27 +482,29 @@ const App: React.FC = () => {
                     
                     let postPalette: string[] | undefined;
                     if(colorMode === 'extract'){
-                        const { palette } = await geminiService.extractPaletteFromImage(bgSrc);
+                        const { palette } = await geminiService.extractPaletteFromImage(bgData.src, userApiKey);
                         postPalette = palette;
                     }
 
-                    const post: Post = {
-                        id: postId,
-                        elements: [backgroundElement, ...textElements],
-                        palette: postPalette
-                    };
-                    
+                    const post: Post = { id: postId, elements: [backgroundElement, ...textElements], palette: postPalette };
                     if (carouselId) {
                         post.carouselId = carouselId;
                         post.slideIndex = i;
                     }
-    
                     newPosts.push(post);
                 }
     
                 setPosts(newPosts);
                 if (newPosts.length > 0) setSelectedPostId(newPosts[0].id);
                 toast.success('Posts criados com sucesso!', { id: toastId });
+            }
+             if (isFreeTierUser) {
+                const generationsToday = user.generationsToday || 0;
+                updateUser({
+                    ...user,
+                    generationsToday: generationsToday + count,
+                    lastGenerationDate: new Date().toISOString().split('T')[0]
+                });
             }
         } catch (error) {
             console.error(error);
@@ -536,6 +639,10 @@ const App: React.FC = () => {
     };
 
     const handleSaveBrandKit = (name: string) => {
+        if (!user) {
+            toast.error("Faça login para salvar Brand Kits.");
+            return;
+        }
         if (!selectedPostId) {
             toast.error("Selecione um post para usar seu layout no Brand Kit.");
             return;
@@ -545,12 +652,12 @@ const App: React.FC = () => {
         
         const assets: BrandAsset[] = [];
         const layoutElements = postToSave.elements.map(el => {
-            const newEl = { ...el, id: el.id.split('-').slice(1).join('-') }; // Make IDs relative
+            const newEl = { ...el, id: el.id.split('-').slice(1).join('-') };
             if (newEl.type === 'image' && newEl.src.startsWith('data:image')) {
                 const assetId = uuidv4();
                 assets.push({ id: assetId, type: 'image', dataUrl: newEl.src });
                 (newEl as ImageElement).assetId = assetId;
-                (newEl as ImageElement).src = `asset://${assetId}`; // Replace src with a reference
+                (newEl as ImageElement).src = `asset://${assetId}`;
             }
             return newEl;
         });
@@ -558,18 +665,14 @@ const App: React.FC = () => {
         const newLayout: LayoutTemplate = { id: uuidv4(), name: 'Layout Padrão', elements: layoutElements };
     
         const newBrandKit: BrandKit = {
-            id: uuidv4(),
-            name,
-            styleGuide,
-            fonts: availableFonts.filter(f => f.dataUrl), // Only save custom fonts
-            palette: customPalette,
-            layouts: [newLayout],
-            assets: assets,
+            id: uuidv4(), name, styleGuide,
+            fonts: availableFonts.filter(f => f.dataUrl),
+            palette: customPalette, layouts: [newLayout], assets: assets,
         };
     
         const updatedKits = [...brandKits, newBrandKit];
         setBrandKits(updatedKits);
-        localStorage.setItem(`brandKits`, JSON.stringify(updatedKits));
+        localStorage.setItem(`brandKits_${user.id}`, JSON.stringify(updatedKits));
         toast.success(`Brand Kit "${name}" salvo!`);
     };
 
@@ -586,7 +689,7 @@ const App: React.FC = () => {
     };
 
     const handleSaveLayoutToActiveKit = (layoutName: string) => {
-        if (!activeBrandKitId || !selectedPostId) {
+        if (!user || !activeBrandKitId || !selectedPostId) {
             toast.error("Erro: kit ou post não selecionado.");
             return;
         }
@@ -595,12 +698,8 @@ const App: React.FC = () => {
         if (!postToSave) return;
         
         const updatedKits = brandKits.map(kit => {
-            if (kit.id !== activeBrandKitId) {
-                return kit;
-            }
-            
+            if (kit.id !== activeBrandKitId) return kit;
             const newAssets = [...kit.assets];
-    
             const layoutElements = postToSave.elements.map(el => {
                 const newEl = { ...el, id: el.id.split('-').slice(1).join('-') };
                 if (newEl.type === 'image' && newEl.src.startsWith('data:image')) {
@@ -614,25 +713,18 @@ const App: React.FC = () => {
                 }
                 return newEl;
             });
-            
             const newLayout: LayoutTemplate = { id: uuidv4(), name: layoutName, elements: layoutElements };
-            
             toast.success(`Layout "${layoutName}" adicionado ao kit!`);
-    
-            return {
-                ...kit,
-                layouts: [...kit.layouts, newLayout],
-                assets: newAssets,
-            };
+            return { ...kit, layouts: [...kit.layouts, newLayout], assets: newAssets };
         });
 
         setBrandKits(updatedKits);
-        localStorage.setItem(`brandKits`, JSON.stringify(updatedKits));
+        localStorage.setItem(`brandKits_${user.id}`, JSON.stringify(updatedKits));
         setAddLayoutModalOpen(false);
     };
     
     const handleUpdateLayoutName = (layoutId: string, newName: string) => {
-        if (!activeBrandKitId) {
+        if (!user || !activeBrandKitId) {
             toast.error("Nenhum Brand Kit está ativo.");
             return;
         }
@@ -642,9 +734,7 @@ const App: React.FC = () => {
         }
     
         const updatedKits = brandKits.map(kit => {
-            if (kit.id !== activeBrandKitId) {
-                return kit;
-            }
+            if (kit.id !== activeBrandKitId) return kit;
             return {
                 ...kit,
                 layouts: kit.layouts.map(layout =>
@@ -653,34 +743,27 @@ const App: React.FC = () => {
             };
         });
         setBrandKits(updatedKits);
-        localStorage.setItem(`brandKits`, JSON.stringify(updatedKits));
+        localStorage.setItem(`brandKits_${user.id}`, JSON.stringify(updatedKits));
         toast.success("Nome do layout atualizado!");
     };
     
     const handleDeleteLayoutFromKit = (layoutId: string) => {
-        if (!activeBrandKitId) {
+        if (!user || !activeBrandKitId) {
             toast.error("Nenhum Brand Kit está ativo.");
             return;
         }
     
         const newKits = brandKits.map(kit => {
-            if (kit.id !== activeBrandKitId) {
-                return kit;
-            }
-            
+            if (kit.id !== activeBrandKitId) return kit;
             if (selectedLayoutId === layoutId) {
                 setSelectedLayoutId(null);
                 setUseLayoutToFill(false);
             }
-
-            return {
-                ...kit,
-                layouts: kit.layouts.filter(layout => layout.id !== layoutId),
-            };
+            return { ...kit, layouts: kit.layouts.filter(layout => layout.id !== layoutId) };
         });
 
         setBrandKits(newKits);
-        localStorage.setItem(`brandKits`, JSON.stringify(newKits));
+        localStorage.setItem(`brandKits_${user.id}`, JSON.stringify(newKits));
         toast.success("Layout removido do kit.");
     };
 
@@ -734,6 +817,10 @@ const App: React.FC = () => {
     };
     
     const handleImportBrandKit = (event: React.ChangeEvent<HTMLInputElement>) => {
+        if (!user) {
+            toast.error("Faça login para importar um Brand Kit.");
+            return;
+        }
         const file = event.target.files?.[0];
         if (!file) return;
     
@@ -747,7 +834,7 @@ const App: React.FC = () => {
                     const newKit: BrandKit = { ...importedData, id: uuidv4() };
                     const updatedKits = [...brandKits, newKit];
                     setBrandKits(updatedKits);
-                    localStorage.setItem(`brandKits`, JSON.stringify(updatedKits));
+                    localStorage.setItem(`brandKits_${user.id}`, JSON.stringify(updatedKits));
                     loadFontsFromKit(newKit);
                     toast.success(`Brand Kit "${newKit.name}" importado com sucesso!`);
                 } else {
@@ -763,10 +850,11 @@ const App: React.FC = () => {
     };
 
     const handleDeleteBrandKit = (kitId: string) => {
+        if (!user) return;
         if(activeBrandKitId === kitId) setActiveBrandKitId(null);
         const updatedKits = brandKits.filter(k => k.id !== kitId);
         setBrandKits(updatedKits);
-        localStorage.setItem(`brandKits`, JSON.stringify(updatedKits));
+        localStorage.setItem(`brandKits_${user.id}`, JSON.stringify(updatedKits));
         toast.success("Brand Kit removido.");
     };
 
@@ -783,24 +871,17 @@ const App: React.FC = () => {
             const newEl = { ...el, id: `${newPostId}-${el.id}` };
             if (newEl.type === 'image' && newEl.assetId) {
                 const asset = kit.assets.find(a => a.id === newEl.assetId);
-                if (asset) {
-                    newEl.src = asset.dataUrl;
-                }
+                if (asset) newEl.src = asset.dataUrl;
             }
             return newEl as AnyElement;
         });
         
-        const newPost: Post = {
-            id: newPostId,
-            elements: newElements,
-        };
-
+        const newPost: Post = { id: newPostId, elements: newElements };
         setPosts(prev => [...prev, newPost]);
         setSelectedPostId(newPostId);
         if(showToast) toast.success("Post criado a partir do layout!");
         return newPost;
     };
-
 
     const handleAlignElement = (alignment: 'h-start' | 'h-center' | 'h-end' | 'v-start' | 'v-center' | 'v-end') => {
         const selectedPost = posts.find(p => p.id === selectedPostId);
@@ -828,9 +909,8 @@ const App: React.FC = () => {
     };
 
     const handleUpdateBackgroundSrc = (elementId: string, src: string) => {
-        updatePostElement(elementId, { src, provider: undefined }); // User provided, so clear provider
+        updatePostElement(elementId, { src, provider: undefined });
     };
-
 
     const handleExport = async (format: 'png' | 'jpeg' | 'zip') => {
         const toastId = toast.loading(`Exportando...`);
@@ -866,7 +946,6 @@ const App: React.FC = () => {
                     const root = createRoot(postContainer);
                     
                     root.render(<StaticPost post={post} postSize={postSize} />);
-
                     await new Promise(r => setTimeout(r, 100));
 
                     const nodeToCapture = postContainer.firstChild as HTMLElement;
@@ -917,17 +996,11 @@ const App: React.FC = () => {
         if (!viewportRef.current || !postSize) return;
         const { width: vw, height: vh } = viewportRef.current.getBoundingClientRect();
         const { width: cw, height: ch } = postSize;
-
-        const zoomX = vw / cw;
-        const zoomY = vh / ch;
-        const newZoom = Math.min(zoomX, zoomY) * 0.9;
-
+        const newZoom = Math.min(vw / cw, vh / ch) * 0.9;
         setZoom(newZoom);
     }, [postSize]);
 
-    useEffect(() => {
-        handleFitToScreen();
-    }, [selectedPostId, postSize, handleFitToScreen]);
+    useEffect(() => { handleFitToScreen(); }, [selectedPostId, postSize, handleFitToScreen]);
     
     const handleWheel = (e: React.WheelEvent) => {
         e.preventDefault();
@@ -945,9 +1018,8 @@ const App: React.FC = () => {
         const newPost: Post = {
             id: newPostId,
             elements: [{
-                id: `${newPostId}-background`,
-                type: 'background',
-                src: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mO8//9/PQAI8wN3Y0UNbAAAAABJRU5ErkJggg==', // dark grey
+                id: `${newPostId}-background`, type: 'background',
+                src: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mO8//9/PQAI8wN3Y0UNbAAAAABJRU5ErkJggg==',
             }]
         };
         setPosts(prev => [...prev, newPost]);
@@ -959,10 +1031,7 @@ const App: React.FC = () => {
     const handleDeletePost = ({ postId, carouselId }: { postId?: string, carouselId?: string }) => {
         const postIndex = posts.findIndex(p => p.id === postId);
         setPosts(prev => {
-            const newPosts = carouselId
-                ? prev.filter(p => p.carouselId !== carouselId)
-                : prev.filter(p => p.id !== postId);
-                
+            const newPosts = carouselId ? prev.filter(p => p.carouselId !== carouselId) : prev.filter(p => p.id !== postId);
             if (selectedPostId === postId || (carouselId && selectedPost?.carouselId === carouselId)) {
                 if (newPosts.length > 0) {
                      const nextIndex = Math.max(0, postIndex - 1);
@@ -979,7 +1048,14 @@ const App: React.FC = () => {
     return (
         <>
             <Toaster position="top-center" reverseOrder={false} />
-             <AddLayoutModal
+            <AccountManagerModal
+                isOpen={isAccountModalOpen}
+                onClose={() => setAccountModalOpen(false)}
+                user={user}
+                onLinkAccount={handleLinkAccount}
+                onUnlinkAccount={handleUnlinkAccount}
+            />
+            <AddLayoutModal
                 isOpen={isAddLayoutModalOpen}
                 onClose={() => setAddLayoutModalOpen(false)}
                 onSave={handleSaveLayoutToActiveKit}
@@ -987,7 +1063,9 @@ const App: React.FC = () => {
                 postSize={postSize}
             />
             <div className="flex flex-col h-screen font-sans bg-gray-950 text-gray-100" style={{ minWidth: '1400px' }}>
-                <header className="w-full bg-zinc-900 border-b border-zinc-800 px-6 py-4 flex-shrink-0" />
+                <header className="w-full bg-zinc-900 border-b border-zinc-800 px-6 py-3 flex-shrink-0 flex items-center justify-end">
+                    <UserProfile user={user} onLogin={() => {}} onLogout={handleLogout} onManageAccounts={handleManageAccounts} />
+                </header>
                 <div className="flex flex-row flex-grow min-h-0">
                     <ControlPanel
                         isLoading={isLoading}
@@ -1007,7 +1085,6 @@ const App: React.FC = () => {
                         postSize={postSize}
                         setPostSize={setPostSize}
                         hasPosts={posts.length > 0}
-                        referenceImages={referenceImages}
                         customBackgrounds={customBackgrounds}
                         styleImages={styleImages}
                         onFileChange={handleFileChange}
@@ -1024,6 +1101,9 @@ const App: React.FC = () => {
                         setSelectedLayoutId={setSelectedLayoutId}
                         useLayoutToFill={useLayoutToFill}
                         setUseLayoutToFill={setUseLayoutToFill}
+                        user={user}
+                        generationsToday={user?.generationsToday || 0}
+                        dailyLimit={DAILY_GENERATION_LIMIT}
                     />
                     <main 
                         className="flex-1 flex flex-col items-center justify-center bg-black/30 overflow-hidden relative"
@@ -1049,9 +1129,7 @@ const App: React.FC = () => {
                         {selectedPost && (
                              <div 
                                 className="flex items-center justify-center transition-transform duration-100 ease-out"
-                                style={{ 
-                                    transform: `scale(${zoom})`,
-                                }}
+                                style={{ transform: `scale(${zoom})` }}
                             >
                                 <CanvasEditor
                                     ref={editorRef}

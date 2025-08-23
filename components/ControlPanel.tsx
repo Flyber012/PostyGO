@@ -1,9 +1,12 @@
 
 
+
+
+
 import React, { useState, useRef, useEffect } from 'react';
-import { PostSize, BrandKit, LayoutTemplate } from '../types';
+import { PostSize, BrandKit, LayoutTemplate, User } from '../types';
 import { POST_SIZES } from '../constants';
-import { FileDown, Image, Save, Download, Sparkles, Upload, X, Trash2, Plus, File, Files, BrainCircuit, ShieldCheck, Copy, Package, Check, LayoutTemplate as LayoutIcon, ChevronDown } from 'lucide-react';
+import { FileDown, Image, Save, Download, Sparkles, Upload, X, Trash2, Plus, File, Files, BrainCircuit, ShieldCheck, Copy, Package, Check, LayoutTemplate as LayoutIcon, ChevronDown, AlertCircle } from 'lucide-react';
 import AdvancedColorPicker from './ColorPicker';
 import { toast } from 'react-hot-toast';
 
@@ -78,7 +81,7 @@ const Accordion: React.FC<{ title: React.ReactNode; children: React.ReactNode; d
 
 interface ControlPanelProps {
     isLoading: boolean;
-    onGenerate: (topic: string, count: number, type: 'post' | 'carousel', contentLevel: 'mínimo' | 'médio' | 'detalhado') => void;
+    onGenerate: (topic: string, count: number, type: 'post' | 'carousel', contentLevel: 'mínimo' | 'médio' | 'detalhado', backgroundSource: 'upload' | 'ai') => void;
     onExport: (format: 'png' | 'jpeg' | 'zip') => void;
     onSaveBrandKit: (name: string) => void;
     onAddLayoutToActiveKit: () => void;
@@ -94,11 +97,10 @@ interface ControlPanelProps {
     postSize: PostSize;
     setPostSize: (size: PostSize) => void;
     hasPosts: boolean;
-    referenceImages: string[];
     customBackgrounds: string[];
     styleImages: string[];
-    onFileChange: (event: React.ChangeEvent<HTMLInputElement>, type: 'reference' | 'background' | 'style') => void;
-    onRemoveImage: (index: number, type: 'reference' | 'background' | 'style') => void;
+    onFileChange: (event: React.ChangeEvent<HTMLInputElement>, type: 'background' | 'style') => void;
+    onRemoveImage: (index: number, type: 'background' | 'style') => void;
     colorMode: 'default' | 'custom' | 'extract';
     setColorMode: (mode: 'default' | 'custom' | 'extract') => void;
     customPalette: string[];
@@ -111,6 +113,9 @@ interface ControlPanelProps {
     setSelectedLayoutId: (id: string | null) => void;
     useLayoutToFill: boolean;
     setUseLayoutToFill: (use: boolean) => void;
+    user: User | null;
+    generationsToday: number;
+    dailyLimit: number;
 }
 
 const ControlPanel: React.FC<ControlPanelProps> = (props) => {
@@ -122,6 +127,7 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
         colorMode, setColorMode, customPalette, setCustomPalette,
         styleGuide, useStyleGuide, setUseStyleGuide, onAnalyzeStyle,
         selectedLayoutId, setSelectedLayoutId, useLayoutToFill, setUseLayoutToFill,
+        user, generationsToday, dailyLimit
      } = props;
     const [topic, setTopic] = useState('Productivity Hacks');
     const [generationType, setGenerationType] = useState<'post' | 'carousel'>('post');
@@ -136,10 +142,11 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
     
     const [editingLayoutId, setEditingLayoutId] = useState<string | null>(null);
     const [tempLayoutName, setTempLayoutName] = useState('');
+    const [backgroundSource, setBackgroundSource] = useState<'upload' | 'ai'>('upload');
+    const [aiPostCount, setAiPostCount] = useState(4);
 
 
     useEffect(() => {
-        // If the fill layout mode is on, but the selected layout is no longer available (e.g. kit changed), turn it off.
         if (useLayoutToFill && (!activeBrandKit || !activeBrandKit.layouts.some(l => l.id === selectedLayoutId))) {
             setUseLayoutToFill(false);
             setSelectedLayoutId(null);
@@ -158,9 +165,9 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
             return;
         }
         
-        const finalCount = customBackgrounds.length;
+        const finalCount = backgroundSource === 'upload' ? customBackgrounds.length : aiPostCount;
         
-        if (finalCount === 0) {
+        if (backgroundSource === 'upload' && finalCount === 0) {
             toast.error("Por favor, suba suas imagens de fundo antes de gerar.");
             return;
         }
@@ -170,10 +177,14 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
             return;
         }
         
-        onGenerate(topic, finalCount, generationType, contentLevel);
+        onGenerate(topic, finalCount, generationType, contentLevel, backgroundSource);
     };
 
     const handleSaveKitClick = () => {
+        if (!user) {
+            toast.error("Você precisa estar logado para criar um Brand Kit.");
+            return;
+        }
         if(newKitName.trim()) {
             onSaveBrandKit(newKitName);
             setNewKitName('');
@@ -196,7 +207,6 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
     const handlePickerClose = () => {
         setColorPickerState({ isOpen: false, index: null, color: '#FFFFFF' });
     };
-
 
     const addPaletteColor = () => {
         if (customPalette.length < 8) {
@@ -227,6 +237,14 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
         setEditingLayoutId(null);
         setTempLayoutName('');
     };
+
+    const isFreeTierUser = !user?.linkedAccounts?.google?.apiKey;
+    const generationsLeft = dailyLimit - generationsToday;
+    const canGenerate = !isLoading && user && (generationsLeft > 0 || !isFreeTierUser);
+    let generateButtonTooltip = '';
+    if (!user) generateButtonTooltip = 'Faça login para gerar conteúdo.';
+    else if (isFreeTierUser && generationsLeft <= 0) generateButtonTooltip = 'Você atingiu seu limite diário de gerações.';
+
 
     return (
         <aside className="w-96 bg-zinc-900 p-6 flex flex-col h-full overflow-y-auto shadow-2xl flex-shrink-0 relative">
@@ -322,20 +340,60 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
                 </Accordion>
                 
                 <Accordion title={<>3. Fundos</>} defaultOpen>
-                     <div className="space-y-2 mt-4">
-                            <p className="text-xs text-center text-gray-400">A IA cria o texto sobre os fundos que você subir.</p>
-                            <ImageUploader 
-                                title="Seus Fundos"
-                                images={customBackgrounds}
-                                onFileChange={(e) => onFileChange(e, 'background')}
-                                onRemove={(index) => onRemoveImage(index, 'background')}
-                                limit={10}
-                                idPrefix="bg"
-                            />
+                    <div className="flex bg-zinc-900/70 p-1 rounded-lg mb-4 text-sm">
+                        <button onClick={() => setBackgroundSource('upload')} className={`flex-1 flex items-center justify-center text-center py-1.5 rounded-md transition-all duration-300 ${backgroundSource === 'upload' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:bg-zinc-700'}`}>
+                            <Upload className="w-4 h-4 mr-2"/> Usar Meus Fundos
+                        </button>
+                        <button 
+                            onClick={() => setBackgroundSource('ai')} 
+                            className={`flex-1 flex items-center justify-center text-center py-1.5 rounded-md transition-all duration-300 ${backgroundSource === 'ai' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:bg-zinc-700'} disabled:opacity-50 disabled:cursor-not-allowed`}
+                            disabled={!user || !user.linkedAccounts?.runware}
+                            title={(!user || !user.linkedAccounts?.runware) ? 'Conecte sua conta Runware AI para gerar fundos' : ''}
+                        >
+                            <Sparkles className="w-4 h-4 mr-2"/> Gerar com IA
+                        </button>
+                    </div>
+                    {backgroundSource === 'upload' ? (
+                        <ImageUploader 
+                            title="Seus Fundos"
+                            images={customBackgrounds}
+                            onFileChange={(e) => onFileChange(e, 'background')}
+                            onRemove={(index) => onRemoveImage(index, 'background')}
+                            limit={10}
+                            idPrefix="bg"
+                        />
+                    ) : (
+                         <div>
+                            <p className="text-xs text-center text-gray-400 mb-2">A IA irá gerar as imagens de fundo e o texto.</p>
+                             <label htmlFor="post-count-ai" className="block text-sm font-medium text-gray-300 mb-1">
+                                {generationType === 'post' ? 'Número de Posts' : 'Número de Slides'}
+                            </label>
+                            <input type="number" id="post-count-ai" value={aiPostCount} onChange={e => setAiPostCount(Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))} min="1" max="10" className="w-full bg-black/50 border border-zinc-600 rounded-md px-3 py-2 text-white" />
                         </div>
+                    )}
                 </Accordion>
                 
                 <Accordion title={<>4. Formato e Geração</>} defaultOpen>
+                    {user && isFreeTierUser && (
+                        <div className="space-y-2 p-3 bg-black/20 rounded-lg">
+                            <div className="flex justify-between items-center text-sm">
+                                <label className="font-medium text-gray-300">Limite Diário Gratuito</label>
+                                <span className="font-semibold text-gray-200">{generationsToday}/{dailyLimit}</span>
+                            </div>
+                            <div className="w-full bg-zinc-700 rounded-full h-2.5">
+                                <div 
+                                    className="bg-purple-600 h-2.5 rounded-full transition-all duration-500" 
+                                    style={{ width: `${(generationsToday / dailyLimit) * 100}%` }}
+                                ></div>
+                            </div>
+                        </div>
+                    )}
+                     {user && !isFreeTierUser && (
+                        <div className="p-3 bg-green-900/50 rounded-lg text-center">
+                           <p className="text-sm font-semibold text-green-300">Gerações ilimitadas ativadas com sua chave de API!</p>
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-2 gap-2">
                         <button onClick={() => setGenerationType('post')} className={`flex items-center justify-center p-2 rounded-md transition-colors ${generationType === 'post' ? 'bg-purple-600 text-white' : 'bg-zinc-700 hover:bg-zinc-600'}`}>
                             <File className="w-4 h-4 mr-2"/> Post Único
@@ -344,6 +402,7 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
                             <Files className="w-4 h-4 mr-2"/> Carrossel
                         </button>
                     </div>
+                    {backgroundSource === 'upload' && (
                     <div>
                         <label htmlFor="post-count-disabled" className="block text-sm font-medium text-gray-300 mb-1">
                             {generationType === 'post' ? 'Número de Posts' : 'Número de Slides'}
@@ -351,6 +410,7 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
                         <input type="number" id="post-count-disabled" value={customBackgrounds.length} disabled className="w-full bg-black/30 border border-zinc-700 rounded-md px-3 py-2 text-gray-400 focus:outline-none cursor-not-allowed" />
                         <p className="text-xs text-zinc-400 mt-1">O número é definido pela quantidade de imagens que você subiu.</p>
                     </div>
+                    )}
                     <div>
                         <label htmlFor="post-size" className="block text-sm font-medium text-gray-300 mb-1">Tamanho do Post</label>
                         <select id="post-size" value={postSize.name} onChange={(e) => setPostSize(POST_SIZES.find(s => s.name === e.target.value) || POST_SIZES[0])} className="w-full bg-black/50 border border-zinc-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-purple-500 focus:outline-none appearance-none">
@@ -385,9 +445,17 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
                             )}
                         </div>
                     </div>
-                    <button onClick={handleGenerateClick} disabled={isLoading} className="w-full flex items-center justify-center animated-gradient-bg text-white font-bold py-2 px-4 rounded-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
-                        {isLoading ? 'Gerando...' : 'Gerar Conteúdo'}
-                    </button>
+                    <div title={generateButtonTooltip}>
+                        <button onClick={handleGenerateClick} disabled={!canGenerate} className="w-full flex items-center justify-center animated-gradient-bg text-white font-bold py-2 px-4 rounded-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                            {isLoading ? 'Gerando...' : 'Gerar Conteúdo'}
+                        </button>
+                    </div>
+                     {!user && (
+                        <div className="flex items-center justify-center text-center p-2 bg-yellow-900/30 rounded-lg">
+                           <AlertCircle className="w-4 h-4 mr-2 text-yellow-400 shrink-0" />
+                           <p className="text-xs text-yellow-300">Por favor, faça login para gerar conteúdo e salvar Brand Kits.</p>
+                        </div>
+                    )}
                 </Accordion>
 
                 <Accordion title={<><Package className="mr-2 h-5 w-5 text-purple-400"/> Brand Kits</>}>
@@ -414,7 +482,7 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
                             )
                         })}
                     </div>
-                     {hasPosts && <div>
+                     {hasPosts && user && <div>
                         <label htmlFor="kit-name" className="block text-sm font-medium text-gray-300 mb-1">Nome do Novo Kit</label>
                         <div className="flex space-x-2">
                             <input type="text" id="kit-name" value={newKitName} onChange={e => setNewKitName(e.target.value)} className="flex-grow w-full bg-black/50 border border-zinc-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-purple-500 focus:outline-none" placeholder="ex: 'Minha Marca Incrível'"/>
@@ -487,7 +555,7 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
                                     <p className="text-xs text-zinc-400">Nenhum layout salvo neste kit.</p>
                                 </div>
                             )}
-                            {hasPosts && (
+                            {hasPosts && user && (
                                 <button onClick={onAddLayoutToActiveKit} className="mt-3 w-full flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">
                                    <Plus className="mr-2 h-4 w-4"/> Adicionar Layout do Post Atual
                                 </button>
