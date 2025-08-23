@@ -1,9 +1,12 @@
 
 
+
 import React, { useState, useEffect } from 'react';
 import { User } from '../types';
-import { X, CheckCircle, Link, XCircle, Key, Eye, EyeOff } from 'lucide-react';
+import { X, CheckCircle, Link, XCircle, Key, Eye, EyeOff, RotateCw } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import * as geminiService from '../services/geminiService';
+import * as freepikService from '../services/freepikService';
 
 interface AccountManagerModalProps {
     isOpen: boolean;
@@ -15,7 +18,7 @@ interface AccountManagerModalProps {
 
 type Service = 'google' | 'freepik' | 'envato' | 'chatgpt';
 
-const ServiceRow: React.FC<{
+interface ServiceRowProps {
     service: Service;
     name: string;
     description: string;
@@ -23,19 +26,34 @@ const ServiceRow: React.FC<{
     user: User | null;
     onLink: (service: Service, apiKey: string) => void;
     onUnlink: (service: Service) => void;
-}> = ({ service, name, description, icon, user, onLink, onUnlink }) => {
+    getApiKeyUrl: string;
+    verificationFn: (apiKey: string) => Promise<boolean>;
+}
+
+
+const ServiceRow: React.FC<ServiceRowProps> = ({ service, name, description, icon, user, onLink, onUnlink, getApiKeyUrl, verificationFn }) => {
     const [apiKey, setApiKey] = useState('');
     const [isEditing, setIsEditing] = useState(false);
     const [isKeyVisible, setIsKeyVisible] = useState(false);
+    const [isVerifying, setIsVerifying] = useState(false);
     const isConnected = user?.linkedAccounts?.[service]?.status === 'connected';
 
-    const handleConnect = () => {
+    const handleConnect = async () => {
         if (!apiKey.trim()) {
             toast.error('A chave de API não pode estar vazia.');
             return;
         }
-        onLink(service, apiKey);
-        setIsEditing(false);
+        setIsVerifying(true);
+        const isValid = await verificationFn(apiKey.trim());
+        setIsVerifying(false);
+
+        if (isValid) {
+            onLink(service, apiKey.trim());
+            setIsEditing(false);
+            setApiKey('');
+        } else {
+            toast.error(`Chave de API do ${name} inválida ou expirada. Verifique e tente novamente.`);
+        }
     };
 
     const handleCancel = () => {
@@ -78,7 +96,12 @@ const ServiceRow: React.FC<{
             </div>
             {isEditing && (
                 <div className="mt-4 space-y-3 p-3 bg-black/20 rounded-md animate-fade-in-fast">
-                     <label className="text-sm font-medium text-zinc-300 flex items-center"><Key className="w-4 h-4 mr-2 text-zinc-400" /> Chave de API</label>
+                    <div className="flex justify-between items-center">
+                        <label className="text-sm font-medium text-zinc-300 flex items-center"><Key className="w-4 h-4 mr-2 text-zinc-400" /> Chave de API</label>
+                        <a href={getApiKeyUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:text-blue-300 hover:underline">
+                            Obter Chave de API
+                        </a>
+                    </div>
                      <div className="relative">
                         <input
                             type={isKeyVisible ? 'text' : 'password'}
@@ -96,8 +119,12 @@ const ServiceRow: React.FC<{
                         <button onClick={handleCancel} className="px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-white text-sm font-semibold rounded-md transition-colors">
                             Cancelar
                         </button>
-                        <button onClick={handleConnect} className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-md transition-colors">
-                            Salvar Conexão
+                        <button 
+                            onClick={handleConnect}
+                            disabled={isVerifying}
+                            className="w-36 flex items-center justify-center px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-md transition-colors disabled:bg-green-800 disabled:cursor-wait"
+                        >
+                            {isVerifying ? <RotateCw className="w-4 h-4 animate-spin" /> : 'Salvar e Verificar'}
                         </button>
                     </div>
                 </div>
@@ -153,6 +180,8 @@ const AccountManagerModal: React.FC<AccountManagerModalProps> = ({ isOpen, onClo
                         user={user}
                         onLink={onLinkAccount}
                         onUnlink={onUnlinkAccount}
+                        getApiKeyUrl="https://aistudio.google.com/app/apikey"
+                        verificationFn={geminiService.verifyApiKey}
                     />
                      <ServiceRow 
                         service="freepik"
@@ -162,6 +191,8 @@ const AccountManagerModal: React.FC<AccountManagerModalProps> = ({ isOpen, onClo
                         user={user}
                         onLink={onLinkAccount}
                         onUnlink={onUnlinkAccount}
+                        getApiKeyUrl="https://www.freepik.com/developers/applications"
+                        verificationFn={freepikService.verifyApiKey}
                     />
                     <DisabledServiceRow
                         name="ChatGPT"

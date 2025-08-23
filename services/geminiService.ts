@@ -8,6 +8,27 @@ const getAIClient = (apiKey: string) => {
     return new GoogleGenAI({ apiKey });
 };
 
+/**
+ * Verifica se a chave de API do Google Gemini é válida.
+ * @param apiKey A chave de API a ser verificada.
+ * @returns true se a chave for válida, false caso contrário.
+ */
+export async function verifyApiKey(apiKey: string): Promise<boolean> {
+    try {
+        const ai = getAIClient(apiKey);
+        // Faz uma chamada muito leve para verificar se a chave é válida e tem permissões.
+        await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: 'hi' // Um prompt mínimo para validar a autenticação.
+        });
+        return true;
+    } catch (error) {
+        console.error("Falha na verificação da chave de API do Google Gemini:", error);
+        return false;
+    }
+}
+
+
 export async function analyzeStyleFromImages(apiKey: string, base64Images: string[]): Promise<string> {
     const ai = getAIClient(apiKey);
     const parts: Part[] = [];

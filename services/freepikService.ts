@@ -1,7 +1,35 @@
 
 
-// Endpoint hipotético para a API de geração de imagens da Freepik AI.
-const API_ENDPOINT = 'https://api.freepik.com/v1/ai/images/generate';
+
+const GENERATE_ENDPOINT = 'https://api.freepik.com/v1/ai/images/generate';
+// Este é um endpoint hipotético para verificação de chaves, baseado em práticas comuns de API.
+// Usamos isso para uma verificação leve sem gastar créditos de geração.
+const VERIFY_ENDPOINT = 'https://api.freepik.com/v1/me';
+
+/**
+ * Verifica se a chave de API do Freepik é válida fazendo uma chamada leve.
+ * @param apiKey A chave de API a ser verificada.
+ * @returns true se a chave for válida, false caso contrário.
+ */
+export async function verifyApiKey(apiKey: string): Promise<boolean> {
+    try {
+        const response = await fetch(VERIFY_ENDPOINT, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Accept': 'application/json'
+            },
+        });
+        // Uma resposta bem-sucedida (2xx) indica uma chave válida.
+        // Respostas de erro (4xx, 5xx) indicam uma chave inválida ou problema no servidor.
+        return response.ok;
+    } catch (error) {
+        // Erros de rede (ex: CORS, sem conexão) também resultarão em falha na verificação.
+        console.error("Falha na requisição de verificação da chave Freepik:", error);
+        return false;
+    }
+}
+
 
 /**
  * Gera uma única imagem usando a API do Freepik.
@@ -10,7 +38,7 @@ const API_ENDPOINT = 'https://api.freepik.com/v1/ai/images/generate';
  * @returns Uma string base64 dos dados da imagem.
  */
 async function generateImage(apiKey: string, prompt: string): Promise<string> {
-    const response = await fetch(API_ENDPOINT, {
+    const response = await fetch(GENERATE_ENDPOINT, {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${apiKey}`,
