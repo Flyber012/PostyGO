@@ -1,22 +1,22 @@
 
 
 
+
 import React, { useState, useEffect } from 'react';
 import { User } from '../types';
 import { X, CheckCircle, Link, XCircle, Key, Eye, EyeOff, RotateCw, AlertTriangle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import * as geminiService from '../services/geminiService';
-import * as freepikService from '../services/freepikService';
 
 interface AccountManagerModalProps {
     isOpen: boolean;
     onClose: () => void;
     user: User | null;
-    onLinkAccount: (service: 'google' | 'freepik' | 'envato' | 'chatgpt', apiKey: string) => void;
-    onUnlinkAccount: (service: 'google' | 'freepik' | 'envato' | 'chatgpt') => void;
+    onLinkAccount: (service: 'google' | 'chatgpt' | 'envato', apiKey: string) => void;
+    onUnlinkAccount: (service: 'google' | 'chatgpt' | 'envato') => void;
 }
 
-type Service = 'google' | 'freepik' | 'envato' | 'chatgpt';
+type Service = 'google' | 'chatgpt' | 'envato';
 
 interface ServiceRowProps {
     service: Service;
@@ -29,6 +29,23 @@ interface ServiceRowProps {
     getApiKeyUrl: string;
     verificationFn: (apiKey: string) => Promise<boolean>;
 }
+
+// Function to verify OpenAI (ChatGPT) API key
+const verifyChatGptApiKey = async (apiKey: string): Promise<boolean> => {
+    try {
+        const response = await fetch('https://api.openai.com/v1/models', {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Accept': 'application/json'
+            },
+        });
+        return response.ok;
+    } catch (error) {
+        console.error("Failed to verify OpenAI API key:", error);
+        return false;
+    }
+};
 
 
 const ServiceRow: React.FC<ServiceRowProps> = ({ service, name, description, icon, user, onLink, onUnlink, getApiKeyUrl, verificationFn }) => {
@@ -56,7 +73,7 @@ const ServiceRow: React.FC<ServiceRowProps> = ({ service, name, description, ico
             if (service === 'google') {
                 errorMessage += ' Se o erro persistir, verifique se o faturamento está ativado em seu projeto do Google Cloud.';
             }
-            toast.error(errorMessage);
+            toast.error(errorMessage, { duration: 6000 });
         }
     };
 
@@ -203,25 +220,20 @@ const AccountManagerModal: React.FC<AccountManagerModalProps> = ({ isOpen, onClo
                         getApiKeyUrl="https://aistudio.google.com/app/apikey"
                         verificationFn={geminiService.verifyApiKey}
                     />
-                     <ServiceRow 
-                        service="freepik"
-                        name="Freepik AI"
-                        description="Para geração de imagens com a IA do Freepik."
-                        icon={<img src="https://freepik.cdnpk.net/img/logo/freepik-gradient_2.svg" alt="Freepik" className="w-7 h-7"/>}
-                        user={user}
-                        onLink={onLinkAccount}
-                        onUnlink={onUnlinkAccount}
-                        getApiKeyUrl="https://www.freepik.com/developers/applications"
-                        verificationFn={freepikService.verifyApiKey}
-                    />
-                    <DisabledServiceRow
-                        name="ChatGPT"
+                     <ServiceRow
+                        service="chatgpt"
+                        name="ChatGPT (OpenAI)"
                         description="Para geração de conteúdo textual avançado."
                         icon={
                             <svg role="img" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 fill-white">
                                 <path d="M22.2819 9.82132C22.2819 9.44319 22.1069 9.08256 21.8116 8.8253C21.5163 8.56804 21.1287 8.42847 20.7241 8.42847H18.4281C18.0235 8.42847 17.6359 8.56804 17.3406 8.8253C17.0453 9.08256 16.8703 9.44319 16.8703 9.82132V12.1173C16.8703 12.5119 17.0453 12.8725 17.3406 13.1298C17.6359 13.387 18.0235 13.5266 18.4281 13.5266H19.2131V14.4552C19.2131 15.2475 18.9068 15.996 18.3683 16.5345C17.8298 17.073 17.0813 17.3793 16.289 17.3793H15.589C14.9394 17.3793 14.3339 17.5852 13.8828 17.9471C13.4317 18.309 13.1693 18.7979 13.1693 19.3225V20.7241C13.1693 21.1287 13.3089 21.5163 13.5662 21.8116C13.8234 22.1069 14.1841 22.2819 14.5622 22.2819H16.8582C17.2628 22.2819 17.6504 22.1423 17.9457 21.885C18.241 21.6278 18.416 21.2671 18.416 20.889V18.593C18.416 18.1884 18.2764 17.8008 18.0192 17.5435C17.7619 17.2863 17.4012 17.1113 17.0231 17.1113H16.2381V16.1827C16.2381 15.3904 16.5444 14.6419 17.0829 14.1034C17.6214 13.5649 18.3699 13.2586 19.1622 13.2586H19.8622C20.5118 13.2586 21.1173 13.0527 21.5684 12.6908C22.0195 12.3289 22.2819 11.8399 22.2819 11.3154V9.82132ZM9.82132 1.71806C9.44319 1.71806 9.08256 1.89309 8.8253 2.18838C8.56804 2.48366 8.42847 2.87127 8.42847 3.27586V5.57186C8.42847 5.97645 8.56804 6.36406 8.8253 6.62132C9.08256 6.87858 9.44319 7.01814 9.82132 7.01814H12.1173C12.5119 7.01814 12.8725 6.87858 13.1298 6.62132C13.387 6.36406 13.5266 5.97645 13.5266 5.57186V4.17027C13.5266 3.37798 13.2203 2.62947 12.6818 2.09096C12.1433 1.55245 11.3948 1.24612 10.6025 1.24612H9.82132V1.71806ZM7.01814 8.42847C6.63945 8.42847 6.27811 8.56942 6.01831 8.82772C5.75851 9.08602 5.61814 9.44496 5.61814 9.82132V12.1173C5.61814 12.5119 5.75771 12.8725 6.01497 13.1298C6.27223 13.387 6.63286 13.5266 7.011 13.5266H9.30699C9.71158 13.5266 10.1001 13.387 10.3564 13.1298C10.6127 12.8725 10.7523 12.5119 10.7523 12.1173V11.2173C10.7523 10.5677 10.5464 9.96219 10.1845 9.51108C9.82259 9.05996 9.33364 8.79761 8.80914 8.79761H7.28614V8.42847ZM3.27586 8.99132C2.87127 8.99132 2.48366 9.13089 2.18838 9.38815C1.89309 9.64541 1.71806 10.006 1.71806 10.4006V12.6966C1.71806 13.1012 1.85763 13.4888 2.1149 13.7461C2.37216 14.0033 2.73279 14.1429 3.12738 14.1429H5.42338C5.82797 14.1429 6.21558 14.0033 6.47284 13.7461C6.7301 13.4888 6.86967 13.1012 6.86967 12.6966V11.8116C6.86967 11.162 6.66373 10.5565 6.30182 10.1054C5.93992 9.65426 5.45097 9.39191 4.92647 9.39191H3.27586V8.99132Z"/>
                             </svg>
                         }
+                        user={user}
+                        onLink={onLinkAccount}
+                        onUnlink={onUnlinkAccount}
+                        getApiKeyUrl="https://platform.openai.com/api-keys"
+                        verificationFn={verifyChatGptApiKey}
                     />
                      <DisabledServiceRow
                         name="Envato Elements"

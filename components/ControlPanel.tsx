@@ -112,8 +112,6 @@ interface ControlPanelProps {
     useLayoutToFill: boolean;
     setUseLayoutToFill: (use: boolean) => void;
     currentUser: User | null;
-    imageGenerationProvider: 'google' | 'freepik';
-    setImageGenerationProvider: (provider: 'google' | 'freepik') => void;
 }
 
 const ControlPanel: React.FC<ControlPanelProps> = (props) => {
@@ -125,7 +123,7 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
         colorMode, setColorMode, customPalette, setCustomPalette,
         styleGuide, useStyleGuide, setUseStyleGuide, onAnalyzeStyle,
         selectedLayoutId, setSelectedLayoutId, useLayoutToFill, setUseLayoutToFill,
-        currentUser, imageGenerationProvider, setImageGenerationProvider
+        currentUser
      } = props;
     const [topic, setTopic] = useState('Productivity Hacks');
     const [postCount, setPostCount] = useState(3);
@@ -353,17 +351,6 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
 
                     {creationMode === 'ai' && (
                         <div className="space-y-4 mt-4">
-                             <div>
-                                <label className="block text-sm font-medium text-gray-300 mb-1">Motor de Geração de Imagem</label>
-                                <div className="flex bg-zinc-900/70 p-1 rounded-lg">
-                                    <button onClick={() => setImageGenerationProvider('google')} className={`flex-1 text-center text-xs py-1.5 rounded-md transition-all duration-300 ${imageGenerationProvider === 'google' ? 'bg-blue-600 text-white shadow' : 'text-gray-300 hover:bg-zinc-700'}`}>
-                                        Google Gemini
-                                    </button>
-                                    <button onClick={() => setImageGenerationProvider('freepik')} className={`flex-1 text-center text-xs py-1.5 rounded-md transition-all duration-300 ${imageGenerationProvider === 'freepik' ? 'bg-blue-600 text-white shadow' : 'text-gray-300 hover:bg-zinc-700'}`}>
-                                        Freepik AI
-                                    </button>
-                                </div>
-                            </div>
                             <ImageUploader 
                                 title="Imagens de Referência (Opcional)"
                                 images={referenceImages}

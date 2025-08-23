@@ -1,5 +1,6 @@
 
 
+
 export interface BaseElement {
     id: string;
     type: string;
@@ -93,7 +94,7 @@ export interface BackgroundElement {
     type: 'background';
     src: string; // base64
     prompt?: string; // The prompt used to generate it, for regeneration
-    provider?: 'google' | 'freepik';
+    provider?: 'google';
 }
 
 
@@ -189,7 +190,6 @@ export interface User {
     avatar: string;
     linkedAccounts: {
         google?: LinkedAccount;
-        freepik?: LinkedAccount;
         envato?: LinkedAccount;
         chatgpt?: LinkedAccount;
     };
