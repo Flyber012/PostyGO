@@ -1,5 +1,4 @@
 
-
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import { createRoot } from 'react-dom/client';
@@ -20,6 +19,35 @@ import * as htmlToImage from 'html-to-image';
 import JSZip from 'jszip';
 import { ZoomIn, ZoomOut, Maximize, AlignHorizontalJustifyStart, AlignHorizontalJustifyCenter, AlignHorizontalJustifyEnd, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Copy, Trash2, ChevronLeft, ChevronRight, Eye, EyeOff, Lock, Unlock, X } from 'lucide-react';
 
+
+declare global {
+    interface Window {
+        google: any;
+    }
+}
+
+interface DecodedJwt {
+    sub: string;
+    name: string;
+    email: string;
+    picture: string;
+}
+
+function decodeJwtResponse(token: string): DecodedJwt {
+     try {
+        const base64Url = token.split('.')[1];
+        if (!base64Url) throw new Error("Invalid JWT token");
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+
+        return JSON.parse(jsonPayload);
+    } catch (e) {
+        console.error("Error decoding JWT", e);
+        throw new Error("Could not decode JWT");
+    }
+}
 
 const AddLayoutModal: React.FC<{
     isOpen: boolean;
@@ -152,7 +180,7 @@ const App: React.FC = () => {
 
     // --- User Authentication and Data Management ---
     useEffect(() => {
-        // Mock session check
+        // Check for a logged-in user in localStorage on initial load
         const savedUser = localStorage.getItem('postyUser');
         if (savedUser) {
             const user = JSON.parse(savedUser) as User;
@@ -162,23 +190,73 @@ const App: React.FC = () => {
             setBrandKits(savedKits ? JSON.parse(savedKits) : PRESET_BRAND_KITS);
         }
     }, []);
+    
+    const handleCredentialResponse = useCallback((response: any /* CredentialResponse */) => {
+        if (!response.credential) {
+            console.error("Google Sign-In failed: No credential returned.");
+            toast.error("Falha no login com Google. Tente novamente.");
+            return;
+        }
+        
+        try {
+            const decoded: DecodedJwt = decodeJwtResponse(response.credential);
+            
+            const realUser: User = {
+                id: decoded.sub,
+                name: decoded.name,
+                email: decoded.email,
+                avatar: decoded.picture,
+                linkedAccounts: {},
+            };
+    
+            // Check for previously saved profile data (like linked API keys)
+            const userProfile = localStorage.getItem(`user_profile_${realUser.id}`);
+            if (userProfile) {
+                realUser.linkedAccounts = JSON.parse(userProfile).linkedAccounts || {};
+            }
+    
+            localStorage.setItem('postyUser', JSON.stringify(realUser));
+            
+            const savedKits = localStorage.getItem(`brandKits_${realUser.id}`);
+            setBrandKits(savedKits ? JSON.parse(savedKits) : PRESET_BRAND_KITS);
+            if (!savedKits) {
+                 localStorage.setItem(`brandKits_${realUser.id}`, JSON.stringify(PRESET_BRAND_KITS));
+            }
+            
+            setCurrentUser(realUser);
+            toast.success(`Bem-vindo, ${realUser.name.split(' ')[0]}!`);
+        } catch (error) {
+            console.error("Error processing Google login:", error);
+            toast.error("Ocorreu um erro ao processar seu login.");
+        }
+    }, []);
+
+    useEffect(() => {
+        // Initialize Google Identity Services
+        if (window.google) {
+            window.google.accounts.id.initialize({
+                client_id: '730562602445-6a2gav1iki25ppretrf8da1p95esm5ra.apps.googleusercontent.com',
+                callback: handleCredentialResponse
+            });
+        } else {
+            console.warn("Google Identity Services script not loaded yet.");
+        }
+    }, [handleCredentialResponse]);
+
 
     const handleLogin = () => {
-        const mockUser: User = {
-            id: 'user_12345',
-            name: 'Usuário Convidado',
-            email: 'guest@posty.app',
-            avatar: 'https://i.pravatar.cc/150?u=guest@posty.app',
-            linkedAccounts: {},
-        };
-        localStorage.setItem('postyUser', JSON.stringify(mockUser));
-        localStorage.setItem(`brandKits_${mockUser.id}`, JSON.stringify(PRESET_BRAND_KITS));
-        setCurrentUser(mockUser);
-        setBrandKits(PRESET_BRAND_KITS);
-        toast.success('Login realizado com sucesso!');
+        if (!window.google) {
+            toast.error("Serviço de login do Google não está disponível. Tente recarregar a página.");
+            return;
+        }
+        // Triggers the Google One Tap prompt
+        window.google.accounts.id.prompt();
     };
 
     const handleLogout = () => {
+        if (window.google) {
+            window.google.accounts.id.disableAutoSelect();
+        }
         localStorage.removeItem('postyUser');
         setCurrentUser(null);
         setPosts([]);
@@ -198,6 +276,8 @@ const App: React.FC = () => {
         };
         setCurrentUser(updatedUser);
         localStorage.setItem('postyUser', JSON.stringify(updatedUser));
+        // Persist linked accounts separately to survive logouts
+        localStorage.setItem(`user_profile_${updatedUser.id}`, JSON.stringify({ linkedAccounts: updatedUser.linkedAccounts }));
         toast.success(`Conta ${service.charAt(0).toUpperCase() + service.slice(1)} conectada!`);
     };
     
@@ -210,6 +290,8 @@ const App: React.FC = () => {
         };
         setCurrentUser(updatedUser);
         localStorage.setItem('postyUser', JSON.stringify(updatedUser));
+        // Persist linked accounts separately to survive logouts
+        localStorage.setItem(`user_profile_${updatedUser.id}`, JSON.stringify({ linkedAccounts: updatedUser.linkedAccounts }));
         toast.success(`Conta ${service.charAt(0).toUpperCase() + service.slice(1)} desconectada.`);
     };
 
