@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { User } from '../types';
-import { X, CheckCircle, Link, XCircle, Key, Eye, EyeOff, RotateCw } from 'lucide-react';
+import { X, CheckCircle, Link, XCircle, Key, Eye, EyeOff, RotateCw, AlertTriangle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import * as geminiService from '../services/geminiService';
 import * as freepikService from '../services/freepikService';
@@ -52,7 +52,11 @@ const ServiceRow: React.FC<ServiceRowProps> = ({ service, name, description, ico
             setIsEditing(false);
             setApiKey('');
         } else {
-            toast.error(`Chave de API do ${name} inválida ou expirada. Verifique e tente novamente.`);
+            let errorMessage = `Chave de API do ${name} inválida ou expirada. Verifique e tente novamente.`;
+            if (service === 'google') {
+                errorMessage += ' Se o erro persistir, verifique se o faturamento está ativado em seu projeto do Google Cloud.';
+            }
+            toast.error(errorMessage);
         }
     };
 
@@ -99,7 +103,7 @@ const ServiceRow: React.FC<ServiceRowProps> = ({ service, name, description, ico
                     <div className="flex justify-between items-center">
                         <label className="text-sm font-medium text-zinc-300 flex items-center"><Key className="w-4 h-4 mr-2 text-zinc-400" /> Chave de API</label>
                         <a href={getApiKeyUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:text-blue-300 hover:underline">
-                            Obter Chave de API
+                            Obter Chave de API ↗
                         </a>
                     </div>
                      <div className="relative">
@@ -115,7 +119,23 @@ const ServiceRow: React.FC<ServiceRowProps> = ({ service, name, description, ico
                             {isKeyVisible ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                         </button>
                      </div>
-                    <div className="flex justify-end space-x-2">
+                      {service === 'google' && (
+                        <div className="mt-2 p-3 bg-yellow-900/50 border border-yellow-700 rounded-lg text-xs text-yellow-200 space-y-2">
+                             <p className="flex items-start">
+                                <AlertTriangle className="w-4 h-4 mr-2 mt-0.5 text-yellow-400 shrink-0"/>
+                                <span>
+                                    <strong>Aviso Importante:</strong> A geração de imagens (API Imagen) requer uma conta do Google Cloud com <strong>faturamento ativado</strong>.
+                                </span>
+                            </p>
+                            <p>
+                                O Posty usa a <strong>sua própria chave de API</strong>. Custos de geração de imagem serão cobrados diretamente na sua conta do Google Cloud.
+                            </p>
+                            <a href="https://console.cloud.google.com/billing" target="_blank" rel="noopener noreferrer" className="font-semibold text-yellow-100 hover:underline">
+                                Configurar Faturamento no Google Cloud ↗
+                            </a>
+                        </div>
+                    )}
+                    <div className="flex justify-end space-x-2 pt-2">
                         <button onClick={handleCancel} className="px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-white text-sm font-semibold rounded-md transition-colors">
                             Cancelar
                         </button>
