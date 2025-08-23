@@ -496,39 +496,6 @@ export async function generateTextForLayout(
     }
 }
 
-
-export async function generateBackgroundImages(apiKey: string, prompts: string[]): Promise<string[]> {
-    const ai = getAIClient(apiKey);
-    const imagePromises = prompts.map(prompt => 
-        ai.models.generateImages({
-            model: 'imagen-3.0-generate-002',
-            prompt: prompt,
-            config: {
-                numberOfImages: 1,
-                outputMimeType: 'image/png',
-                aspectRatio: '1:1', // Nota: A API gerará 1:1, nós o ajustaremos no CSS.
-            },
-        })
-    );
-
-    const responses = await Promise.all(imagePromises);
-    return responses.map(res => res.generatedImages[0].image.imageBytes);
-}
-
-export async function generateSingleBackgroundImage(apiKey: string, prompt: string): Promise<string> {
-    const ai = getAIClient(apiKey);
-    const response = await ai.models.generateImages({
-        model: 'imagen-3.0-generate-002',
-        prompt: prompt,
-        config: {
-            numberOfImages: 1,
-            outputMimeType: 'image/png',
-            aspectRatio: '1:1',
-        },
-    });
-    return `data:image/png;base64,${response.generatedImages[0].image.imageBytes}`;
-}
-
 export async function extractPaletteFromImage(apiKey: string, base64Image: string): Promise<PaletteExtractionResult> {
     const ai = getAIClient(apiKey);
     const [header, data] = base64Image.split(',');

@@ -94,7 +94,7 @@ export interface BackgroundElement {
     type: 'background';
     src: string; // base64
     prompt?: string; // The prompt used to generate it, for regeneration
-    provider?: 'google';
+    provider?: 'runware';
 }
 
 
@@ -192,5 +192,6 @@ export interface User {
         google?: LinkedAccount;
         envato?: LinkedAccount;
         chatgpt?: LinkedAccount;
+        runware?: LinkedAccount;
     };
 }

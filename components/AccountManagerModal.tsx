@@ -4,19 +4,21 @@
 
 import React, { useState, useEffect } from 'react';
 import { User } from '../types';
-import { X, CheckCircle, Link, XCircle, Key, Eye, EyeOff, RotateCw, AlertTriangle } from 'lucide-react';
+import { X, CheckCircle, Link, XCircle, Key, Eye, EyeOff, RotateCw, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import * as geminiService from '../services/geminiService';
+import * as runwareService from '../services/runwareService';
+
 
 interface AccountManagerModalProps {
     isOpen: boolean;
     onClose: () => void;
     user: User | null;
-    onLinkAccount: (service: 'google' | 'chatgpt' | 'envato', apiKey: string) => void;
-    onUnlinkAccount: (service: 'google' | 'chatgpt' | 'envato') => void;
+    onLinkAccount: (service: 'google' | 'chatgpt' | 'envato' | 'runware', apiKey: string) => void;
+    onUnlinkAccount: (service: 'google' | 'chatgpt' | 'envato' | 'runware') => void;
 }
 
-type Service = 'google' | 'chatgpt' | 'envato';
+type Service = 'google' | 'chatgpt' | 'envato' | 'runware';
 
 interface ServiceRowProps {
     service: Service;
@@ -70,9 +72,6 @@ const ServiceRow: React.FC<ServiceRowProps> = ({ service, name, description, ico
             setApiKey('');
         } else {
             let errorMessage = `Chave de API do ${name} inválida ou expirada. Verifique e tente novamente.`;
-            if (service === 'google') {
-                errorMessage += ' Se o erro persistir, verifique se o faturamento está ativado em seu projeto do Google Cloud.';
-            }
             toast.error(errorMessage, { duration: 6000 });
         }
     };
@@ -136,22 +135,6 @@ const ServiceRow: React.FC<ServiceRowProps> = ({ service, name, description, ico
                             {isKeyVisible ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                         </button>
                      </div>
-                      {service === 'google' && (
-                        <div className="mt-2 p-3 bg-yellow-900/50 border border-yellow-700 rounded-lg text-xs text-yellow-200 space-y-2">
-                             <p className="flex items-start">
-                                <AlertTriangle className="w-4 h-4 mr-2 mt-0.5 text-yellow-400 shrink-0"/>
-                                <span>
-                                    <strong>Aviso Importante:</strong> A geração de imagens (API Imagen) requer uma conta do Google Cloud com <strong>faturamento ativado</strong>.
-                                </span>
-                            </p>
-                            <p>
-                                O Posty usa a <strong>sua própria chave de API</strong>. Custos de geração de imagem serão cobrados diretamente na sua conta do Google Cloud.
-                            </p>
-                            <a href="https://console.cloud.google.com/billing" target="_blank" rel="noopener noreferrer" className="font-semibold text-yellow-100 hover:underline">
-                                Configurar Faturamento no Google Cloud ↗
-                            </a>
-                        </div>
-                    )}
                     <div className="flex justify-end space-x-2 pt-2">
                         <button onClick={handleCancel} className="px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 text-white text-sm font-semibold rounded-md transition-colors">
                             Cancelar
@@ -212,13 +195,24 @@ const AccountManagerModal: React.FC<AccountManagerModalProps> = ({ isOpen, onClo
                     <ServiceRow 
                         service="google"
                         name="Google Gemini"
-                        description="Para geração de textos e imagens com IA."
+                        description="Para geração de textos e análise de estilo."
                         icon={<img src="https://www.gstatic.com/images/branding/product/2x/gemini_48dp.png" alt="Google Gemini" className="w-6 h-6"/>}
                         user={user}
                         onLink={onLinkAccount}
                         onUnlink={onUnlinkAccount}
                         getApiKeyUrl="https://aistudio.google.com/app/apikey"
                         verificationFn={geminiService.verifyApiKey}
+                    />
+                    <ServiceRow 
+                        service="runware"
+                        name="Runware AI"
+                        description="Para geração de imagens com IA."
+                        icon={<ImageIcon className="w-6 h-6 text-white"/>}
+                        user={user}
+                        onLink={onLinkAccount}
+                        onUnlink={onUnlinkAccount}
+                        getApiKeyUrl="https://my.runware.ai/keys"
+                        verificationFn={runwareService.verifyApiKey}
                     />
                      <ServiceRow
                         service="chatgpt"

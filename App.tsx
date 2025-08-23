@@ -6,6 +6,7 @@ import { createRoot } from 'react-dom/client';
 import { Post, BrandKit, PostSize, AnyElement, TextElement, ImageElement, GradientElement, BackgroundElement, ShapeElement, QRCodeElement, FontDefinition, LayoutTemplate, BrandAsset, User } from './types';
 import { POST_SIZES, INITIAL_FONTS, PRESET_BRAND_KITS } from './constants';
 import * as geminiService from './services/geminiService';
+import * as runwareService from './services/runwareService';
 import ControlPanel from './components/ControlPanel';
 import CanvasEditor from './components/CanvasEditor';
 import PostGallery from './components/PostGallery';
@@ -264,7 +265,7 @@ const App: React.FC = () => {
         toast('Você saiu.', { icon: '👋' });
     };
 
-    const handleLinkAccount = (service: 'google' | 'chatgpt' | 'envato', apiKey: string) => {
+    const handleLinkAccount = (service: 'google' | 'chatgpt' | 'envato' | 'runware', apiKey: string) => {
         if (!currentUser) return;
         const updatedUser: User = {
             ...currentUser,
@@ -280,7 +281,7 @@ const App: React.FC = () => {
         toast.success(`Conta ${service.charAt(0).toUpperCase() + service.slice(1)} conectada!`);
     };
     
-    const handleUnlinkAccount = (service: 'google' | 'chatgpt' | 'envato') => {
+    const handleUnlinkAccount = (service: 'google' | 'chatgpt' | 'envato' | 'runware') => {
         if (!currentUser) return;
         const { [service]: _, ...remainingAccounts } = currentUser.linkedAccounts;
         const updatedUser: User = {
@@ -394,10 +395,16 @@ const App: React.FC = () => {
             return;
         }
 
-        // Check for required API keys
         const googleApiKey = currentUser.linkedAccounts.google?.apiKey;
         if (!googleApiKey) {
             toast.error("Conecte sua chave de API do Google Gemini para gerar conteúdo.");
+            setAccountModalOpen(true);
+            return;
+        }
+
+        const runwareApiKey = currentUser.linkedAccounts.runware?.apiKey;
+        if (!useUploadedBgs && !runwareApiKey) {
+            toast.error("Conecte sua chave de API da Runware AI para gerar imagens.");
             setAccountModalOpen(true);
             return;
         }
@@ -430,11 +437,12 @@ const App: React.FC = () => {
                     }
                     backgroundSources = customBackgrounds.map(src => ({ src }));
                 } else {
+                    if (!runwareApiKey) throw new Error("A chave de API da Runware é necessária para gerar fundos.");
                     setLoadingMessage('Gerando novos fundos para seu layout...');
                     toast.loading('Gerando novos fundos...', { id: toastId });
                     const backgroundPrompts = await geminiService.generateImagePrompts(googleApiKey, topic, count, referenceImages, activeStyleGuide);
                     
-                    const aiBackgroundData = await geminiService.generateBackgroundImages(googleApiKey, backgroundPrompts);
+                    const aiBackgroundData = await runwareService.generateBackgroundImages(runwareApiKey, backgroundPrompts);
 
                     backgroundSources = aiBackgroundData.map((data, i) => ({
                         src: `data:image/png;base64,${data}`,
@@ -475,7 +483,7 @@ const App: React.FC = () => {
                     
                     const backgroundElement: BackgroundElement = {
                         id: `${newPostId}-background`, type: 'background', src: bgData.src, prompt: bgData.prompt,
-                        provider: useUploadedBgs ? undefined : 'google',
+                        provider: useUploadedBgs ? undefined : 'runware',
                     };
 
                     const clonedForegroundElements: AnyElement[] = JSON.parse(JSON.stringify(
@@ -576,6 +584,7 @@ const App: React.FC = () => {
                 toast.success('Posts criados com sucesso!', { id: toastId });
 
             } else {
+                if (!runwareApiKey) throw new Error("A chave de API da Runware é necessária para gerar fundos.");
                 // Full AI-based generation
                 setLoadingMessage('Aquecendo a IA...');
                 toast.loading('Aquecendo a IA...', { id: toastId });
@@ -591,7 +600,7 @@ const App: React.FC = () => {
                     setLoadingMessage(`Gerando ${count} visuais coesos...`);
                     toast.loading(`Gerando ${count} visuais coesos...`, { id: toastId });
                     
-                    const aiBackgroundsBase64 = await geminiService.generateBackgroundImages(googleApiKey, imagePrompts);
+                    const aiBackgroundsBase64 = await runwareService.generateBackgroundImages(runwareApiKey, imagePrompts);
                     const backgroundSrcs = aiBackgroundsBase64.map(b64 => `data:image/png;base64,${b64}`);
         
                     // Step 3: Generate layout for each image based on the script
@@ -623,7 +632,7 @@ const App: React.FC = () => {
                             type: 'background',
                             src: backgroundSrc,
                             prompt: scriptData.imagePrompt,
-                            provider: 'google',
+                            provider: 'runware',
                         };
             
                         const fontSizeMap: Record<string, number> = { large: 48, medium: 28, small: 18, cta: 22 };
@@ -679,7 +688,7 @@ const App: React.FC = () => {
                     setLoadingMessage('Projetando visuais deslumbrantes...');
                     toast.loading('Projetando visuais deslumbrantes...', { id: toastId });
                     
-                    const aiBackgroundData = await geminiService.generateBackgroundImages(googleApiKey, backgroundPrompts);
+                    const aiBackgroundData = await runwareService.generateBackgroundImages(runwareApiKey, backgroundPrompts);
                     
                     const finalBackgrounds = aiBackgroundData.map((data, i) => ({
                         src: `data:image/png;base64,${data}`,
@@ -702,7 +711,7 @@ const App: React.FC = () => {
                         const postId = uuidv4();
                         
                         const backgroundElement: BackgroundElement = {
-                            id: `${postId}-background`, type: 'background', src: bgData.src, prompt: bgData.prompt, provider: 'google',
+                            id: `${postId}-background`, type: 'background', src: bgData.src, prompt: bgData.prompt, provider: 'runware',
                         };
             
                         const fontSizeMap: Record<string, number> = { large: 48, medium: 28, small: 18, cta: 22 };
@@ -1177,16 +1186,16 @@ const App: React.FC = () => {
         const bgElement = post?.elements.find(e => e.id === elementId) as BackgroundElement | undefined;
         if (!bgElement || !currentUser) return;
 
-        const apiKey = currentUser.linkedAccounts.google?.apiKey;
+        const apiKey = currentUser.linkedAccounts.runware?.apiKey;
         if (!apiKey) {
-            toast.error(`Conecte sua chave de API do Google Gemini para gerar um novo fundo.`);
+            toast.error(`Conecte sua chave de API da Runware AI para gerar um novo fundo.`);
             setAccountModalOpen(true);
             return;
         }
 
-        const toastId = toast.loading(`Gerando novo fundo com Google Gemini...`);
+        const toastId = toast.loading(`Gerando novo fundo com Runware AI...`);
         try {
-            const newSrc = await geminiService.generateSingleBackgroundImage(apiKey, prompt);
+            const newSrc = await runwareService.generateSingleBackgroundImage(apiKey, prompt);
             updatePostElement(elementId, { src: newSrc });
             toast.success("Fundo atualizado!", { id: toastId });
         } catch (e) {
