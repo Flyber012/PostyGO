@@ -1,5 +1,18 @@
+import { PostSize } from '../types';
+
+// Chave de API padrão fornecida pelo usuário.
+const DEFAULT_API_KEY = "FPSX79eca67f2b982538ba1d2e970fa24cb0";
 const GENERATE_ENDPOINT = 'https://api.freepik.com/v1/ai/images';
 const VERIFY_ENDPOINT = 'https://api.freepik.com/v1/ai/styles'; // Usar um endpoint leve e de leitura
+
+const getApiKey = (userApiKey?: string) => {
+    const apiKey = userApiKey || DEFAULT_API_KEY;
+    if (!apiKey) {
+        // Este caso não deve ocorrer com uma chave padrão, mas é uma boa prática.
+        throw new Error("Chave de API do Freepik não encontrada. Por favor, adicione sua chave em 'Gerenciar Contas'.");
+    }
+    return apiKey;
+};
 
 /**
  * Verifica se a chave de API do Freepik é válida fazendo uma chamada leve à API.
@@ -31,7 +44,12 @@ export async function verifyApiKey(apiKey: string): Promise<boolean> {
  * @param prompt O prompt de texto para a geração da imagem.
  * @returns Uma string base64 dos dados da imagem.
  */
-async function generateImage(apiKey: string, prompt: string): Promise<string> {
+async function generateImage(apiKey: string, prompt: string, postSize: PostSize): Promise<string> {
+    // A documentação do Freepik não é clara sobre os tamanhos suportados além de 1024x1024.
+    // Para garantir a compatibilidade e evitar erros, usaremos "1024x1024".
+    // A aplicação usa `object-cover` para a imagem de fundo, que irá preencher o espaço corretamente.
+    const size = "1024x1024";
+
     const response = await fetch(GENERATE_ENDPOINT, {
         method: 'POST',
         headers: {
@@ -41,7 +59,7 @@ async function generateImage(apiKey: string, prompt: string): Promise<string> {
         },
         body: JSON.stringify({
             prompt: prompt,
-            size: "1024x1024",
+            size: size,
             quantity: 1
         })
     });
@@ -64,22 +82,26 @@ async function generateImage(apiKey: string, prompt: string): Promise<string> {
 
 /**
  * Gera várias imagens de fundo em paralelo.
- * @param apiKey A chave de API do usuário.
  * @param prompts Um array de prompts de texto.
+ * @param postSize O tamanho dos posts a serem gerados.
+ * @param userApiKey A chave de API opcional do usuário.
  * @returns Uma promessa que resolve para um array de strings base64 de imagens.
  */
-export async function generateBackgroundImages(apiKey: string, prompts: string[]): Promise<string[]> {
-    const imagePromises = prompts.map(prompt => generateImage(apiKey, prompt));
+export async function generateBackgroundImages(prompts: string[], postSize: PostSize, userApiKey?: string): Promise<string[]> {
+    const apiKey = getApiKey(userApiKey);
+    const imagePromises = prompts.map(prompt => generateImage(apiKey, prompt, postSize));
     return Promise.all(imagePromises);
 }
 
 /**
  * Gera uma única imagem de fundo e retorna uma URL de dados completa.
- * @param apiKey A chave de API do usuário.
  * @param prompt O prompt de texto.
+ * @param postSize O tamanho do post a ser gerado.
+ * @param userApiKey A chave de API opcional do usuário.
  * @returns Uma promessa que resolve para uma URL de dados de imagem completa (ex: 'data:image/png;base64,...').
  */
-export async function generateSingleBackgroundImage(apiKey: string, prompt: string): Promise<string> {
-    const base64Data = await generateImage(apiKey, prompt);
+export async function generateSingleBackgroundImage(prompt: string, postSize: PostSize, userApiKey?: string): Promise<string> {
+    const apiKey = getApiKey(userApiKey);
+    const base64Data = await generateImage(apiKey, prompt, postSize);
     return `data:image/png;base64,${base64Data}`;
 }

@@ -431,13 +431,10 @@ const App: React.FC = () => {
                         toast.loading(`Criando imagens de fundo com Gemini...`, { id: toastId });
                         generatedBase64Images = await geminiService.generateBackgroundImages(imagePrompts, postSize, userApiKey);
                     } else if (aiProvider === 'freepik') {
-                        const freepikApiKey = user.linkedAccounts?.freepik?.apiKey;
-                        if (!freepikApiKey) {
-                            throw new Error("A conta Freepik não está conectada. Adicione sua chave de API.");
-                        }
+                        const freepikUserApiKey = user.linkedAccounts?.freepik?.apiKey;
                         setLoadingMessage(`Criando imagens de fundo com Freepik...`);
                         toast.loading(`Criando imagens de fundo com Freepik...`, { id: toastId });
-                        generatedBase64Images = await freepikService.generateBackgroundImages(freepikApiKey, imagePrompts);
+                        generatedBase64Images = await freepikService.generateBackgroundImages(imagePrompts, postSize, freepikUserApiKey);
                     }
                     
                     backgroundSources = generatedBase64Images.map((b64, index) => ({
@@ -935,12 +932,8 @@ const App: React.FC = () => {
             const provider = bgElement.provider || 'gemini';
     
             if (provider === 'freepik') {
-                const freepikApiKey = user.linkedAccounts?.freepik?.apiKey;
-                if (!freepikApiKey) {
-                    toast.error("Conecte sua conta Freepik para regenerar.", { id: toastId });
-                    return;
-                }
-                newSrc = await freepikService.generateSingleBackgroundImage(freepikApiKey, prompt);
+                const freepikUserApiKey = user.linkedAccounts?.freepik?.apiKey;
+                newSrc = await freepikService.generateSingleBackgroundImage(prompt, postSize, freepikUserApiKey);
             } else { // Gemini
                 const userApiKey = user.linkedAccounts?.google?.apiKey;
                 const isFreeTierUser = !userApiKey;
