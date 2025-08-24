@@ -47,13 +47,21 @@ const convertMarkdownToHtml = (text: string, highlightColor?: string, accentFont
 const convertAILayoutToElements = (aiLayout: AIGeneratedTextElement[], postSize: PostSize, postId: string): TextElement[] => {
     return aiLayout.map((aiEl, index) => {
         const { width: postWidth, height: postHeight } = postSize;
-        const fontSizeMapping = {
-            large: postWidth * 0.09,
-            medium: postWidth * 0.05,
-            small: postWidth * 0.03,
-            cta: postWidth * 0.04,
+
+        // New logic for font sizes with variability within user-defined limits.
+        const fontSizeRanges = {
+            large: { min: 38, max: 50 },   // Títulos
+            medium: { min: 24, max: 30 },  // Descrições/Corpo
+            small: { min: 18, max: 22 },   // Rodapés/Texto pequeno
+            cta: { min: 26, max: 32 },     // Call-to-actions
         };
-        const fontSize = Math.round(fontSizeMapping[aiEl.fontSize] || fontSizeMapping.medium);
+        
+        const category = aiEl.fontSize || 'medium';
+        const range = fontSizeRanges[category];
+        // Creates a pseudo-random but deterministic size based on element properties
+        const hash = (aiEl.content.length + aiEl.x + aiEl.y * 2) % 101 / 100; // Use 101 (prime) for better distribution
+        const fontSize = Math.round(range.min + (range.max - range.min) * hash);
+
         const element: TextElement = {
             id: `${postId}-text-${index}`,
             type: 'text',
@@ -73,10 +81,10 @@ const convertAILayoutToElements = (aiLayout: AIGeneratedTextElement[], postSize:
             verticalAlign: 'middle',
             rotation: aiEl.rotation || 0,
             opacity: 1, locked: false, visible: true, letterSpacing: 0,
-            lineHeight: aiEl.lineHeight || 1.3, // A more standard default
+            lineHeight: aiEl.lineHeight || 1.3,
             backgroundColor: aiEl.backgroundColor,
-            padding: aiEl.fontSize === 'cta' ? fontSize * 0.5 : 0,
-            borderRadius: aiEl.fontSize === 'cta' ? 8 : 0,
+            padding: category === 'cta' ? fontSize * 0.5 : 0,
+            borderRadius: category === 'cta' ? 8 : 0,
         };
         return element;
     });

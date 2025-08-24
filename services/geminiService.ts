@@ -210,7 +210,7 @@ export async function generateLayoutAndContentForImage(base64Image: string, topi
     1.  **Conteúdo Criativo com Personalidade:** Primeiro, crie o texto. Seja envolvente, use markdown (\`**destaque**\`) para ênfase e emojis relevantes. Use 'Poppins' como a fontFamily padrão se nenhuma outra for especificada.
     2.  **ANÁLISE VISUAL CRÍTICA:** Depois de ter o texto, analise a imagem. Identifique as "zonas seguras" com espaço negativo (céu, paredes, áreas desfocadas).
     3.  **NUNCA OBSTRUA O ESSENCIAL:** É PROIBIDO posicionar texto sobre rostos, produtos, ou o ponto focal principal da imagem. A legibilidade e o respeito pela imagem são fundamentais.
-    4.  **HIERARQUIA E POSICIONAMENTO:** Decomponha seu texto em elementos lógicos (título, corpo, etc.) e distribua-os harmonicamente nas zonas seguras que você identificou.
+    4.  **HIERARQUIA E POSICIONAMENTO:** Decomponha seu texto em elementos lógicos (título, corpo, etc.) e distribua-os harmonicamente. O título (use fontSize: 'large') deve ser o mais proeminente. A descrição (use fontSize: 'medium') deve ser claramente secundária e legível. Texto de rodapé ou detalhes (use fontSize: 'small') deve ser discreto.
     5.  **CONTRASTE É REI:** Analise o tom da imagem (\`backgroundTone\`) *exatamente* onde você vai colocar cada bloco de texto. Use branco ('#FFFFFF') para fundos escuros e um cinza muito escuro/preto ('#0F172A') para fundos claros.
     6.  **DESIGN INTELIGENTE:**
         -   Para textos com markdown, sugira uma \`highlightColor\` vibrante da imagem e uma \`accentFontFamily\` de contraste.
@@ -238,7 +238,7 @@ export async function generateLayoutAndContentForImage(base64Image: string, topi
 
         **Seu Processo (Seguindo as Regras):**
         1.  **Conteúdo no Tom Certo:** Crie o texto alinhado com o tópico e a "vibe" do Guia de Estilo.
-        2.  **Análise e Posicionamento:** Analise a imagem para encontrar "zonas seguras" e posicione os elementos de texto conforme as regras de composição do Guia de Estilo. **NUNCA** coloque texto sobre rostos ou pontos focais.
+        2.  **Análise e Posicionamento:** Analise a imagem para encontrar "zonas seguras". Posicione os elementos de texto seguindo o Guia de Estilo e criando uma hierarquia visual clara. O título (fontSize: 'large') deve ser proeminente, e a descrição (fontSize: 'medium') secundária. **NUNCA** coloque texto sobre rostos ou pontos focais.
         3.  **Tipografia e Cores:** Aplique as fontes e cores OBRIGATÓRIAS do Brand Kit.
         4.  **Contraste:** Use branco ('#FFFFFF') para fundos escuros e preto/cinza escuro ('#0F172A') para fundos claros, a menos que a paleta do Brand Kit forneça outras opções.`;
     }

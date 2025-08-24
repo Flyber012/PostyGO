@@ -200,7 +200,12 @@ const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSel
                 ref={nodeRef}
                 className={`absolute group ${isSelected && !isLocked ? 'border-2 border-purple-500' : 'border-2 border-transparent hover:border-purple-500/30'} ${!isLocked && !isEditing ? 'handle cursor-move' : 'cursor-default'}`}
                 style={containerStyles}
-                onClick={(e) => { e.stopPropagation(); onSelect(element.id); }}
+                onClick={(e) => { 
+                    e.stopPropagation(); 
+                    if (!isEditing) {
+                        onSelect(element.id);
+                    }
+                }}
                 onDoubleClick={handleDoubleClick}
             >
                 {renderContent()}
