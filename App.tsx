@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import { Post, BrandKit, PostSize, AnyElement, TextElement, ImageElement, BackgroundElement, FontDefinition, LayoutTemplate, BrandAsset, TextStyle, Project, AIGeneratedTextElement, ShapeElement, QRCodeElement } from './types';
@@ -14,7 +15,7 @@ import { GenerationWizard } from './components/GenerationWizard';
 import { BrandKitPanel } from './components/BrandKitPanel';
 import saveAs from 'file-saver';
 import { v4 as uuidv4 } from 'uuid';
-import { ZoomIn, ZoomOut, Maximize, PanelLeft, PanelRight, Package, Image as ImageIcon, FileText, X } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize, PanelLeft, PanelRight, Package, Image as ImageIcon, FileText, X, LayoutTemplate as LayoutTemplateIcon } from 'lucide-react';
 import AdvancedColorPicker from './components/ColorPicker';
 
 // --- HELPERS ---
@@ -85,20 +86,27 @@ const WelcomeScreen: React.FC<{ onNewProject: (size: PostSize) => void; onOpenPr
 
     return (
         <div className="flex h-full w-full bg-zinc-900 text-gray-300">
-            <aside className="w-64 bg-zinc-950/50 p-6 flex flex-col space-y-4">
-                 <h1 className="text-2xl font-bold animated-gradient-text">Posty</h1>
-                <button
-                    onClick={() => onNewProject(POST_SIZES[0])}
-                    className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors text-left"
-                >
-                    Novo Projeto...
-                </button>
-                <button
-                    onClick={onOpenProject}
-                    className="w-full bg-zinc-700 hover:bg-zinc-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors text-left"
-                >
-                    Abrir...
-                </button>
+            <aside className="w-64 bg-zinc-950/50 p-4 flex flex-col">
+                <div className="flex items-center space-x-3 px-2 pt-2 mb-6">
+                    <LayoutTemplateIcon className="w-9 h-9 text-white" />
+                    <h1 className="text-3xl font-bold">
+                        <span className="text-white">Po</span><span className="text-purple-400">sty</span>
+                    </h1>
+                </div>
+                <div className="space-y-3">
+                    <button
+                        onClick={() => onNewProject(POST_SIZES[0])}
+                        className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-4 rounded-xl transition-colors text-left"
+                    >
+                        Novo Projeto...
+                    </button>
+                    <button
+                        onClick={onOpenProject}
+                        className="w-full bg-zinc-700 hover:bg-zinc-600 text-white font-semibold py-3 px-4 rounded-xl transition-colors text-left"
+                    >
+                        Abrir...
+                    </button>
+                </div>
             </aside>
             <main className="flex-1 p-8 overflow-y-auto">
                  <h2 className="text-xl font-semibold mb-4 text-gray-200">Comece com um Template</h2>
@@ -176,8 +184,8 @@ const App: React.FC = () => {
     // UI State
     const [isLoading, setIsLoading] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState('');
-    const [isLeftPanelOpen, setLeftPanelOpen] = useState(true);
-    const [isRightPanelOpen, setRightPanelOpen] = useState(true);
+    const [isLeftPanelOpen, setLeftPanelOpen] = useState(false);
+    const [isRightPanelOpen, setRightPanelOpen] = useState(false);
     const [zoom, setZoom] = useState(1);
     const [isWizardOpen, setWizardOpen] = useState(false);
     const [isBrandKitPanelOpen, setBrandKitPanelOpen] = useState(false);
@@ -226,10 +234,7 @@ const App: React.FC = () => {
         const handleResize = () => {
             const mobile = window.innerWidth <= 1024;
             setIsMobileView(mobile);
-            if (!mobile) {
-                setLeftPanelOpen(true);
-                setRightPanelOpen(true);
-            } else {
+            if (mobile) {
                 setLeftPanelOpen(false);
                 setRightPanelOpen(false);
             }
@@ -257,6 +262,10 @@ const App: React.FC = () => {
         const newProj = createNewProject(`Untitled Project ${projects.length + 1}`, size);
         setProjects(prev => [...prev, newProj]);
         setCurrentProjectId(newProj.id);
+        if (!isMobileView) {
+            setLeftPanelOpen(true);
+            setRightPanelOpen(true);
+        }
     };
 
     const handleSaveProject = () => {
@@ -285,6 +294,10 @@ const App: React.FC = () => {
         const recentIds = JSON.parse(localStorage.getItem('posty_recent_project_ids') || '[]');
         const updatedRecents = [project.id, ...recentIds.filter((id: string) => id !== project.id)].slice(0, 8);
         localStorage.setItem('posty_recent_project_ids', JSON.stringify(updatedRecents));
+        if (!isMobileView) {
+            setLeftPanelOpen(true);
+            setRightPanelOpen(true);
+        }
     };
 
     const handleOpenProjectFile = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -310,7 +323,11 @@ const App: React.FC = () => {
         const newProjects = projects.filter(p => p.id !== projectIdToClose);
         setProjects(newProjects);
         if (currentProjectId === projectIdToClose) {
-            if (newProjects.length === 0) { setCurrentProjectId(null); } 
+            if (newProjects.length === 0) {
+                setCurrentProjectId(null);
+                setLeftPanelOpen(false);
+                setRightPanelOpen(false);
+            } 
             else { setCurrentProjectId(newProjects[Math.max(0, projectIndex - 1)].id); }
         }
     };
@@ -572,7 +589,7 @@ const App: React.FC = () => {
             <input type="file" ref={openProjectInputRef} onChange={handleOpenProjectFile} accept=".posty" className="hidden" />
             <input type="file" ref={importKitRef} onChange={() => {}} accept=".json" className="hidden" />
 
-            <div className={`app-layout font-sans bg-gray-950 text-gray-100 ${isLeftPanelOpen ? 'left-panel-open' : ''} ${isRightPanelOpen ? 'right-panel-open' : ''}`}>
+            <div className={`app-layout font-sans bg-gray-950 text-gray-100 ${projects.length > 0 && isLeftPanelOpen ? 'left-panel-open' : ''} ${projects.length > 0 && isRightPanelOpen ? 'right-panel-open' : ''}`}>
                 <Header onNewProject={handleNewProject} onSaveProject={handleSaveProject} onSaveAsProject={handleSaveAsProject} onOpenProject={handleOpenProjectClick} hasProject={projects.length > 0} />
 
                 <aside className={`left-panel ${isMobileView && isLeftPanelOpen ? 'mobile-panel-open' : ''}`}>
@@ -624,16 +641,20 @@ const App: React.FC = () => {
                         </div>
                     )}
 
-                    <div className="absolute top-4 left-4 flex flex-col space-y-2 z-10">
-                        <button onClick={() => setLeftPanelOpen(!isLeftPanelOpen)} className="p-2 bg-zinc-900/70 backdrop-blur-sm rounded-lg shadow-lg hover:bg-zinc-800 transition-colors">
-                            <PanelLeft className="w-5 h-5"/>
-                        </button>
-                    </div>
-                     <div className="absolute top-4 right-4 flex flex-col space-y-2 z-10">
-                        <button onClick={() => setRightPanelOpen(!isRightPanelOpen)} className="p-2 bg-zinc-900/70 backdrop-blur-sm rounded-lg shadow-lg hover:bg-zinc-800 transition-colors">
-                            <PanelRight className="w-5 h-5"/>
-                        </button>
-                    </div>
+                    {projects.length > 0 && (
+                        <>
+                            <div className="absolute top-4 left-4 flex flex-col space-y-2 z-10">
+                                <button onClick={() => setLeftPanelOpen(!isLeftPanelOpen)} className="p-2 bg-zinc-900/70 backdrop-blur-sm rounded-lg shadow-lg hover:bg-zinc-800 transition-colors">
+                                    <PanelLeft className="w-5 h-5"/>
+                                </button>
+                            </div>
+                             <div className="absolute top-4 right-4 flex flex-col space-y-2 z-10">
+                                <button onClick={() => setRightPanelOpen(!isRightPanelOpen)} className="p-2 bg-zinc-900/70 backdrop-blur-sm rounded-lg shadow-lg hover:bg-zinc-800 transition-colors">
+                                    <PanelRight className="w-5 h-5"/>
+                                </button>
+                            </div>
+                        </>
+                    )}
                     
                     {projects.length > 0 && (
                         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center space-x-2 bg-zinc-900/70 backdrop-blur-sm p-2 rounded-lg shadow-lg z-10">
