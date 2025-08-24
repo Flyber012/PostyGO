@@ -36,8 +36,8 @@ export default async function handler(req: any, res: any) {
                 prompt: prompt,
                 negative_prompt: "blurry, ugly, deformed, noisy, text, letters, watermark, low quality",
                 num_images: 1,
-                image: { size: size },
-                styling: { style: "photorealistic" },
+                size: size,
+                style: "photorealistic",
             }),
         });
 
@@ -45,15 +45,23 @@ export default async function handler(req: any, res: any) {
             let errorMessage = 'Falha na requisição';
             try {
                 const errorData = await startResponse.json();
-                // Log do erro completo para depuração no servidor
                 console.error("Freepik API Error:", JSON.stringify(errorData, null, 2));
-                // Constrói uma mensagem mais útil para o cliente
+
+                let detailMessage = '';
+                if (typeof errorData.detail === 'string') {
+                    detailMessage = errorData.detail;
+                } else if (Array.isArray(errorData.detail)) {
+                    detailMessage = errorData.detail.map((d: any) => d.msg || JSON.stringify(d)).join('; ');
+                }
+
                 errorMessage = errorData.title || 'Erro desconhecido do Freepik';
-                if (errorData.detail) {
-                    errorMessage += `. Detalhe: ${errorData.detail}`;
+                if (detailMessage) {
+                    errorMessage += `. Detalhe: ${detailMessage}`;
                 }
             } catch (e) {
-                errorMessage = `O serviço do Freepik respondeu com um erro inesperado (Status: ${startResponse.status}).`;
+                 const errorText = await startResponse.text();
+                 console.error("Freepik API non-JSON error:", errorText);
+                 errorMessage = `O serviço do Freepik respondeu com um erro inesperado (Status: ${startResponse.status}).`;
             }
             res.status(startResponse.status).json({ error: errorMessage });
             return;
