@@ -34,6 +34,7 @@ export default async function handler(req: any, res: any) {
             },
             body: JSON.stringify({
                 prompt: prompt,
+                negative_prompt: "blurry, ugly, deformed, noisy, text, letters, watermark, low quality",
                 num_images: 1,
                 image: { size: size },
                 styling: { style: "photorealistic" },
@@ -41,8 +42,20 @@ export default async function handler(req: any, res: any) {
         });
 
         if (!startResponse.ok) {
-            const errorData = await startResponse.json();
-            res.status(startResponse.status).json({ error: `Erro do Freepik ao iniciar: ${errorData.title || 'Falha na requisição'}` });
+            let errorMessage = 'Falha na requisição';
+            try {
+                const errorData = await startResponse.json();
+                // Log do erro completo para depuração no servidor
+                console.error("Freepik API Error:", JSON.stringify(errorData, null, 2));
+                // Constrói uma mensagem mais útil para o cliente
+                errorMessage = errorData.title || 'Erro desconhecido do Freepik';
+                if (errorData.detail) {
+                    errorMessage += `. Detalhe: ${errorData.detail}`;
+                }
+            } catch (e) {
+                errorMessage = `O serviço do Freepik respondeu com um erro inesperado (Status: ${startResponse.status}).`;
+            }
+            res.status(startResponse.status).json({ error: errorMessage });
             return;
         }
 

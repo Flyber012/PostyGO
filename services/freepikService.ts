@@ -41,7 +41,8 @@ const callFreepikProxy = async (prompt: string, postSize: PostSize, userApiKey?:
         });
 
         if (!response.ok) {
-            const errorData = await response.json();
+            // Tenta obter o erro detalhado do proxy; caso contrário, mostra uma mensagem padrão.
+            const errorData = await response.json().catch(() => ({ error: 'Resposta de erro inválida do servidor.' }));
             throw new Error(`Erro do Proxy Freepik: ${errorData.error || 'Falha na requisição'}`);
         }
 
