@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { Toaster, toast } from 'react-hot-toast';
@@ -824,13 +825,19 @@ const App: React.FC = () => {
     const handleToggleTextStyle = (style: 'bold' | 'italic' | 'underline') => {
         if (!selectedElement || selectedElement.type !== 'text') return;
 
-        if (activeEditorRef.current && activeEditorRef.current.id === selectedElement.id) {
+        // If in rich text editing mode, apply style only to the selection
+        if (isEditingText && activeEditorRef.current) {
             document.execCommand(style);
+            
+            // Persist the change by saving the new HTML content
             const newContent = activeEditorRef.current.node.innerHTML;
             updatePostElement(selectedElement.id, { content: newContent });
+
+            // Keep focus and update UI to reflect selection style
             activeEditorRef.current.node.focus();
             handleSelectionUpdate();
         } else {
+            // Fallback to styling the entire element if not editing
             const propMap = { bold: 'fontWeight', italic: 'fontStyle', underline: 'textDecoration' };
             const prop = propMap[style];
             let newValue: any;
@@ -846,7 +853,8 @@ const App: React.FC = () => {
     const handleUpdateTextProperty = (prop: string, value: any) => {
         if (!selectedElement || selectedElement.type !== 'text') return;
         
-        if (activeEditorRef.current && activeEditorRef.current.id === selectedElement.id) {
+        // If in rich text editing mode, apply property only to the selection
+        if (isEditingText && activeEditorRef.current) {
             const commandMap: Record<string, string> = {
                 fontFamily: 'fontName',
                 color: 'foreColor'
@@ -854,15 +862,48 @@ const App: React.FC = () => {
             const command = commandMap[prop];
             if (command) {
                 document.execCommand(command, false, value);
+
+                // Persist the change by saving the new HTML content
                 const newContent = activeEditorRef.current.node.innerHTML;
                 updatePostElement(selectedElement.id, { content: newContent });
+
+                // Keep focus and update UI to reflect selection style
                 activeEditorRef.current.node.focus();
                 handleSelectionUpdate();
             } else {
+                 // For properties without a direct execCommand (like letterSpacing), apply to whole element
                  updatePostElement(selectedElement.id, { [prop]: value });
             }
         } else {
+            // Fallback to styling the entire element if not editing
             updatePostElement(selectedElement.id, { [prop]: value });
+        }
+    };
+
+    const handleSelectionUpdate = () => {
+        if (activeEditorRef.current) {
+            const selection = window.getSelection();
+
+            // If there's no selection or it's just a cursor, reset the selection styles in the UI
+            if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
+                setSelectionStyles({ color: null, bold: false, italic: false, underline: false });
+                return;
+            }
+
+            const colorStr = document.queryCommandValue('foreColor');
+            const isBold = document.queryCommandState('bold');
+            const isItalic = document.queryCommandState('italic');
+            const isUnderline = document.queryCommandState('underline');
+            let hexColor: string | null = null;
+
+            if (colorStr) {
+                const parsed = parseColor(colorStr);
+                hexColor = rgbToHex(parsed.r, parsed.g, parsed.b).toUpperCase();
+            }
+            setSelectionStyles({ color: hexColor, bold: isBold, italic: isItalic, underline: isUnderline });
+        } else {
+             // If not editing at all, ensure styles are reset
+             setSelectionStyles({ color: null, bold: false, italic: false, underline: false });
         }
     };
 
@@ -908,23 +949,6 @@ const App: React.FC = () => {
         };
     }, [handleFitToScreen, selectedPostId, postSize, isLeftPanelOpen, isRightPanelOpen]);
     
-    const handleSelectionUpdate = () => {
-        if (activeEditorRef.current) {
-            const colorStr = document.queryCommandValue('foreColor');
-            const isBold = document.queryCommandState('bold');
-            const isItalic = document.queryCommandState('italic');
-            const isUnderline = document.queryCommandState('underline');
-            let hexColor: string | null = null;
-
-            if (colorStr) {
-                const parsed = parseColor(colorStr);
-                hexColor = rgbToHex(parsed.r, parsed.g, parsed.b).toUpperCase();
-            }
-            setSelectionStyles({ color: hexColor, bold: isBold, italic: isItalic, underline: isUnderline });
-        } else {
-             setSelectionStyles({ color: null, bold: false, italic: false, underline: false });
-        }
-    };
 
 
     // --- BRANDKIT & FONT HANDLERS ---
