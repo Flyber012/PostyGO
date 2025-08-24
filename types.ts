@@ -37,6 +37,7 @@ export interface TextElement extends BaseElement {
     backgroundColor?: string;
     padding?: number;
     borderRadius?: number;
+    autosize?: boolean;
     backdropFilters?: {
         blur: number; // in px
         brightness: number; // 0-2

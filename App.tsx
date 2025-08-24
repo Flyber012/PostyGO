@@ -48,10 +48,10 @@ const convertAILayoutToElements = (aiLayout: AIGeneratedTextElement[], postSize:
     return aiLayout.map((aiEl, index) => {
         const { width: postWidth, height: postHeight } = postSize;
         const fontSizeMapping = {
-            large: postWidth * 0.08,
-            medium: postWidth * 0.04,
-            small: postWidth * 0.025,
-            cta: postWidth * 0.035,
+            large: postWidth * 0.09,
+            medium: postWidth * 0.05,
+            small: postWidth * 0.03,
+            cta: postWidth * 0.04,
         };
         const fontSize = Math.round(fontSizeMapping[aiEl.fontSize] || fontSizeMapping.medium);
         const element: TextElement = {
@@ -60,8 +60,9 @@ const convertAILayoutToElements = (aiLayout: AIGeneratedTextElement[], postSize:
             content: convertMarkdownToHtml(aiEl.content, aiEl.highlightColor, aiEl.accentFontFamily),
             x: (aiEl.x / 100) * postWidth,
             y: (aiEl.y / 100) * postHeight,
-            width: (aiEl.width / 100) * postWidth,
-            height: (aiEl.height / 100) * postHeight,
+            width: Math.max(100, (aiEl.width / 100) * postWidth), // Ensure a minimum width
+            height: 50, // Start with a temporary height, autosize will fix it
+            autosize: true, // Flag for the component to auto-resize itself
             fontSize,
             fontFamily: aiEl.fontFamily || 'Poppins',
             fontWeight: 400,
@@ -71,10 +72,8 @@ const convertAILayoutToElements = (aiLayout: AIGeneratedTextElement[], postSize:
             textAlign: aiEl.textAlign,
             verticalAlign: 'middle',
             rotation: aiEl.rotation || 0,
-            opacity: 1, locked: false, visible: true,
-            letterSpacing: 0, lineHeight: aiEl.lineHeight || 1,
-            // The following are now part of the HTML content string
-            // highlightColor: aiEl.highlightColor, accentFontFamily: aiEl.accentFontFamily,
+            opacity: 1, locked: false, visible: true, letterSpacing: 0,
+            lineHeight: aiEl.lineHeight || 1.3, // A more standard default
             backgroundColor: aiEl.backgroundColor,
             padding: aiEl.fontSize === 'cta' ? fontSize * 0.5 : 0,
             borderRadius: aiEl.fontSize === 'cta' ? 8 : 0,
@@ -919,15 +918,15 @@ const App: React.FC = () => {
                             {selectedElement && selectedElement.type !== 'background' && (
                                 <>
                                 <div className="flex items-center space-x-1">
-                                    <button onClick={() => handleAlignElement('left')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Alinhar à Esquerda"><AlignHorizontalJustifyStart className="w-5 h-5"/></button>
-                                    <button onClick={() => handleAlignElement('center')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Centralizar Horizontalmente"><AlignHorizontalJustifyCenter className="w-5 h-5"/></button>
-                                    <button onClick={() => handleAlignElement('right')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Alinhar à Direita"><AlignHorizontalJustifyEnd className="w-5 h-5"/></button>
+                                    <button onMouseDown={e => e.preventDefault()} onClick={() => handleAlignElement('left')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Alinhar à Esquerda"><AlignHorizontalJustifyStart className="w-5 h-5"/></button>
+                                    <button onMouseDown={e => e.preventDefault()} onClick={() => handleAlignElement('center')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Centralizar Horizontalmente"><AlignHorizontalJustifyCenter className="w-5 h-5"/></button>
+                                    <button onMouseDown={e => e.preventDefault()} onClick={() => handleAlignElement('right')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Alinhar à Direita"><AlignHorizontalJustifyEnd className="w-5 h-5"/></button>
                                 </div>
                                  <div className="w-px h-5 bg-zinc-700 mx-1"></div>
                                  <div className="flex items-center space-x-1">
-                                    <button onClick={() => handleAlignElement('top')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Alinhar ao Topo"><AlignVerticalJustifyStart className="w-5 h-5"/></button>
-                                    <button onClick={() => handleAlignElement('middle')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Centralizar Verticalmente"><AlignVerticalJustifyCenter className="w-5 h-5"/></button>
-                                    <button onClick={() => handleAlignElement('bottom')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Alinhar à Base"><AlignVerticalJustifyEnd className="w-5 h-5"/></button>
+                                    <button onMouseDown={e => e.preventDefault()} onClick={() => handleAlignElement('top')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Alinhar ao Topo"><AlignVerticalJustifyStart className="w-5 h-5"/></button>
+                                    <button onMouseDown={e => e.preventDefault()} onClick={() => handleAlignElement('middle')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Centralizar Verticalmente"><AlignVerticalJustifyCenter className="w-5 h-5"/></button>
+                                    <button onMouseDown={e => e.preventDefault()} onClick={() => handleAlignElement('bottom')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Alinhar à Base"><AlignVerticalJustifyEnd className="w-5 h-5"/></button>
                                  </div>
                                  <div className="w-px h-5 bg-zinc-700 mx-1"></div>
                                 </>
@@ -935,9 +934,9 @@ const App: React.FC = () => {
                               {selectedElement?.type === 'text' && (
                                 <>
                                 <div className="flex items-center space-x-1">
-                                    <button onClick={() => handleToggleTextStyle('bold')} className={`p-2 hover:bg-zinc-700 rounded-md ${selectedElement.fontWeight === 700 ? 'text-purple-400' : ''}`}><Bold className="w-5 h-5"/></button>
-                                    <button onClick={() => handleToggleTextStyle('italic')} className={`p-2 hover:bg-zinc-700 rounded-md ${selectedElement.fontStyle === 'italic' ? 'text-purple-400' : ''}`}><Italic className="w-5 h-5"/></button>
-                                    <button onClick={() => handleToggleTextStyle('underline')} className={`p-2 hover:bg-zinc-700 rounded-md ${selectedElement.textDecoration === 'underline' ? 'text-purple-400' : ''}`}><Underline className="w-5 h-5"/></button>
+                                    <button onMouseDown={e => e.preventDefault()} onClick={() => handleToggleTextStyle('bold')} className={`p-2 hover:bg-zinc-700 rounded-md ${selectedElement.fontWeight === 700 ? 'text-purple-400' : ''}`}><Bold className="w-5 h-5"/></button>
+                                    <button onMouseDown={e => e.preventDefault()} onClick={() => handleToggleTextStyle('italic')} className={`p-2 hover:bg-zinc-700 rounded-md ${selectedElement.fontStyle === 'italic' ? 'text-purple-400' : ''}`}><Italic className="w-5 h-5"/></button>
+                                    <button onMouseDown={e => e.preventDefault()} onClick={() => handleToggleTextStyle('underline')} className={`p-2 hover:bg-zinc-700 rounded-md ${selectedElement.textDecoration === 'underline' ? 'text-purple-400' : ''}`}><Underline className="w-5 h-5"/></button>
                                 </div>
                                 <div className="w-px h-5 bg-zinc-700 mx-1"></div>
                                 </>

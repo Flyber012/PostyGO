@@ -19,6 +19,25 @@ const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSel
     const contentRef = useRef<HTMLDivElement>(null);
     const [isEditing, setIsEditing] = useState(false);
 
+    // Auto-resizing effect for newly created text elements
+    useEffect(() => {
+        if (element.type === 'text' && element.autosize && nodeRef.current) {
+            const node = nodeRef.current as HTMLDivElement;
+            // Temporarily remove height constraint to measure natural height
+            const originalHeight = node.style.height;
+            node.style.height = 'auto';
+
+            // Get the scrollHeight, which is the height of the content
+            const newHeight = node.scrollHeight;
+            
+            // Restore original height to prevent flicker before react re-renders
+            node.style.height = originalHeight;
+
+            // Update the element state with the new height and disable autosizing
+            onUpdate(element.id, { height: newHeight + 4, autosize: false }); // Add a small buffer
+        }
+    }, [element, onUpdate]);
+
     useEffect(() => {
         // Sync content from state to the DOM, but only if it's different
         // and the element is not the active editor. This prevents cursor jumps.

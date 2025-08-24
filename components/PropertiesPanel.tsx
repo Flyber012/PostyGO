@@ -29,14 +29,14 @@ const ColorInput: React.FC<{label: string, color: string, onChange: (color: stri
 ({ label, color, onChange, onOpenColorPicker }) => (
     <div>
         <label className="block text-xs font-medium text-gray-400">{label}</label>
-        <button onClick={() => onOpenColorPicker(color, onChange)} className="w-full h-8 mt-1 rounded-md border border-gray-600" style={{backgroundColor: color}} />
+        <button onMouseDown={e => e.preventDefault()} onClick={() => onOpenColorPicker(color, onChange)} className="w-full h-8 mt-1 rounded-md border border-gray-600" style={{backgroundColor: color}} />
     </div>
 );
 
 const SelectInput: React.FC<{label: string, value: string | number, onChange: (val: string) => void, children: React.ReactNode}> = ({label, value, onChange, children}) => (
     <div>
         <label className="block text-xs font-medium text-gray-400">{label}</label>
-        <div className="relative">
+        <div className="relative" onMouseDown={e => e.preventDefault()}>
             <select value={value} onChange={e => onChange(e.target.value)} className="w-full mt-1 bg-black/50 border border-zinc-600 rounded-md px-2 py-1.5 text-white text-xs appearance-none">
                 {children}
             </select>
@@ -180,9 +180,9 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedElement, onUp
                                     <ColorInput label="Cor" color={(selectedElement as TextElement).color} onChange={val => onUpdateTextProperty('color', val)} onOpenColorPicker={onOpenColorPicker} />
                                 </div>
                                 <div className="flex items-center space-x-1 p-1 bg-black/30 rounded-md">
-                                    <button onClick={() => onUpdateTextProperty('fontWeight', (selectedElement as TextElement).fontWeight === 700 ? 400 : 700)} className={`flex-1 text-center py-1 rounded text-xs transition-colors ${(selectedElement as TextElement).fontWeight === 700 ? 'bg-zinc-600 text-white' : 'hover:bg-zinc-700 text-gray-300'}`}><b className="font-sans">B</b></button>
-                                    <button onClick={() => onUpdateTextProperty('fontStyle', (selectedElement as TextElement).fontStyle === 'italic' ? 'normal' : 'italic')} className={`flex-1 text-center py-1 rounded text-xs transition-colors ${(selectedElement as TextElement).fontStyle === 'italic' ? 'bg-zinc-600 text-white' : 'hover:bg-zinc-700 text-gray-300'}`}><i>I</i></button>
-                                    <button onClick={() => onUpdateTextProperty('textDecoration', (selectedElement as TextElement).textDecoration === 'underline' ? 'none' : 'underline')} className={`flex-1 text-center py-1 rounded text-xs transition-colors ${(selectedElement as TextElement).textDecoration === 'underline' ? 'bg-zinc-600 text-white' : 'hover:bg-zinc-700 text-gray-300'}`}><u>U</u></button>
+                                    <button onMouseDown={e => e.preventDefault()} onClick={() => onUpdateTextProperty('fontWeight', (selectedElement as TextElement).fontWeight === 700 ? 400 : 700)} className={`flex-1 text-center py-1 rounded text-xs transition-colors ${(selectedElement as TextElement).fontWeight === 700 ? 'bg-zinc-600 text-white' : 'hover:bg-zinc-700 text-gray-300'}`}><b className="font-sans">B</b></button>
+                                    <button onMouseDown={e => e.preventDefault()} onClick={() => onUpdateTextProperty('fontStyle', (selectedElement as TextElement).fontStyle === 'italic' ? 'normal' : 'italic')} className={`flex-1 text-center py-1 rounded text-xs transition-colors ${(selectedElement as TextElement).fontStyle === 'italic' ? 'bg-zinc-600 text-white' : 'hover:bg-zinc-700 text-gray-300'}`}><i>I</i></button>
+                                    <button onMouseDown={e => e.preventDefault()} onClick={() => onUpdateTextProperty('textDecoration', (selectedElement as TextElement).textDecoration === 'underline' ? 'none' : 'underline')} className={`flex-1 text-center py-1 rounded text-xs transition-colors ${(selectedElement as TextElement).textDecoration === 'underline' ? 'bg-zinc-600 text-white' : 'hover:bg-zinc-700 text-gray-300'}`}><u>U</u></button>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2">
                                      <SelectInput label="Alinhamento" value={(selectedElement as TextElement).textAlign} onChange={val => handleInputChange('textAlign', val)}>
