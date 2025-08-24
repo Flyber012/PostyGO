@@ -17,7 +17,6 @@ import saveAs from 'file-saver';
 import { v4 as uuidv4 } from 'uuid';
 import { ZoomIn, ZoomOut, Maximize, Package, Image as ImageIcon, FileText, X, LayoutTemplate as LayoutTemplateIcon, Plus, Layers, AlignHorizontalJustifyCenter, AlignHorizontalJustifyStart, AlignHorizontalJustifyEnd, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd } from 'lucide-react';
 import AdvancedColorPicker from './components/ColorPicker';
-import Draggable from 'react-draggable';
 
 // --- HELPERS ---
 const readFileAsBase64 = (file: File): Promise<string> => {
@@ -195,13 +194,15 @@ const App: React.FC = () => {
     const [loadingMessage, setLoadingMessage] = useState('');
     const [isLeftPanelOpen, setLeftPanelOpen] = useState(true);
     const [isRightPanelOpen, setRightPanelOpen] = useState(true);
-    const [zoom, setZoom] = useState(1);
     const [isWizardOpen, setWizardOpen] = useState(false);
     const [isBrandKitPanelOpen, setBrandKitPanelOpen] = useState(false);
     const [isMobileView, setIsMobileView] = useState(window.innerWidth <= 1024);
     const [colorPickerState, setColorPickerState] = useState<{ isOpen: boolean, color: string, onChange: (color: string) => void }>({ isOpen: false, color: '#FFFFFF', onChange: () => {} });
-    const [canvasPosition, setCanvasPosition] = useState({ x: 0, y: 0 });
+    
+    // Canvas View State
+    const [viewState, setViewState] = useState({ zoom: 1, offset: { x: 0, y: 0 } });
     const [isPanning, setIsPanning] = useState(false);
+    const panStart = useRef({ x: 0, y: 0 });
 
     // Generation Settings (persist across projects for convenience)
     const [topic, setTopic] = useState('Productivity Hacks');
@@ -225,8 +226,7 @@ const App: React.FC = () => {
     const [availableFonts, setAvailableFonts] = useState<FontDefinition[]>(INITIAL_FONTS);
     
     // Refs
-    const editorRef = useRef<HTMLDivElement>(null);
-    const viewportRef = useRef<HTMLElement>(null);
+    const viewportRef = useRef<HTMLDivElement>(null);
     const openProjectInputRef = useRef<HTMLInputElement>(null);
     const importKitRef = useRef<HTMLInputElement>(null);
 
@@ -577,17 +577,63 @@ const App: React.FC = () => {
     // --- CANVAS INTERACTION & ALIGNMENT ---
     const handleFitToScreen = useCallback(() => {
         if (!viewportRef.current || !postSize) return;
-        setCanvasPosition({x: 0, y: 0}); // Reset pan on fit
         const { width: vw, height: vh } = viewportRef.current.getBoundingClientRect();
         const { width: cw, height: ch } = postSize;
-        const newZoom = Math.min(vw / cw, vh / ch) * 0.9;
-        setZoom(newZoom);
+        const zoom = Math.min(vw / cw, vh / ch) * 0.9;
+        const offset = {
+            x: (vw - cw * zoom) / 2,
+            y: (vh - ch * zoom) / 2,
+        };
+        setViewState({ zoom, offset });
     }, [postSize]);
-
+    
     const handleWheel = (e: React.WheelEvent) => {
+        if (!viewportRef.current) return;
         e.preventDefault();
+        const rect = viewportRef.current.getBoundingClientRect();
+        const mousePos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        
         const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
-        setZoom(prevZoom => Math.max(0.1, Math.min(prevZoom * zoomFactor, 5)));
+        const newZoom = Math.max(0.1, Math.min(viewState.zoom * zoomFactor, 5));
+        
+        const mouseBeforeZoom = {
+            x: (mousePos.x - viewState.offset.x) / viewState.zoom,
+            y: (mousePos.y - viewState.offset.y) / viewState.zoom
+        };
+        
+        const newOffset = {
+            x: mousePos.x - mouseBeforeZoom.x * newZoom,
+            y: mousePos.y - mouseBeforeZoom.y * newZoom
+        };
+        
+        setViewState({ zoom: newZoom, offset: newOffset });
+    };
+
+    const handleMouseDown = (e: React.MouseEvent) => {
+        if (isPanning && viewportRef.current) {
+            e.preventDefault();
+            panStart.current = { x: e.clientX, y: e.clientY };
+            viewportRef.current.style.cursor = 'grabbing';
+        }
+    };
+    
+    const handleMouseMove = (e: React.MouseEvent) => {
+        if (isPanning && panStart.current && viewportRef.current) {
+            const dx = e.clientX - panStart.current.x;
+            const dy = e.clientY - panStart.current.y;
+            panStart.current = { x: e.clientX, y: e.clientY };
+            setViewState(prev => ({
+                ...prev,
+                offset: { x: prev.offset.x + dx, y: prev.offset.y + dy }
+            }));
+        }
+    };
+    
+    const handleMouseUp = () => {
+        if (viewportRef.current) {
+            panStart.current = { x: 0, y: 0 };
+            viewportRef.current.style.cursor = isPanning ? 'grab' : 'default';
+        }
     };
 
     const handleAlignElement = (alignment: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => {
@@ -610,13 +656,16 @@ const App: React.FC = () => {
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.code === 'Space' && !e.repeat) {
+            if (e.code === 'Space' && !e.repeat && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
+                e.preventDefault();
                 setIsPanning(true);
+                if (viewportRef.current) viewportRef.current.style.cursor = 'grab';
             }
         };
         const handleKeyUp = (e: KeyboardEvent) => {
             if (e.code === 'Space') {
                 setIsPanning(false);
+                if (viewportRef.current) viewportRef.current.style.cursor = 'default';
             }
         };
         window.addEventListener('keydown', handleKeyDown);
@@ -689,7 +738,15 @@ const App: React.FC = () => {
                     ) : <EmptyPanelPlaceholder text="Crie ou abra um projeto para começar."/>}
                 </aside>
 
-                <main className={`main-content ${isPanning ? 'cursor-grab' : ''}`} ref={viewportRef} onWheel={handleWheel}>
+                <main 
+                    className="main-content" 
+                    ref={viewportRef} 
+                    onWheel={handleWheel}
+                    onMouseDown={handleMouseDown}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                    onMouseLeave={handleMouseUp}
+                >
                     {projects.length === 0 ? (
                         <WelcomeScreen onNewProject={handleNewProject} onOpenProject={handleOpenProjectClick} onOpenRecent={handleOpenProject} />
                     ) : (
@@ -706,17 +763,9 @@ const App: React.FC = () => {
                                         <p className="text-gray-400">Aguarde, a mágica está acontecendo...</p>
                                     </div>
                                 ) : selectedPost ? (
-                                    <Draggable
-                                        position={canvasPosition}
-                                        onDrag={(e, data) => setCanvasPosition({ x: data.x, y: data.y })}
-                                        disabled={!isPanning}
-                                        nodeRef={editorRef}
-                                    >
-                                        <div ref={editorRef} style={{ transform: `scale(${zoom})`, transition: 'transform 0.1s' }}>
-                                            <CanvasEditor post={selectedPost} postSize={postSize} onUpdateElement={updatePostElement} selectedElementId={selectedElementId} onSelectElement={setSelectedElementId} />
-                                        </div>
-                                    </Draggable>
-
+                                    <div style={{ transform: `translate(${viewState.offset.x}px, ${viewState.offset.y}px) scale(${viewState.zoom})`, transition: 'transform 0.05s' }}>
+                                        <CanvasEditor post={selectedPost} postSize={postSize} onUpdateElement={updatePostElement} selectedElementId={selectedElementId} onSelectElement={setSelectedElementId} />
+                                    </div>
                                 ) : (
                                     <div className="text-center text-gray-400 p-4">
                                         <h2 className="text-2xl font-bold mb-2">Projeto Vazio</h2>
@@ -745,9 +794,9 @@ const App: React.FC = () => {
                                  <div className="w-px h-5 bg-zinc-700 mx-1"></div>
                                 </>
                              )}
-                            <button onClick={() => setZoom(z => Math.max(z / 1.25, 0.1))} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Zoom Out"><ZoomOut className="w-5 h-5"/></button>
-                            <span className="text-sm font-mono w-16 text-center">{Math.round(zoom * 100)}%</span>
-                            <button onClick={() => setZoom(z => Math.min(z * 1.25, 5))} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Zoom In"><ZoomIn className="w-5 h-5"/></button>
+                            <button onClick={() => setViewState(s => ({...s, zoom: Math.max(s.zoom / 1.25, 0.1)}))} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Zoom Out"><ZoomOut className="w-5 h-5"/></button>
+                            <span className="text-sm font-mono w-16 text-center">{Math.round(viewState.zoom * 100)}%</span>
+                            <button onClick={() => setViewState(s => ({...s, zoom: Math.min(s.zoom * 1.25, 5)}))} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Zoom In"><ZoomIn className="w-5 h-5"/></button>
                             <button onClick={handleFitToScreen} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Fit to Screen"><Maximize className="w-5 h-5"/></button>
                         </div>
                     )}

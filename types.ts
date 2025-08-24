@@ -104,6 +104,7 @@ export interface BackgroundElement {
 
 export type AnyElement = TextElement | ImageElement | GradientElement | BackgroundElement | ShapeElement | QRCodeElement;
 
+export type ForegroundElement = TextElement | ImageElement | GradientElement | ShapeElement | QRCodeElement;
 
 export interface Post {
     id: string;

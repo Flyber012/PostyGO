@@ -1,11 +1,12 @@
 
+
 import React, { useRef, useState, useEffect } from 'react';
 import Draggable from 'react-draggable';
-import { AnyElement, TextElement, ImageElement, GradientElement, ShapeElement, QRCodeElement } from '../types';
+import { AnyElement, TextElement, ImageElement, GradientElement, ShapeElement, QRCodeElement, ForegroundElement } from '../types';
 import QRCodeDisplay from './QRCodeDisplay';
 
 interface EditableElementProps {
-    element: AnyElement;
+    element: ForegroundElement;
     onUpdate: (elementId: string, updates: Partial<AnyElement>) => void;
     isSelected: boolean;
     onSelect: (elementId: string | null) => void;
@@ -42,7 +43,7 @@ const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSel
         if (element.type === 'text') {
             setEditText(element.content);
         }
-    }, [element.type, (element as TextElement).content]);
+    }, [element.type === 'text' && element.content]);
 
     useEffect(() => {
         if (element.type === 'text' && textSpanRef.current && element.content) {
@@ -52,22 +53,22 @@ const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSel
 
             // Reset scale to measure natural size
             span.style.transform = 'scale(1)';
-            span.style.whiteSpace = 'nowrap'; // Measure as single line first for width
+            span.style.whiteSpace = 'nowrap';
             const naturalWidth = span.scrollWidth;
-            span.style.whiteSpace = 'pre-wrap'; // Then allow wrapping
+            span.style.whiteSpace = 'pre-wrap'; 
             const naturalHeight = span.scrollHeight;
-
+            
             if (naturalWidth > 0 && naturalHeight > 0) {
-                const scaleX = element.width / naturalWidth;
-                const scaleY = element.height / naturalHeight;
-                const scale = Math.min(scaleX, scaleY); // Use min to maintain aspect ratio
+                const scaleX = element.width / (naturalWidth + 2); // Add a small buffer
+                const scaleY = element.height / (naturalHeight + 2);
+                const scale = Math.min(scaleX, scaleY);
                 span.style.transform = `scale(${scale})`;
             }
         }
-    }, [element]);
+    }, [element.width, element.height, element.type === 'text' ? element.content : '', element.type === 'text' ? element.fontFamily: '', element.type === 'text' ? element.fontSize : '']);
 
 
-    if (element.type === 'background' || !element.visible) {
+    if (!element.visible) {
         return null;
     }
 
@@ -138,6 +139,10 @@ const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSel
             element.verticalAlign === 'top' ? 'flex-start' :
             element.verticalAlign === 'bottom' ? 'flex-end' :
             'center';
+        styles.alignItems = 
+            element.textAlign === 'left' ? 'flex-start' :
+            element.textAlign === 'right' ? 'flex-end' :
+            'center';
        
         styles.backgroundColor = element.backgroundColor;
         styles.padding = `${element.padding || 0}px`;
@@ -178,7 +183,8 @@ const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSel
                         resize: 'none',
                         transform: 'none',
                         zIndex: 10,
-                        overflowWrap: 'break-word'
+                        overflowWrap: 'break-word',
+                        alignItems: 'unset' // Unset flex properties for textarea
                     }}
                 />
             );
@@ -189,7 +195,7 @@ const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSel
         switch (element.type) {
             case 'text':
                 return (
-                    <span ref={textSpanRef} style={{ transformOrigin: '0 0', display: 'inline-block', whiteSpace: 'pre-wrap' }}>
+                    <span ref={textSpanRef} style={{ transformOrigin: 'center', display: 'inline-block', whiteSpace: 'pre-wrap' }}>
                         <TextParser content={element.content} highlightColor={element.highlightColor} accentFontFamily={element.accentFontFamily}/>
                     </span>
                 );

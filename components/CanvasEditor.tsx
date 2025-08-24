@@ -1,7 +1,7 @@
 
 
-import React, { forwardRef } from 'react';
-import { Post, AnyElement, PostSize, BackgroundElement } from '../types';
+import React from 'react';
+import { Post, AnyElement, PostSize, BackgroundElement, ForegroundElement } from '../types';
 import EditableText from './EditableText';
 
 interface CanvasEditorProps {
@@ -12,7 +12,7 @@ interface CanvasEditorProps {
     onSelectElement: (id: string | null) => void;
 }
 
-const CanvasEditor = forwardRef<HTMLDivElement, CanvasEditorProps>(({ post, postSize, onUpdateElement, selectedElementId, onSelectElement }, ref) => {
+const CanvasEditor: React.FC<CanvasEditorProps> = ({ post, postSize, onUpdateElement, selectedElementId, onSelectElement }) => {
 
     const deselectElement = (e: React.MouseEvent) => {
         if (e.target === e.currentTarget) {
@@ -21,11 +21,10 @@ const CanvasEditor = forwardRef<HTMLDivElement, CanvasEditorProps>(({ post, post
     };
     
     const backgroundElement = post.elements.find(el => el.type === 'background') as BackgroundElement | undefined;
-    const foregroundElements = post.elements.filter(el => el.type !== 'background');
+    const foregroundElements = post.elements.filter((el): el is ForegroundElement => el.type !== 'background');
 
     return (
         <div 
-            ref={ref}
             className="shadow-lg rounded-lg overflow-hidden relative bg-gray-700"
             style={{
                 width: postSize.width,
@@ -57,6 +56,6 @@ const CanvasEditor = forwardRef<HTMLDivElement, CanvasEditorProps>(({ post, post
             ))}
         </div>
     );
-});
+};
 
 export default CanvasEditor;
