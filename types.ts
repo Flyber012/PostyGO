@@ -2,6 +2,8 @@
 
 
 
+export type ToneOfVoice = 'padrão' | 'profissional' | 'amigável' | 'inspirador' | 'divertido';
+
 export interface BaseElement {
     id: string;
     type: string;

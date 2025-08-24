@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, PostSize, BrandKit } from '../types';
+import { User, PostSize, BrandKit, ToneOfVoice } from '../types';
 import { POST_SIZES } from '../constants';
 import { Sparkles, BrainCircuit, Upload, ChevronLeft, X, File, Files, AlertCircle, Coins, LayoutTemplate as LayoutIcon } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -55,12 +55,13 @@ const ImageUploader: React.FC<{
 interface GenerationWizardProps {
     isOpen: boolean;
     onClose: () => void;
-    onGenerate: (topic: string, count: number, type: 'post' | 'carousel', contentLevel: 'mínimo' | 'médio' | 'detalhado', backgroundSource: 'upload' | 'ai', aiProvider: 'gemini' | 'freepik') => void;
+    onGenerate: (topic: string, count: number, type: 'post' | 'carousel', contentLevel: 'mínimo' | 'médio' | 'detalhado', backgroundSource: 'upload' | 'ai', aiProvider: 'gemini' | 'freepik', toneOfVoice: ToneOfVoice) => void;
     isLoading: boolean;
     // States from App.tsx
     topic: string; setTopic: (s: string) => void;
     contentLevel: 'mínimo' | 'médio' | 'detalhado'; setContentLevel: (s: 'mínimo' | 'médio' | 'detalhado') => void;
     generationType: 'post' | 'carousel'; setGenerationType: (s: 'post' | 'carousel') => void;
+    toneOfVoice: ToneOfVoice; setToneOfVoice: (t: ToneOfVoice) => void;
     postSize: PostSize; setPostSize: (ps: PostSize) => void;
     backgroundSource: 'upload' | 'ai'; setBackgroundSource: (s: 'upload' | 'ai') => void;
     aiPostCount: number; setAiPostCount: (n: number) => void;
@@ -123,7 +124,7 @@ export const GenerationWizard: React.FC<GenerationWizardProps> = (props) => {
             return;
         }
         
-        onGenerate(props.topic, finalCount, props.generationType, props.contentLevel, props.backgroundSource, props.aiProvider);
+        onGenerate(props.topic, finalCount, props.generationType, props.contentLevel, props.backgroundSource, props.aiProvider, props.toneOfVoice);
     };
 
     let canGenerate = !isLoading;
@@ -188,6 +189,17 @@ export const GenerationWizard: React.FC<GenerationWizardProps> = (props) => {
                                 <button onClick={() => props.setContentLevel('médio')} className={`flex-1 text-center text-xs py-1.5 rounded-md transition-all duration-300 ${props.contentLevel === 'médio' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:bg-zinc-700'}`}>Médio</button>
                                 <button onClick={() => props.setContentLevel('detalhado')} className={`flex-1 text-center text-xs py-1.5 rounded-md transition-all duration-300 ${props.contentLevel === 'detalhado' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:bg-zinc-700'}`}>Detalhado</button>
                             </div>
+                        </div>
+
+                        <div>
+                            <label htmlFor="wiz-tone-of-voice" className="block text-sm font-medium text-gray-300 mb-1">Tom de Voz</label>
+                            <select id="wiz-tone-of-voice" value={props.toneOfVoice} onChange={(e) => props.setToneOfVoice(e.target.value as ToneOfVoice)} className="w-full bg-black/50 border border-zinc-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-purple-500 focus:outline-none appearance-none">
+                                <option value="padrão">Padrão (Neutro)</option>
+                                <option value="profissional">Profissional</option>
+                                <option value="amigável">Amigável</option>
+                                <option value="inspirador">Inspirador</option>
+                                <option value="divertido">Divertido</option>
+                            </select>
                         </div>
 
                         { activeBrandKit && activeBrandKit.layouts.length > 0 && (

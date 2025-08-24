@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { PostSize, BrandKit, LayoutTemplate, User } from '../types';
+import { PostSize, BrandKit, LayoutTemplate, User, ToneOfVoice } from '../types';
 import { POST_SIZES } from '../constants';
 import { FileDown, Image, Download, Sparkles, Upload, X, Plus, File, Files, BrainCircuit, ShieldCheck, Copy, Package, Check, LayoutTemplate as LayoutIcon, ChevronDown, AlertCircle, Coins } from 'lucide-react';
 import AdvancedColorPicker from './ColorPicker';
@@ -78,7 +78,7 @@ const Accordion: React.FC<{ title: React.ReactNode; children: React.ReactNode; d
 
 interface ControlPanelProps {
     isLoading: boolean;
-    onGenerate: (topic: string, count: number, type: 'post' | 'carousel', contentLevel: 'mínimo' | 'médio' | 'detalhado', backgroundSource: 'upload' | 'ai', aiProvider: 'gemini' | 'freepik') => void;
+    onGenerate: (topic: string, count: number, type: 'post' | 'carousel', contentLevel: 'mínimo' | 'médio' | 'detalhado', backgroundSource: 'upload' | 'ai', aiProvider: 'gemini' | 'freepik', toneOfVoice: ToneOfVoice) => void;
     onExport: (format: 'png' | 'jpeg' | 'zip') => void;
     
     brandKits: BrandKit[];
@@ -108,6 +108,7 @@ interface ControlPanelProps {
     topic: string; setTopic: (s: string) => void;
     contentLevel: 'mínimo' | 'médio' | 'detalhado'; setContentLevel: (s: 'mínimo' | 'médio' | 'detalhado') => void;
     generationType: 'post' | 'carousel'; setGenerationType: (s: 'post' | 'carousel') => void;
+    toneOfVoice: ToneOfVoice; setToneOfVoice: (t: ToneOfVoice) => void;
     backgroundSource: 'upload' | 'ai'; setBackgroundSource: (s: 'upload' | 'ai') => void;
     aiPostCount: number; setAiPostCount: (n: number) => void;
     aiProvider: 'gemini' | 'freepik'; setAiProvider: (s: 'gemini' | 'freepik') => void;
@@ -136,6 +137,7 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
         useLayoutToFill, setUseLayoutToFill,
         user, onBuyCredits,
         topic, setTopic, contentLevel, setContentLevel, generationType, setGenerationType,
+        toneOfVoice, setToneOfVoice,
         backgroundSource, setBackgroundSource, aiPostCount, setAiPostCount, aiProvider, setAiProvider,
         // BrandKit props passed down
         onSaveBrandKit, onAddLayoutToActiveKit, onImportBrandKit, onExportBrandKit, onDeleteBrandKit,
@@ -180,7 +182,7 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
             return;
         }
         
-        onGenerate(topic, finalCount, generationType, contentLevel, backgroundSource, aiProvider);
+        onGenerate(topic, finalCount, generationType, contentLevel, backgroundSource, aiProvider, toneOfVoice);
     };
     
     const handleOpenColorPicker = (index: number, color: string) => {
@@ -303,6 +305,17 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
                                 Detalhado
                             </button>
                         </div>
+                    </div>
+
+                    <div>
+                        <label htmlFor="tone-of-voice" className="block text-sm font-medium text-gray-300 mb-1">Tom de Voz</label>
+                        <select id="tone-of-voice" value={toneOfVoice} onChange={(e) => setToneOfVoice(e.target.value as ToneOfVoice)} className="w-full bg-black/50 border border-zinc-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-purple-500 focus:outline-none appearance-none">
+                            <option value="padrão">Padrão (Neutro)</option>
+                            <option value="profissional">Profissional</option>
+                            <option value="amigável">Amigável</option>
+                            <option value="inspirador">Inspirador</option>
+                            <option value="divertido">Divertido</option>
+                        </select>
                     </div>
 
                     { activeBrandKit && activeBrandKit.layouts.length > 0 && (

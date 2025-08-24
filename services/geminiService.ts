@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type, Part } from "@google/genai";
-import { AIGeneratedTextElement, PaletteExtractionResult, AIGeneratedCarouselScriptSlide, TextElement, BrandKit, PostSize } from '../types';
+import { AIGeneratedTextElement, PaletteExtractionResult, AIGeneratedCarouselScriptSlide, TextElement, BrandKit, PostSize, ToneOfVoice } from '../types';
 
 // Conforme solicitado, esta chave será usada como padrão.
 // A geração de imagens pode falhar se não estiver vinculada a uma conta com faturamento.
@@ -131,9 +131,12 @@ export async function generateImagePrompts(topic: string, count: number, styleGu
     let prompt = `Você é um diretor de arte criativo. Sua tarefa é gerar ${count} prompts de imagem distintos, visualmente interessantes e artísticos para um gerador de imagens de IA, todos baseados no tópico principal: "${topic}".
 
     **Instruções:**
-    1.  **Diversidade Temática:** Cada prompt deve explorar um ângulo ou subtema diferente relacionado ao tópico principal. Evite repetições.
-    2.  **Riqueza Visual:** Descreva a cena, os objetos, as cores, a iluminação e a composição. Use adjetivos evocativos.
-    3.  **Consistência de Estilo:** Todos os prompts devem seguir um estilo visual coeso.`;
+    1.  **Composição Limpa:** A composição deve ser limpa, minimalista e esteticamente agradável. O objetivo é criar um fundo que complemente o texto, não que compita com ele.
+    2.  **Espaço Negativo CRÍTICO:** A imagem DEVE incluir uma quantidade significativa de espaço negativo (como uma parede lisa, céu claro, fundo desfocado ou superfície texturizada simples). Este espaço é onde o texto será colocado, por isso não deve conter elementos que distraiam.
+    3.  **Evitar Desordem:** Evite cenas excessivamente cheias ou ocupadas.
+    4.  **Diversidade Temática:** Cada prompt deve explorar um ângulo ou subtema diferente relacionado ao tópico principal. Evite repetições.
+    5.  **Riqueza Visual:** Descreva a cena, os objetos, as cores, a iluminação e a composição. Use adjetivos evocativos.
+    6.  **Consistência de Estilo:** Todos os prompts devem seguir um estilo visual coeso.`;
 
     if (styleGuide) {
         prompt += `\n\n**DIRETRIZES DE ESTILO OBRIGATÓRIAS (do Brand Kit):**\n${styleGuide}\n\nAdapte o estilo dos prompts (ex: 'fotografia cinematográfica', 'ilustração 3D minimalista', 'arte abstrata com gradientes') para corresponder a essas diretrizes.`;
@@ -171,7 +174,7 @@ export async function generateImagePrompts(topic: string, count: number, styleGu
 }
 
 
-export async function generateLayoutAndContentForImage(base64Image: string, topic: string, contentLevel: 'mínimo' | 'médio' | 'detalhado', brandKit: BrandKit | null, userApiKey?: string): Promise<AIGeneratedTextElement[]> {
+export async function generateLayoutAndContentForImage(base64Image: string, topic: string, contentLevel: 'mínimo' | 'médio' | 'detalhado', brandKit: BrandKit | null, userApiKey?: string, toneOfVoice: ToneOfVoice = 'padrão'): Promise<AIGeneratedTextElement[]> {
     const ai = getAIClient(userApiKey);
     const [header, data] = base64Image.split(',');
     if (!header || !data) throw new Error("Formato de imagem base64 inválido.");
@@ -185,10 +188,21 @@ export async function generateLayoutAndContentForImage(base64Image: string, topi
         detalhado: 'Gere um texto mais completo. Pode incluir um título, um subtítulo e um parágrafo mais elaborado ou uma lista de pontos. Forneça mais valor e contexto.'
     };
 
+    const toneOfVoiceInstructions = {
+        padrão: 'Mantenha um tom de voz neutro e informativo, adequado para um público geral.',
+        profissional: 'Adote um tom de voz profissional, corporativo e direto. Use uma linguagem formal e evite gírias ou excesso de emojis.',
+        amigável: 'Escreva como se estivesse conversando com um amigo. Use uma linguagem informal e acolhedora, faça perguntas e use emojis relevantes de forma moderada.',
+        inspirador: 'Use um tom de voz motivacional e edificante. Inspire o leitor com mensagens positivas e encorajadoras.',
+        divertido: 'Adote um tom bem-humorado, espirituoso e descontraído. O objetivo é entreter e engajar através da diversão.'
+    };
+
     let prompt = `Você é um diretor de arte e designer gráfico de IA com um olho impecável para composição e tipografia. Sua missão é criar um layout de texto visualmente deslumbrante e, acima de tudo, legível, para o tópico "${topic}", posicionando-o sobre a imagem de fundo.
 
     **Nível de Conteúdo Solicitado: ${contentLevel.toUpperCase()}**
     - ${contentLevelInstructions[contentLevel]}
+
+    **Tom de Voz Solicitado: ${toneOfVoice.toUpperCase()}**
+    - ${toneOfVoiceInstructions[toneOfVoice]}
 
     **Seu Processo Criativo (Regras Inquebráveis):**
     1.  **Conteúdo Criativo com Personalidade:** Primeiro, crie o texto. Seja envolvente, use markdown (\`**destaque**\`) para ênfase e emojis relevantes.
@@ -216,6 +230,9 @@ export async function generateLayoutAndContentForImage(base64Image: string, topi
 
         **Nível de Conteúdo Solicitado: ${contentLevel.toUpperCase()}**
         - ${contentLevelInstructions[contentLevel]}
+
+        **Tom de Voz Solicitado: ${toneOfVoice.toUpperCase()}**
+        - ${toneOfVoiceInstructions[toneOfVoice]}
 
         **Seu Processo (Seguindo as Regras):**
         1.  **Conteúdo no Tom Certo:** Crie o texto alinhado com o tópico e a "vibe" do Guia de Estilo.
@@ -445,7 +462,8 @@ export async function generateTextForLayout(
     topic: string, 
     contentLevel: 'mínimo' | 'médio' | 'detalhado', 
     styleGuide: string | null,
-    userApiKey?: string
+    userApiKey?: string,
+    toneOfVoice: ToneOfVoice = 'padrão'
 ): Promise<Record<string, string>> {
     const ai = getAIClient(userApiKey);
     
@@ -453,6 +471,14 @@ export async function generateTextForLayout(
         mínimo: 'Gere um texto muito conciso. Uma frase curta ou um título de impacto.',
         médio: 'Gere um texto informativo, mas breve. Um título e um subtítulo ou um pequeno parágrafo são ideais.',
         detalhado: 'Gere um texto mais completo. Pode incluir um título, um subtítulo e um parágrafo mais elaborado.'
+    };
+
+    const toneOfVoiceInstructions = {
+        padrão: 'Mantenha um tom de voz neutro e informativo, adequado para um público geral.',
+        profissional: 'Adote um tom de voz profissional, corporativo e direto. Use uma linguagem formal e evite gírias ou excesso de emojis.',
+        amigável: 'Escreva como se estivesse conversando com um amigo. Use uma linguagem informal e acolhedora, faça perguntas e use emojis relevantes de forma moderada.',
+        inspirador: 'Use um tom de voz motivacional e edificante. Inspire o leitor com mensagens positivas e encorajadoras.',
+        divertido: 'Adote um tom bem-humorado, espirituoso e descontraído. O objetivo é entreter e engajar através da diversão.'
     };
 
     const contextString = textElements.map(el => 
@@ -463,6 +489,9 @@ export async function generateTextForLayout(
     
     **Nível de Conteúdo Solicitado: ${contentLevel.toUpperCase()}**
     - ${contentLevelInstructions[contentLevel]}
+
+    **Tom de Voz Solicitado: ${toneOfVoice.toUpperCase()}**
+    - ${toneOfVoiceInstructions[toneOfVoice]}
 
     **Estrutura do Layout e Contexto:**
     ${contextString}
@@ -484,6 +513,9 @@ export async function generateTextForLayout(
         
         **Nível de Conteúdo Solicitado: ${contentLevel.toUpperCase()}**
         - ${contentLevelInstructions[contentLevel]}
+
+        **Tom de Voz Solicitado: ${toneOfVoice.toUpperCase()}**
+        - ${toneOfVoiceInstructions[toneOfVoice]}
 
         **Estrutura do Layout e Contexto:**
         ${contextString}

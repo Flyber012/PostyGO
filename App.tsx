@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import { createRoot } from 'react-dom/client';
-import { Post, BrandKit, PostSize, AnyElement, TextElement, ImageElement, BackgroundElement, FontDefinition, LayoutTemplate, BrandAsset, User } from './types';
+import { Post, BrandKit, PostSize, AnyElement, TextElement, ImageElement, BackgroundElement, FontDefinition, LayoutTemplate, BrandAsset, User, ToneOfVoice } from './types';
 import { POST_SIZES, INITIAL_FONTS, PRESET_BRAND_KITS } from './constants';
 import * as geminiService from './services/geminiService';
 import * as freepikService from './services/freepikService';
@@ -142,6 +142,7 @@ const App: React.FC = () => {
     const [topic, setTopic] = useState('Productivity Hacks');
     const [contentLevel, setContentLevel] = useState<'mínimo' | 'médio' | 'detalhado'>('médio');
     const [generationType, setGenerationType] = useState<'post' | 'carousel'>('post');
+    const [toneOfVoice, setToneOfVoice] = useState<ToneOfVoice>('padrão');
     const [backgroundSource, setBackgroundSource] = useState<'upload' | 'ai'>('upload');
     const [aiProvider, setAiProvider] = useState<'gemini' | 'freepik'>('gemini');
     const [aiPostCount, setAiPostCount] = useState(4);
@@ -405,7 +406,8 @@ const App: React.FC = () => {
         genType: 'post' | 'carousel', 
         genContentLevel: 'mínimo' | 'médio' | 'detalhado',
         genBackgroundSource: 'upload' | 'ai',
-        genAiProvider: 'gemini' | 'freepik'
+        genAiProvider: 'gemini' | 'freepik',
+        genToneOfVoice: ToneOfVoice
     ) => {
         if (!user) {
             toast.error("Por favor, faça login para gerar conteúdo.");
@@ -477,7 +479,7 @@ const App: React.FC = () => {
                     let newContentMap: Record<string, string> = {};
                     if (textElementsToFill.length > 0) {
                         setLoadingMessage(`Gerando texto para o post ${i + 1}/${backgroundSources.length}...`);
-                        newContentMap = await geminiService.generateTextForLayout(textElementsToFill, genTopic, genContentLevel, activeStyleGuide, userApiKey);
+                        newContentMap = await geminiService.generateTextForLayout(textElementsToFill, genTopic, genContentLevel, activeStyleGuide, userApiKey, genToneOfVoice);
                     }
                     
                     const newPostId = uuidv4();
@@ -536,7 +538,7 @@ const App: React.FC = () => {
                 setLoadingMessage('Criando layouts inteligentes...');
                 toast.loading('Criando layouts inteligentes...', { id: toastId });
 
-                const layoutPromises = backgroundSources.map(bg => geminiService.generateLayoutAndContentForImage(bg.src, genTopic, genContentLevel, activeKit, userApiKey));
+                const layoutPromises = backgroundSources.map(bg => geminiService.generateLayoutAndContentForImage(bg.src, genTopic, genContentLevel, activeKit, userApiKey, genToneOfVoice));
                 const allLayouts = await Promise.all(layoutPromises);
 
                 const newPosts: Post[] = [];
@@ -1259,6 +1261,7 @@ const App: React.FC = () => {
                 topic={topic} setTopic={setTopic}
                 contentLevel={contentLevel} setContentLevel={setContentLevel}
                 generationType={generationType} setGenerationType={setGenerationType}
+                toneOfVoice={toneOfVoice} setToneOfVoice={setToneOfVoice}
                 postSize={postSize} setPostSize={setPostSize}
                 backgroundSource={backgroundSource} setBackgroundSource={setBackgroundSource}
                 aiPostCount={aiPostCount} setAiPostCount={setAiPostCount}
@@ -1358,6 +1361,7 @@ const App: React.FC = () => {
                             topic={topic} setTopic={setTopic}
                             contentLevel={contentLevel} setContentLevel={setContentLevel}
                             generationType={generationType} setGenerationType={setGenerationType}
+                            toneOfVoice={toneOfVoice} setToneOfVoice={setToneOfVoice}
                             backgroundSource={backgroundSource} setBackgroundSource={setBackgroundSource}
                             aiPostCount={aiPostCount} setAiPostCount={setAiPostCount}
                             aiProvider={aiProvider} setAiProvider={setAiProvider}
