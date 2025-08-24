@@ -3,11 +3,9 @@
 // Este endpoint usa a API de PIX da Efí (antiga Gerencianet).
 
 // Função para obter o token de acesso da Efí
-async function getEfiToken(clientId: string, clientSecret: string, isSandbox: boolean) {
+async function getEfiToken(clientId: string, clientSecret: string) {
     const auth = btoa(`${clientId}:${clientSecret}`);
-    const tokenUrl = isSandbox 
-        ? 'https://api-pix-h.gerencianet.com.br/oauth/token' 
-        : 'https://api-pix.gerencianet.com.br/oauth/token';
+    const tokenUrl = 'https://api-pix.gerencianet.com.br/oauth/token'; // Endpoint de Produção
 
     const tokenResponse = await fetch(tokenUrl, {
         method: 'POST',
@@ -34,21 +32,18 @@ async function checkPaymentHandler(req: any, res: any) {
         return res.status(400).json({ error: 'O "txid" da transação é obrigatório.' });
     }
 
-    const isSandbox = process.env.EFI_SANDBOX === 'true';
-    const clientId = isSandbox ? process.env.EFI_CLIENT_ID_H : process.env.EFI_CLIENT_ID_P;
-    const clientSecret = isSandbox ? process.env.EFI_CLIENT_SECRET_H : process.env.EFI_CLIENT_SECRET_P;
+    const clientId = process.env.EFI_CLIENT_ID_P;
+    const clientSecret = process.env.EFI_CLIENT_SECRET_P;
 
     if (!clientId || !clientSecret) {
-        console.error("As variáveis de ambiente da Efí (EFI_CLIENT_ID_H/P, EFI_CLIENT_SECRET_H/P, EFI_SANDBOX) não estão configuradas.");
-        return res.status(500).json({ error: 'As credenciais de pagamento não estão configuradas corretamente no servidor.' });
+        console.error("As variáveis de ambiente de produção da Efí (EFI_CLIENT_ID_P, EFI_CLIENT_SECRET_P) não estão configuradas.");
+        return res.status(500).json({ error: 'As credenciais de pagamento de produção não estão configuradas corretamente no servidor.' });
     }
 
     try {
-        const accessToken = await getEfiToken(clientId, clientSecret, isSandbox);
+        const accessToken = await getEfiToken(clientId, clientSecret);
 
-        const apiUrl = isSandbox 
-            ? 'https://api-pix-h.gerencianet.com.br' 
-            : 'https://api-pix.gerencianet.com.br';
+        const apiUrl = 'https://api-pix.gerencianet.com.br'; // Endpoint de Produção
 
         const checkResponse = await fetch(`${apiUrl}/v2/cob/${txid}`, {
             method: 'GET',

@@ -3,11 +3,9 @@
 // Este endpoint usa a API de PIX da Efí (antiga Gerencianet).
 
 // Função para obter o token de acesso da Efí
-async function getEfiToken(clientId: string, clientSecret: string, isSandbox: boolean) {
+async function getEfiToken(clientId: string, clientSecret: string) {
     const auth = btoa(`${clientId}:${clientSecret}`);
-    const tokenUrl = isSandbox 
-        ? 'https://api-pix-h.gerencianet.com.br/oauth/token' 
-        : 'https://api-pix.gerencianet.com.br/oauth/token';
+    const tokenUrl = 'https://api-pix.gerencianet.com.br/oauth/token'; // Endpoint de Produção
 
     const tokenResponse = await fetch(tokenUrl, {
         method: 'POST',
@@ -21,7 +19,7 @@ async function getEfiToken(clientId: string, clientSecret: string, isSandbox: bo
     if (!tokenResponse.ok) {
         const errorData = await tokenResponse.json().catch(() => ({'error_description': 'Falha ao obter token.'}));
         console.error("Erro de autenticação com a Efí:", errorData);
-        throw new Error(errorData.error_description || 'Falha na autenticação com o provedor de pagamento.');
+        throw new Error(errorData.error_description || 'Falha na autenticação com o provedor de pagamento. Verifique suas credenciais de produção.');
     }
 
     const tokenData = await tokenResponse.json();
@@ -34,26 +32,22 @@ async function paymentHandler(req: any, res: any) {
         return res.status(400).json({ error: 'Os campos "amount" e "description" são obrigatórios.' });
     }
 
-    const isSandbox = process.env.EFI_SANDBOX === 'true';
-    const clientId = isSandbox ? process.env.EFI_CLIENT_ID_H : process.env.EFI_CLIENT_ID_P;
-    const clientSecret = isSandbox ? process.env.EFI_CLIENT_SECRET_H : process.env.EFI_CLIENT_SECRET_P;
+    const clientId = process.env.EFI_CLIENT_ID_P;
+    const clientSecret = process.env.EFI_CLIENT_SECRET_P;
     const pixKey = process.env.EFI_PIX_KEY;
 
     if (!clientId || !clientSecret || !pixKey) {
-        console.error("As variáveis de ambiente da Efí (EFI_CLIENT_ID_H/P, EFI_CLIENT_SECRET_H/P, EFI_PIX_KEY, EFI_SANDBOX) não estão configuradas.");
-        return res.status(500).json({ error: 'As credenciais de pagamento não estão configuradas corretamente no servidor.' });
+        console.error("As variáveis de ambiente de produção da Efí (EFI_CLIENT_ID_P, EFI_CLIENT_SECRET_P, EFI_PIX_KEY) não estão configuradas.");
+        return res.status(500).json({ error: 'As credenciais de pagamento de produção não estão configuradas corretamente no servidor.' });
     }
 
-
     try {
-        const accessToken = await getEfiToken(clientId, clientSecret, isSandbox);
+        const accessToken = await getEfiToken(clientId, clientSecret);
 
         // Gera um txid único com 32 caracteres alfanuméricos
         const txid = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 10);
 
-        const apiUrl = isSandbox 
-            ? 'https://api-pix-h.gerencianet.com.br' 
-            : 'https://api-pix.gerencianet.com.br';
+        const apiUrl = 'https://api-pix.gerencianet.com.br'; // Endpoint de Produção
 
         // Etapa 1: Criar a cobrança imediata (cob)
         const cobResponse = await fetch(`${apiUrl}/v2/cob/${txid}`, {
