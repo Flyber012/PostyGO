@@ -17,6 +17,8 @@ import saveAs from 'file-saver';
 import { v4 as uuidv4 } from 'uuid';
 import { ZoomIn, ZoomOut, Maximize, Package, Image as ImageIcon, FileText, X, LayoutTemplate as LayoutTemplateIcon, Plus, Layers, AlignHorizontalJustifyCenter, AlignHorizontalJustifyStart, AlignHorizontalJustifyEnd, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Bold, Italic, Underline, Wand2, RefreshCcw } from 'lucide-react';
 import AdvancedColorPicker from './components/ColorPicker';
+import { parseColor, rgbToHex } from './utils/color';
+
 
 // --- HELPERS ---
 const readFileAsBase64 = (file: File): Promise<string> => {
@@ -230,6 +232,8 @@ const App: React.FC = () => {
 
     // Rich Text Editing State
     const activeEditorRef = useRef<{ id: string, node: HTMLDivElement } | null>(null);
+    const [selectionStyles, setSelectionStyles] = useState<{ color: string | null }>({ color: null });
+
 
     // Generation Settings (persist across projects for convenience)
     const [topic, setTopic] = useState('Productivity Hacks');
@@ -725,6 +729,7 @@ const App: React.FC = () => {
     };
     const handleStopEditing = () => {
         activeEditorRef.current = null;
+        setSelectionStyles({ color: null });
     };
 
     const handleToggleTextStyle = (style: 'bold' | 'italic' | 'underline') => {
@@ -811,6 +816,26 @@ const App: React.FC = () => {
             window.removeEventListener('resize', handleFitToScreen);
         };
     }, [handleFitToScreen, selectedPostId, postSize, isLeftPanelOpen, isRightPanelOpen]);
+
+    useEffect(() => {
+        const handleSelectionChange = () => {
+            if (activeEditorRef.current) {
+                const colorStr = document.queryCommandValue('foreColor');
+                if (colorStr) {
+                    const parsed = parseColor(colorStr);
+                    const hexColor = rgbToHex(parsed.r, parsed.g, parsed.b).toUpperCase();
+                    setSelectionStyles(prev => prev.color === hexColor ? prev : { color: hexColor });
+                }
+            } else {
+                setSelectionStyles(prev => prev.color === null ? prev : { color: null });
+            }
+        };
+    
+        document.addEventListener('selectionchange', handleSelectionChange);
+        return () => {
+            document.removeEventListener('selectionchange', handleSelectionChange);
+        };
+    }, []);
 
 
     // --- BRANDKIT & FONT HANDLERS ---
@@ -947,6 +972,17 @@ const App: React.FC = () => {
                                     <button onMouseDown={e => e.preventDefault()} onClick={() => handleToggleTextStyle('underline')} className={`p-2 hover:bg-zinc-700 rounded-md ${selectedElement.textDecoration === 'underline' ? 'text-purple-400' : ''}`}><Underline className="w-5 h-5"/></button>
                                 </div>
                                 <div className="w-px h-5 bg-zinc-700 mx-1"></div>
+                                <button
+                                    onMouseDown={e => e.preventDefault()}
+                                    onClick={() => handleOpenColorPicker(
+                                        selectionStyles.color || (selectedElement as TextElement).color,
+                                        (newColor) => handleUpdateTextProperty('color', newColor)
+                                    )}
+                                    className="w-6 h-6 rounded-md border border-zinc-600"
+                                    style={{ backgroundColor: selectionStyles.color || (selectedElement as TextElement).color }}
+                                    aria-label="Change text color"
+                                />
+                                <div className="w-px h-5 bg-zinc-700 mx-1"></div>
                                 </>
                             )}
                              {selectedElement?.type === 'image' && (
@@ -974,6 +1010,7 @@ const App: React.FC = () => {
                             onToggleLock={(id) => toggleElementProperty(id, 'locked')} onReorderElements={reorderElements} onRegenerateBackground={() => {}} onUpdateBackgroundSrc={() => {}}
                             availableFonts={availableFonts} onAddFont={handleAddFont} onOpenColorPicker={handleOpenColorPicker} palettes={{ post: selectedPost?.palette, custom: customPalette }}
                             onUpdateTextProperty={handleUpdateTextProperty}
+                            selectionStyles={selectionStyles}
                         />
                     ) : <EmptyPanelPlaceholder text="Selecione um post para ver suas camadas e propriedades."/>}
                 </aside>
