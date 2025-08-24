@@ -4,7 +4,7 @@
 
 // Função para obter o token de acesso da Efí
 async function getEfiToken(clientId: string, clientSecret: string, isSandbox: boolean) {
-    const auth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+    const auth = btoa(`${clientId}:${clientSecret}`);
     const tokenUrl = isSandbox 
         ? 'https://api-pix-h.gerencianet.com.br/oauth/token' 
         : 'https://api-pix.gerencianet.com.br/oauth/token';
@@ -28,11 +28,7 @@ async function getEfiToken(clientId: string, clientSecret: string, isSandbox: bo
     return tokenData.access_token;
 }
 
-export default async function handler(req: any, res: any) {
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Apenas o método POST é permitido' });
-    }
-
+async function paymentHandler(req: any, res: any) {
     const { amount, description } = req.body;
     if (!amount || !description) {
         return res.status(400).json({ error: 'Os campos "amount" e "description" são obrigatórios.' });
@@ -42,7 +38,7 @@ export default async function handler(req: any, res: any) {
     // Em produção, use variáveis de ambiente para segurança.
     const clientId = "Client_Id_8c0e7adf341d9277bde8448d03ea2dfa9f2bcb8a";
     const clientSecret = "Client_Secret_443ec3ecfcb9dc34de3f36d97771dac685f25777";
-    const isSandbox = process.env.EFI_SANDBOX === 'true';
+    const isSandbox = true; // Forçando o modo sandbox para desenvolvimento local.
 
     if (!clientId || !clientSecret) {
         return res.status(500).json({ error: 'As credenciais da Efí não estão configuradas no servidor.' });
@@ -68,6 +64,7 @@ export default async function handler(req: any, res: any) {
             body: JSON.stringify({
                 calendario: { expiracao: 3600 }, // Expira em 1 hora
                 valor: { original: amount.toFixed(2) },
+                chave: "78895521-4d36-4b68-91e8-defb1912b18c", // Chave PIX (obrigatória em sandbox)
                 solicitacaoPagador: description,
             })
         });
@@ -106,5 +103,26 @@ export default async function handler(req: any, res: any) {
     } catch (error: any) {
         console.error("Erro no processo de pagamento com a Efí:", error);
         res.status(500).json({ error: error.message || 'Ocorreu um erro interno.' });
+    }
+}
+
+
+export default async function handler(req: any, res: any) {
+    // Set CORS headers for local development
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Origin', '*'); // Allow any origin
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    // Handle preflight OPTIONS request
+    if (req.method === 'OPTIONS') {
+        res.status(200).end();
+        return;
+    }
+    
+    if (req.method === 'POST') {
+        await paymentHandler(req, res);
+    } else {
+        res.status(405).json({ error: 'Apenas o método POST é permitido' });
     }
 }

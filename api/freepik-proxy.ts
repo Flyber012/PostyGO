@@ -1,14 +1,7 @@
 // Vercel vai tratar este arquivo como uma Serverless Function.
 // O nome do arquivo (freepik-proxy) se torna o endpoint da API: /api/freepik-proxy
 
-// Usamos `any` aqui porque os tipos completos da Vercel não estão disponíveis neste ambiente de módulo simples.
-// A estrutura é similar a `(req: VercelRequest, res: VercelResponse)`
-export default async function handler(req: any, res: any) {
-    if (req.method !== 'POST') {
-        res.status(405).json({ error: 'Apenas o método POST é permitido' });
-        return;
-    }
-
+async function freepikHandler(req: any, res: any) {
     const { prompt, size } = req.body;
     if (!prompt || !size) {
         res.status(400).json({ error: 'Os campos "prompt" e "size" são obrigatórios.' });
@@ -120,5 +113,25 @@ export default async function handler(req: any, res: any) {
     } catch (error) {
         console.error("Erro no proxy do Freepik:", error);
         res.status(500).json({ error: 'Erro interno no servidor proxy.' });
+    }
+}
+
+export default async function handler(req: any, res: any) {
+    // Set CORS headers for local development
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Origin', '*'); // Allow any origin
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    // Handle preflight OPTIONS request
+    if (req.method === 'OPTIONS') {
+        res.status(200).end();
+        return;
+    }
+    
+    if (req.method === 'POST') {
+        await freepikHandler(req, res);
+    } else {
+        res.status(405).json({ error: 'Apenas o método POST é permitido' });
     }
 }
