@@ -1,6 +1,3 @@
-
-
-
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import { createRoot } from 'react-dom/client';
@@ -223,8 +220,10 @@ const App: React.FC = () => {
         }
 
         if (typeof google !== 'undefined') {
+            const GOOGLE_CLIENT_ID = '730562602445-6a2gav1iki25ppretrf8da1p95esm5ra.apps.googleusercontent.com';
+            
             google.accounts.id.initialize({
-                client_id: '108152206708-vka3b584t2st4k5b6k4pn82s7l7ea9j2.apps.googleusercontent.com',
+                client_id: GOOGLE_CLIENT_ID,
                 callback: handleLogin,
             });
             google.accounts.id.renderButton(
@@ -1222,6 +1221,11 @@ const App: React.FC = () => {
                                     }}
                                 />
                             </>
+                        )}
+                        {posts.length === 0 && !isLoading && (
+                            <div className="flex-grow flex items-center justify-center text-center p-4">
+                                <p className="text-zinc-500">A galeria e as camadas aparecerão aqui quando o conteúdo for gerado.</p>
+                            </div>
                         )}
                     </aside>
                 </div>
