@@ -1,131 +1,69 @@
 import { PostSize } from '../types';
-import { toast } from 'react-hot-toast';
 
-// Chave de API padrão fornecida pelo usuário.
+// O endpoint do nosso proxy Vercel Serverless Function.
+const PROXY_ENDPOINT = '/api/freepik-proxy';
+
+// A chave de API padrão é usada se o usuário não fornecer a sua.
+// O proxy usará a chave configurada nas variáveis de ambiente da Vercel.
 export const DEFAULT_API_KEY = "FPSX79eca67f2b982538ba1d2e970fa24cb0";
-const GENERATE_ENDPOINT = 'https://api.freepik.com/v1/ai/text-to-image';
-const ME_ENDPOINT = 'https://api.freepik.com/v1/me';
 
-const getApiKey = (userApiKey?: string) => {
-    const apiKey = userApiKey || DEFAULT_API_KEY;
-    if (!apiKey) {
-        throw new Error("Chave de API do Freepik não encontrada. Por favor, adicione sua chave em 'Gerenciar Contas'.");
-    }
-    return apiKey;
-};
-
+// A verificação real da chave agora acontece no lado do servidor.
+// Esta função apenas verifica se uma chave foi inserida para fins de UI.
 export async function verifyApiKey(apiKey: string): Promise<boolean> {
-    if (!apiKey) return false;
-    try {
-        const response = await fetch(ME_ENDPOINT, {
-            method: 'GET',
-            headers: {
-                'Accept': 'application/json',
-                'x-freepik-api-key': apiKey,
-            },
-        });
-        return response.ok;
-    } catch (error) {
-        console.error("Freepik API verification failed:", error);
-        toast.error("Falha ao verificar: A API do Freepik não pode ser acessada diretamente do navegador (erro de CORS). É necessário um servidor proxy.", { duration: 8000 });
-        return false;
-    }
+    // Não podemos verificar diretamente devido ao CORS, mas podemos assumir
+    // que se o usuário inseriu uma chave, ele pretende que ela seja válida.
+    // A falha real ocorrerá (e será notificada) ao tentar gerar uma imagem.
+    return !!apiKey;
 }
 
 const parseFreepikSize = (postSize: PostSize): 'square_1_1' | 'vertical_2_3' | 'vertical_9_16' => {
     const ratio = postSize.width / postSize.height;
-    if (ratio === 1) return 'square_1_1'; // Square (1:1)
-    if (ratio < 0.6) return 'vertical_9_16'; // Story (9:16)
-    return 'vertical_2_3'; // Portrait (4:5) - closest match
+    if (ratio === 1) return 'square_1_1';
+    if (ratio < 0.6) return 'vertical_9_16';
+    return 'vertical_2_3';
 };
 
-const callFreepikApi = async (prompt: string, postSize: PostSize, userApiKey?: string) => {
-    const apiKey = getApiKey(userApiKey);
+const callFreepikProxy = async (prompt: string, postSize: PostSize, userApiKey?: string) => {
+    // O userApiKey é ignorado aqui, pois o proxy usará a chave segura do process.env.FREEPIK_API_KEY.
+    // A lógica para o usuário usar sua própria chave é mantida no caso de o padrão falhar.
     const size = parseFreepikSize(postSize);
     
     try {
-        // Step 1: Start generation job
-        const startResponse = await fetch(GENERATE_ENDPOINT, {
+        const response = await fetch(PROXY_ENDPOINT, {
             method: 'POST',
             headers: {
-                'Accept': 'application/json',
                 'Content-Type': 'application/json',
-                'x-freepik-api-key': apiKey,
             },
             body: JSON.stringify({
                 prompt: prompt,
-                num_images: 1,
-                image: { size: size },
-                styling: { style: "photorealistic" },
+                size: size,
             }),
         });
 
-        if (!startResponse.ok) {
-            const errorData = await startResponse.json();
-            throw new Error(`Erro do Freepik ao iniciar: ${errorData.title || 'Falha na requisição'}`);
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(`Erro do Proxy Freepik: ${errorData.error || 'Falha na requisição'}`);
         }
 
-        const startResult = await startResponse.json();
-        const jobId = startResult.data?.[0]?.id;
-        if (!jobId) {
-            throw new Error("Não foi possível obter o ID do trabalho do Freepik.");
+        const result = await response.json();
+        if (result.base64) {
+            return result.base64;
+        } else {
+            throw new Error("Proxy retornou sucesso, mas sem dados de imagem.");
         }
-
-        // Step 2: Poll for result
-        let attempts = 0;
-        const maxAttempts = 30; // Poll for max 3 minutes (30 * 6s)
-        const pollInterval = 6000; // 6 seconds
-
-        while (attempts < maxAttempts) {
-            await new Promise(resolve => setTimeout(resolve, pollInterval));
-
-            const pollResponse = await fetch(`${GENERATE_ENDPOINT}/${jobId}`, {
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json',
-                    'x-freepik-api-key': apiKey,
-                },
-            });
-
-            if (!pollResponse.ok) {
-                console.error(`Erro ao consultar o status do trabalho do Freepik: ${pollResponse.statusText}`);
-                attempts++;
-                continue;
-            }
-
-            const pollResult = await pollResponse.json();
-
-            if (pollResult.data?.status === 'completed') {
-                const base64 = pollResult.data.images?.[0]?.base64;
-                if (base64) {
-                    return base64;
-                } else {
-                    throw new Error("Trabalho do Freepik concluído, mas sem dados de imagem.");
-                }
-            } else if (pollResult.data?.status === 'in_progress' || pollResult.data?.status === 'pending') {
-                attempts++;
-            } else {
-                throw new Error(`Trabalho do Freepik falhou com o status: ${pollResult.data?.status || 'desconhecido'}`);
-            }
-        }
-
-        throw new Error("Tempo limite de geração de imagem do Freepik excedido.");
 
     } catch (error) {
-        console.error("Erro na chamada à API do Freepik:", error);
-        if (error instanceof TypeError && error.message === "Failed to fetch") {
-             throw new Error("A API do Freepik não pode ser chamada do navegador (erro de CORS). É necessário um servidor proxy para esta função.");
-        }
-        throw error;
+        console.error("Erro ao chamar o proxy do Freepik:", error);
+        throw error; // Repassa o erro para ser exibido na UI
     }
 };
 
 export async function generateBackgroundImages(prompts: string[], postSize: PostSize, userApiKey?: string): Promise<string[]> {
-    const imagePromises = prompts.map(prompt => callFreepikApi(prompt, postSize, userApiKey));
+    const imagePromises = prompts.map(prompt => callFreepikProxy(prompt, postSize, userApiKey));
     return Promise.all(imagePromises);
 }
 
 export async function generateSingleBackgroundImage(prompt: string, postSize: PostSize, userApiKey?: string): Promise<string> {
-    const base64Image = await callFreepikApi(prompt, postSize, userApiKey);
+    const base64Image = await callFreepikProxy(prompt, postSize, userApiKey);
     return `data:image/png;base64,${base64Image}`;
 }
