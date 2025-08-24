@@ -180,7 +180,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedElement, onUp
                                 </div>
                                  <div className="grid grid-cols-2 gap-2">
                                     <NumberInput label="Tamanho" value={(selectedElement as TextElement).fontSize} onChange={val => onUpdateTextProperty('fontSize', parseInt(val, 10))} min={1} unit="px"/>
-                                    <ColorInput label="Cor" color={selectionStyles?.color || (selectedElement as TextElement).color} onChange={val => onUpdateTextProperty('color', val)} onOpenColorPicker={onOpenColorPicker} />
+                                    <ColorInput label="Cor" color={(isEditingText && selectionStyles.color) ? selectionStyles.color : (selectedElement as TextElement).color} onChange={val => onUpdateTextProperty('color', val)} onOpenColorPicker={onOpenColorPicker} />
                                 </div>
                                 <div className="flex items-center space-x-1 p-1 bg-black/30 rounded-md">
                                     <button onMouseDown={e => e.preventDefault()} onClick={() => onToggleTextStyle('bold')} className={`flex-1 text-center py-1 rounded text-xs transition-colors ${isEditingText ? (selectionStyles.bold ? 'bg-zinc-600 text-white' : 'hover:bg-zinc-700 text-gray-300') : ((selectedElement as TextElement).fontWeight === 700 ? 'bg-zinc-600 text-white' : 'hover:bg-zinc-700 text-gray-300')}`}><b className="font-sans">B</b></button>

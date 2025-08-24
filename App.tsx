@@ -334,6 +334,7 @@ const App: React.FC = () => {
     const selectedPost = posts.find(p => p.id === selectedPostId);
     const selectedElement = selectedPost?.elements.find(el => el.id === selectedElementId);
     const activeBrandKit = brandKits.find(k => k.id === activeBrandKitId);
+    const isEditingText = !!(activeEditorRef.current && activeEditorRef.current.id === selectedElementId);
 
     // --- RESPONSIVE & UI LOGIC ---
      useEffect(() => {
@@ -828,7 +829,7 @@ const App: React.FC = () => {
             const newContent = activeEditorRef.current.node.innerHTML;
             updatePostElement(selectedElement.id, { content: newContent });
             activeEditorRef.current.node.focus();
-            handleSelectionUpdate(); // Update style state immediately
+            handleSelectionUpdate();
         } else {
             const propMap = { bold: 'fontWeight', italic: 'fontStyle', underline: 'textDecoration' };
             const prop = propMap[style];
@@ -1071,24 +1072,24 @@ const App: React.FC = () => {
                                 <>
                                 <div className="flex items-center space-x-1">
                                      <button onMouseDown={e => e.preventDefault()} onClick={() => handleToggleTextStyle('bold')} className={`p-2 hover:bg-zinc-700 rounded-md ${
-                                        (activeEditorRef.current && activeEditorRef.current.id === selectedElement.id) ? (selectionStyles.bold ? 'text-purple-400' : '') : (selectedElement.fontWeight === 700 ? 'text-purple-400' : '')
+                                        (isEditingText) ? (selectionStyles.bold ? 'text-purple-400' : '') : (selectedElement.fontWeight === 700 ? 'text-purple-400' : '')
                                      }`}><Bold className="w-5 h-5"/></button>
                                      <button onMouseDown={e => e.preventDefault()} onClick={() => handleToggleTextStyle('italic')} className={`p-2 hover:bg-zinc-700 rounded-md ${
-                                        (activeEditorRef.current && activeEditorRef.current.id === selectedElement.id) ? (selectionStyles.italic ? 'text-purple-400' : '') : (selectedElement.fontStyle === 'italic' ? 'text-purple-400' : '')
+                                        (isEditingText) ? (selectionStyles.italic ? 'text-purple-400' : '') : (selectedElement.fontStyle === 'italic' ? 'text-purple-400' : '')
                                      }`}><Italic className="w-5 h-5"/></button>
                                      <button onMouseDown={e => e.preventDefault()} onClick={() => handleToggleTextStyle('underline')} className={`p-2 hover:bg-zinc-700 rounded-md ${
-                                        (activeEditorRef.current && activeEditorRef.current.id === selectedElement.id) ? (selectionStyles.underline ? 'text-purple-400' : '') : (selectedElement.textDecoration === 'underline' ? 'text-purple-400' : '')
+                                        (isEditingText) ? (selectionStyles.underline ? 'text-purple-400' : '') : (selectedElement.textDecoration === 'underline' ? 'text-purple-400' : '')
                                      }`}><Underline className="w-5 h-5"/></button>
                                 </div>
                                 <div className="w-px h-5 bg-zinc-700 mx-1"></div>
                                 <button
                                     onMouseDown={e => e.preventDefault()}
                                     onClick={() => handleOpenColorPicker(
-                                        selectionStyles.color || (selectedElement as TextElement).color,
+                                        (isEditingText && selectionStyles.color) ? selectionStyles.color : (selectedElement as TextElement).color,
                                         (newColor) => handleUpdateTextProperty('color', newColor)
                                     )}
                                     className="w-6 h-6 rounded-md border border-zinc-600"
-                                    style={{ backgroundColor: selectionStyles.color || (selectedElement as TextElement).color }}
+                                    style={{ backgroundColor: (isEditingText && selectionStyles.color) ? selectionStyles.color : (selectedElement as TextElement).color }}
                                     aria-label="Change text color"
                                 />
                                 <div className="w-px h-5 bg-zinc-700 mx-1"></div>
@@ -1121,7 +1122,7 @@ const App: React.FC = () => {
                             onUpdateTextProperty={handleUpdateTextProperty}
                             onToggleTextStyle={handleToggleTextStyle}
                             selectionStyles={selectionStyles}
-                            isEditingText={!!(activeEditorRef.current && activeEditorRef.current.id === selectedElementId)}
+                            isEditingText={isEditingText}
                         />
                     ) : <EmptyPanelPlaceholder text="Selecione um post para ver suas camadas e propriedades."/>}
                 </aside>
