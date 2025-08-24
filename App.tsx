@@ -1,4 +1,6 @@
 
+
+
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import { createRoot } from 'react-dom/client';
@@ -188,7 +190,7 @@ const App: React.FC = () => {
 
     const handleManageAccounts = () => setAccountModalOpen(true);
     
-    const handleLinkAccount = (service: 'google', apiKey: string) => {
+    const handleLinkAccount = (service: 'google' | 'freepik', apiKey: string) => {
         if (!user) return;
         const updatedUser: User = {
             ...user,
@@ -200,7 +202,7 @@ const App: React.FC = () => {
         updateUser(updatedUser);
     };
 
-    const handleUnlinkAccount = (service: 'google') => {
+    const handleUnlinkAccount = (service: 'google' | 'freepik') => {
         if (!user) return;
         const updatedUser: User = { ...user, linkedAccounts: { ...user.linkedAccounts } };
         delete updatedUser.linkedAccounts[service];
@@ -434,7 +436,7 @@ const App: React.FC = () => {
                     } else if (aiProvider === 'freepik') {
                         setLoadingMessage(`Criando imagens de fundo com Freepik...`);
                         toast.loading(`Criando imagens de fundo com Freepik...`, { id: toastId });
-                        generatedBase64Images = await freepikService.generateBackgroundImages(imagePrompts, postSize);
+                        generatedBase64Images = await freepikService.generateBackgroundImages(imagePrompts, postSize, user.linkedAccounts?.freepik?.apiKey);
                     }
                     
                     backgroundSources = generatedBase64Images.map((b64, index) => ({
@@ -513,7 +515,7 @@ const App: React.FC = () => {
             }
         } catch (error) {
             console.error(error);
-            toast.error(error instanceof Error ? error.message : 'Falha ao gerar conteúdo.', { id: toastId });
+            toast.error(error instanceof Error ? error.message : 'Falha ao gerar conteúdo.', { id: toastId, duration: 6000 });
         } finally {
             setIsLoading(false);
             setLoadingMessage('');
@@ -928,36 +930,36 @@ const App: React.FC = () => {
     
             if (!bgElement) throw new Error("Elemento de fundo não encontrado.");
             
-            let newSrc = '';
             const provider = bgElement.provider || 'gemini';
-    
-            if (provider === 'freepik') {
-                newSrc = await freepikService.generateSingleBackgroundImage(prompt, postSize);
-            } else { // Gemini
-                const userApiKey = user.linkedAccounts?.google?.apiKey;
-                const isFreeTierUser = !userApiKey;
-    
-                if (isFreeTierUser && (user.generationsToday || 0) >= DAILY_GENERATION_LIMIT) {
-                    toast.error("Você atingiu seu limite diário de gerações.", { id: toastId });
-                    return;
-                }
-                
-                newSrc = await geminiService.generateSingleBackgroundImage(prompt, postSize, userApiKey);
-    
-                if (isFreeTierUser) {
-                    updateUser({
-                        ...user,
-                        generationsToday: (user.generationsToday || 0) + 1,
-                        lastGenerationDate: new Date().toISOString().split('T')[0]
-                    });
-                }
+
+            const userApiKey = user.linkedAccounts?.google?.apiKey;
+            const isFreeTierUser = !userApiKey;
+
+            if (provider === 'gemini' && isFreeTierUser && (user.generationsToday || 0) >= DAILY_GENERATION_LIMIT) {
+                toast.error("Você atingiu seu limite diário de gerações.", { id: toastId });
+                return;
             }
             
-            updatePostElement(elementId, { src: newSrc, provider });
+            let newSrc = '';
+            if (provider === 'gemini') {
+                 newSrc = await geminiService.generateSingleBackgroundImage(prompt, postSize, userApiKey);
+            } else if (provider === 'freepik') {
+                newSrc = await freepikService.generateSingleBackgroundImage(prompt, postSize, user.linkedAccounts?.freepik?.apiKey);
+            }
+
+            if (provider === 'gemini' && isFreeTierUser) {
+                updateUser({
+                    ...user,
+                    generationsToday: (user.generationsToday || 0) + 1,
+                    lastGenerationDate: new Date().toISOString().split('T')[0]
+                });
+            }
+            
+            updatePostElement(elementId, { src: newSrc, provider: provider });
             toast.success("Fundo regenerado!", { id: toastId });
         } catch (error) {
             console.error(error);
-            toast.error(error instanceof Error ? error.message : "Falha ao regenerar o fundo.", { id: toastId });
+            toast.error(error instanceof Error ? error.message : "Falha ao regenerar o fundo.", { id: toastId, duration: 6000 });
         }
     };
 

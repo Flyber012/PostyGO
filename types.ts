@@ -149,7 +149,7 @@ export interface User {
     email: string;
     avatar: string;
     linkedAccounts: {
-        [key in 'google']?: {
+        [key in 'google' | 'freepik']?: {
             status: 'connected' | 'disconnected';
             apiKey?: string;
         }

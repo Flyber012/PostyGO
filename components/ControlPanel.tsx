@@ -1,10 +1,14 @@
 
+
+
+
 import React, { useState, useRef, useEffect } from 'react';
 import { PostSize, BrandKit, LayoutTemplate, User } from '../types';
 import { POST_SIZES } from '../constants';
 import { FileDown, Image, Save, Download, Sparkles, Upload, X, Trash2, Plus, File, Files, BrainCircuit, ShieldCheck, Copy, Package, Check, LayoutTemplate as LayoutIcon, ChevronDown, AlertCircle } from 'lucide-react';
 import AdvancedColorPicker from './ColorPicker';
 import { toast } from 'react-hot-toast';
+import * as freepikService from '../services/freepikService';
 
 interface ImageUploaderProps {
     title: string;
@@ -240,16 +244,22 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
     const generationsLeft = dailyLimit - generationsToday;
     
     const isGeminiReady = user && (isGeminiKeyUser || generationsLeft > 0);
-    
-    let canGenerate = false;
+    const isFreepikReady = user && (!!user.linkedAccounts?.freepik?.apiKey || !!freepikService.DEFAULT_API_KEY);
+
+    let canGenerate = !isLoading;
     let generateButtonTooltip = '';
 
     if (!user) {
         generateButtonTooltip = 'Faça login para gerar conteúdo.';
-    } else if (backgroundSource === 'ai' && aiProvider === 'gemini' && !isGeminiReady) {
-        generateButtonTooltip = 'Conecte sua conta Gemini para usar este provedor.';
-    } else {
-        canGenerate = !isLoading;
+        canGenerate = false;
+    } else if (backgroundSource === 'ai') {
+        if (aiProvider === 'gemini' && !isGeminiReady) {
+            generateButtonTooltip = 'Conecte sua conta Gemini ou aguarde para usar a cota diária.';
+            canGenerate = false;
+        } else if (aiProvider === 'freepik' && !isFreepikReady) {
+            generateButtonTooltip = 'Conecte sua conta Freepik para usar este provedor.';
+            canGenerate = false;
+        }
     }
 
 
@@ -371,18 +381,18 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
                         />
                     ) : (
                         <div className="space-y-4">
-                             <div>
+                            <div>
                                 <label className="block text-sm font-medium text-gray-300 mb-1">Provedor de IA</label>
-                                <div className="flex bg-zinc-900/70 p-1 rounded-lg">
-                                    <button onClick={() => setAiProvider('gemini')} className={`flex-1 text-center text-xs py-1.5 rounded-md transition-all duration-300 ${aiProvider === 'gemini' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:bg-zinc-700'}`}>
+                                <div className="flex bg-zinc-900/70 p-1 rounded-lg text-sm">
+                                    <button onClick={() => setAiProvider('gemini')} className={`flex-1 text-center py-1.5 rounded-md transition-all duration-300 ${aiProvider === 'gemini' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:bg-zinc-700'}`}>
                                         Google Gemini
                                     </button>
-                                    <button onClick={() => setAiProvider('freepik')} className={`flex-1 text-center text-xs py-1.5 rounded-md transition-all duration-300 ${aiProvider === 'freepik' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:bg-zinc-700'}`}>
+                                    <button onClick={() => setAiProvider('freepik')} className={`flex-1 text-center py-1.5 rounded-md transition-all duration-300 ${aiProvider === 'freepik' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:bg-zinc-700'}`}>
                                         Freepik
                                     </button>
                                 </div>
-                                {aiProvider === 'gemini' && !user?.linkedAccounts?.google?.apiKey && 
-                                    <p className="text-xs text-yellow-400 mt-2 text-center">Conecte sua chave de API do Gemini em 'Gerenciar Contas' para usar.</p>
+                                {aiProvider === 'freepik' &&
+                                    <p className="text-xs text-yellow-400 mt-2 text-center">Aviso: A API do Freepik pode não funcionar no navegador devido a restrições de CORS.</p>
                                 }
                             </div>
                             <p className="text-xs text-center text-gray-400">A IA irá gerar as imagens de fundo e o texto.</p>

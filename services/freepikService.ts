@@ -1,79 +1,131 @@
-
 import { PostSize } from '../types';
+import { toast } from 'react-hot-toast';
 
 // Chave de API padrão fornecida pelo usuário.
-const DEFAULT_API_KEY = "FPSX79eca67f2b982538ba1d2e970fa24cb0";
-const GENERATE_ENDPOINT = 'https://api.freepik.com/v1/ai/images';
+export const DEFAULT_API_KEY = "FPSX79eca67f2b982538ba1d2e970fa24cb0";
+const GENERATE_ENDPOINT = 'https://api.freepik.com/v1/ai/text-to-image';
+const ME_ENDPOINT = 'https://api.freepik.com/v1/me';
 
-const getApiKey = () => {
-    if (!DEFAULT_API_KEY) {
-        throw new Error("Chave de API do Freepik não configurada.");
+const getApiKey = (userApiKey?: string) => {
+    const apiKey = userApiKey || DEFAULT_API_KEY;
+    if (!apiKey) {
+        throw new Error("Chave de API do Freepik não encontrada. Por favor, adicione sua chave em 'Gerenciar Contas'.");
     }
-    return DEFAULT_API_KEY;
+    return apiKey;
 };
 
-/**
- * Gera uma única imagem usando a API do Freepik.
- * @param apiKey A chave de API do usuário para autenticação.
- * @param prompt O prompt de texto para a geração da imagem.
- * @returns Uma string base64 dos dados da imagem.
- */
-async function generateImage(apiKey: string, prompt: string, postSize: PostSize): Promise<string> {
-    // A documentação do Freepik não é clara sobre os tamanhos suportados além de 1024x1024.
-    // Para garantir a compatibilidade e evitar erros, usaremos "1024x1024".
-    // A aplicação usa `object-cover` para a imagem de fundo, que irá preencher o espaço corretamente.
-    const size = "1024x1024";
-
-    const response = await fetch(GENERATE_ENDPOINT, {
-        method: 'POST',
-        headers: {
-            'x-api-key': apiKey,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-            prompt: prompt,
-            size: size,
-            quantity: 1
-        })
-    });
-
-    if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'Erro desconhecido da API do Freepik' }));
-        console.error('Erro da API do Freepik:', errorData);
-        throw new Error(`Falha na geração com Freepik: ${errorData.title || response.statusText}`);
-    }
-
-    const result = await response.json();
-    
-    // A estrutura da resposta é { data: [{ base64: "..." }] }
-    if (result.data && result.data[0] && result.data[0].base64) {
-        return result.data[0].base64;
-    } else {
-        throw new Error('Formato de resposta inesperado da API do Freepik.');
+export async function verifyApiKey(apiKey: string): Promise<boolean> {
+    if (!apiKey) return false;
+    try {
+        const response = await fetch(ME_ENDPOINT, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                'x-freepik-api-key': apiKey,
+            },
+        });
+        return response.ok;
+    } catch (error) {
+        console.error("Freepik API verification failed:", error);
+        toast.error("Falha ao verificar: A API do Freepik não pode ser acessada diretamente do navegador (erro de CORS). É necessário um servidor proxy.", { duration: 8000 });
+        return false;
     }
 }
 
-/**
- * Gera várias imagens de fundo em paralelo.
- * @param prompts Um array de prompts de texto.
- * @param postSize O tamanho dos posts a serem gerados.
- * @returns Uma promessa que resolve para um array de strings base64 de imagens.
- */
-export async function generateBackgroundImages(prompts: string[], postSize: PostSize): Promise<string[]> {
-    const apiKey = getApiKey();
-    const imagePromises = prompts.map(prompt => generateImage(apiKey, prompt, postSize));
+const parseFreepikSize = (postSize: PostSize): 'square_1_1' | 'vertical_2_3' | 'vertical_9_16' => {
+    const ratio = postSize.width / postSize.height;
+    if (ratio === 1) return 'square_1_1'; // Square (1:1)
+    if (ratio < 0.6) return 'vertical_9_16'; // Story (9:16)
+    return 'vertical_2_3'; // Portrait (4:5) - closest match
+};
+
+const callFreepikApi = async (prompt: string, postSize: PostSize, userApiKey?: string) => {
+    const apiKey = getApiKey(userApiKey);
+    const size = parseFreepikSize(postSize);
+    
+    try {
+        // Step 1: Start generation job
+        const startResponse = await fetch(GENERATE_ENDPOINT, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'x-freepik-api-key': apiKey,
+            },
+            body: JSON.stringify({
+                prompt: prompt,
+                num_images: 1,
+                image: { size: size },
+                styling: { style: "photorealistic" },
+            }),
+        });
+
+        if (!startResponse.ok) {
+            const errorData = await startResponse.json();
+            throw new Error(`Erro do Freepik ao iniciar: ${errorData.title || 'Falha na requisição'}`);
+        }
+
+        const startResult = await startResponse.json();
+        const jobId = startResult.data?.[0]?.id;
+        if (!jobId) {
+            throw new Error("Não foi possível obter o ID do trabalho do Freepik.");
+        }
+
+        // Step 2: Poll for result
+        let attempts = 0;
+        const maxAttempts = 30; // Poll for max 3 minutes (30 * 6s)
+        const pollInterval = 6000; // 6 seconds
+
+        while (attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, pollInterval));
+
+            const pollResponse = await fetch(`${GENERATE_ENDPOINT}/${jobId}`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'x-freepik-api-key': apiKey,
+                },
+            });
+
+            if (!pollResponse.ok) {
+                console.error(`Erro ao consultar o status do trabalho do Freepik: ${pollResponse.statusText}`);
+                attempts++;
+                continue;
+            }
+
+            const pollResult = await pollResponse.json();
+
+            if (pollResult.data?.status === 'completed') {
+                const base64 = pollResult.data.images?.[0]?.base64;
+                if (base64) {
+                    return base64;
+                } else {
+                    throw new Error("Trabalho do Freepik concluído, mas sem dados de imagem.");
+                }
+            } else if (pollResult.data?.status === 'in_progress' || pollResult.data?.status === 'pending') {
+                attempts++;
+            } else {
+                throw new Error(`Trabalho do Freepik falhou com o status: ${pollResult.data?.status || 'desconhecido'}`);
+            }
+        }
+
+        throw new Error("Tempo limite de geração de imagem do Freepik excedido.");
+
+    } catch (error) {
+        console.error("Erro na chamada à API do Freepik:", error);
+        if (error instanceof TypeError && error.message === "Failed to fetch") {
+             throw new Error("A API do Freepik não pode ser chamada do navegador (erro de CORS). É necessário um servidor proxy para esta função.");
+        }
+        throw error;
+    }
+};
+
+export async function generateBackgroundImages(prompts: string[], postSize: PostSize, userApiKey?: string): Promise<string[]> {
+    const imagePromises = prompts.map(prompt => callFreepikApi(prompt, postSize, userApiKey));
     return Promise.all(imagePromises);
 }
 
-/**
- * Gera uma única imagem de fundo e retorna uma URL de dados completa.
- * @param prompt O prompt de texto.
- * @param postSize O tamanho do post a ser gerado.
- * @returns Uma promessa que resolve para uma URL de dados de imagem completa (ex: 'data:image/png;base64,...').
- */
-export async function generateSingleBackgroundImage(prompt: string, postSize: PostSize): Promise<string> {
-    const apiKey = getApiKey();
-    const base64Data = await generateImage(apiKey, prompt, postSize);
-    return `data:image/png;base64,${base64Data}`;
+export async function generateSingleBackgroundImage(prompt: string, postSize: PostSize, userApiKey?: string): Promise<string> {
+    const base64Image = await callFreepikApi(prompt, postSize, userApiKey);
+    return `data:image/png;base64,${base64Image}`;
 }

@@ -1,20 +1,23 @@
 
+
+
 import React, { useState } from 'react';
 import { User } from '../types';
 import { X, CheckCircle, Link, XCircle, Key, Eye, EyeOff, RotateCw } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import * as geminiService from '../services/geminiService';
+import * as freepikService from '../services/freepikService';
 
 
 interface AccountManagerModalProps {
     isOpen: boolean;
     onClose: () => void;
     user: User | null;
-    onLinkAccount: (service: 'google', apiKey: string) => void;
-    onUnlinkAccount: (service: 'google') => void;
+    onLinkAccount: (service: 'google' | 'freepik', apiKey: string) => void;
+    onUnlinkAccount: (service: 'google' | 'freepik') => void;
 }
 
-type Service = 'google';
+type Service = 'google' | 'freepik';
 
 interface ServiceRowProps {
     service: Service;
@@ -51,6 +54,9 @@ const ServiceRow: React.FC<ServiceRowProps> = ({ service, name, description, ico
             toast.success(`${name} conectado com sucesso!`);
         } else {
             let errorMessage = `Chave de API do ${name} inválida ou expirada. Verifique e tente novamente.`;
+            if (service === 'freepik') { // Custom message for Freepik due to CORS
+                 errorMessage = `A chave do ${name} parece válida, mas a verificação falhou. Isso geralmente ocorre devido a restrições de CORS do navegador.`;
+            }
             toast.error(errorMessage, { duration: 6000 });
         }
     };
@@ -158,6 +164,17 @@ const AccountManagerModal: React.FC<AccountManagerModalProps> = ({ isOpen, onClo
                         onUnlink={onUnlinkAccount}
                         getApiKeyUrl="https://aistudio.google.com/app/apikey"
                         verificationFn={geminiService.verifyApiKey}
+                    />
+                    <ServiceRow 
+                        service="freepik"
+                        name="Freepik"
+                        description="Para geração de imagens (pode falhar no navegador)."
+                        icon={<img src="https://freepik.cdnpk.net/img/logo/freepik-company-dark.svg" alt="Freepik" className="w-6 h-auto invert"/>}
+                        user={user}
+                        onLink={onLinkAccount}
+                        onUnlink={onUnlinkAccount}
+                        getApiKeyUrl="https://www.freepik.com/profile/api-keys"
+                        verificationFn={freepikService.verifyApiKey}
                     />
                 </div>
             </div>
