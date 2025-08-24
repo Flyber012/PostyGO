@@ -676,8 +676,19 @@ const App: React.FC = () => {
         };
     }, []);
 
-    useEffect(() => { handleFitToScreen(); }, [handleFitToScreen, selectedPostId, postSize, isLeftPanelOpen, isRightPanelOpen]);
-    useEffect(() => { window.addEventListener('resize', handleFitToScreen); return () => window.removeEventListener('resize', handleFitToScreen); }, [handleFitToScreen]);
+    useEffect(() => {
+        // Delay the fit-to-screen to allow for panel animation (300ms transition)
+        const timer = setTimeout(() => {
+            handleFitToScreen();
+        }, 350); 
+    
+        window.addEventListener('resize', handleFitToScreen);
+        
+        return () => {
+            clearTimeout(timer);
+            window.removeEventListener('resize', handleFitToScreen);
+        };
+    }, [handleFitToScreen, selectedPostId, postSize, isLeftPanelOpen, isRightPanelOpen]);
 
 
     // --- BRANDKIT & FONT HANDLERS ---
@@ -763,7 +774,10 @@ const App: React.FC = () => {
                                         <p className="text-gray-400">Aguarde, a mágica está acontecendo...</p>
                                     </div>
                                 ) : selectedPost ? (
-                                    <div style={{ transform: `translate(${viewState.offset.x}px, ${viewState.offset.y}px) scale(${viewState.zoom})` }}>
+                                    <div style={{
+                                        transform: `translate(${viewState.offset.x}px, ${viewState.offset.y}px) scale(${viewState.zoom})`,
+                                        transformOrigin: 'top left'
+                                    }}>
                                         <CanvasEditor post={selectedPost} postSize={postSize} onUpdateElement={updatePostElement} selectedElementId={selectedElementId} onSelectElement={setSelectedElementId} />
                                     </div>
                                 ) : (
