@@ -19,7 +19,7 @@ import saveAs from 'file-saver';
 import { v4 as uuidv4 } from 'uuid';
 import * as htmlToImage from 'html-to-image';
 import JSZip from 'jszip';
-import { ZoomIn, ZoomOut, Maximize, AlignHorizontalJustifyStart, AlignHorizontalJustifyCenter, AlignHorizontalJustifyEnd, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Copy, Trash2, ChevronLeft, ChevronRight, Eye, EyeOff, Lock, Unlock, X, Sparkles, Layers, Package } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize, AlignHorizontalJustifyStart, AlignHorizontalJustifyCenter, AlignHorizontalJustifyEnd, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Copy, Trash2, ChevronLeft, ChevronRight, Eye, EyeOff, Lock, Unlock, X, Sparkles, Layers, Package, Download } from 'lucide-react';
 import AdvancedColorPicker from './components/ColorPicker';
 
 declare global {
@@ -164,6 +164,7 @@ const App: React.FC = () => {
     const [isWizardOpen, setWizardOpen] = useState(false);
     const [isBrandKitPanelOpen, setBrandKitPanelOpen] = useState(false);
     const [isRightPanelOpen, setRightPanelOpen] = useState(false);
+    const [isExportMenuOpen, setExportMenuOpen] = useState(false);
 
     // Global Color Picker State
     const [colorPickerState, setColorPickerState] = useState<{
@@ -182,6 +183,19 @@ const App: React.FC = () => {
 
     const editorRef = useRef<HTMLDivElement>(null);
     const viewportRef = useRef<HTMLElement>(null);
+    const exportMenuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+                setExportMenuOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
 
     const updateUser = (updatedUser: User | null) => {
         setUser(updatedUser);
@@ -1046,6 +1060,7 @@ const App: React.FC = () => {
         const toastId = toast.loading(`Exportando...`);
         setSelectedElementId(null);
         await new Promise(resolve => setTimeout(resolve, 50));
+        const isMobile = window.innerWidth < 1024;
 
         try {
             const fontURL = "https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;700&family=Lato:wght@400;700&family=Montserrat:wght@400;700&family=Oswald:wght@400;700&family=Poppins:wght@400;700&family=Roboto:wght@400;700&display=swap";
@@ -1063,12 +1078,16 @@ const App: React.FC = () => {
             };
 
             if (format === 'zip') {
-                const zip = new JSZip();
                 const container = document.createElement('div');
                 container.style.position = 'absolute';
                 container.style.left = '-9999px';
                 container.style.top = '-9999px';
                 document.body.appendChild(container);
+
+                if (isMobile) {
+                    toast.success(`Iniciando download de ${posts.length} imagens...`, { id: toastId, duration: 4000 });
+                }
+                const zip = isMobile ? null : new JSZip();
 
                 for (const post of posts) {
                     const postContainer = document.createElement('div');
@@ -1083,16 +1102,25 @@ const App: React.FC = () => {
                         const blob = await htmlToImage.toBlob(nodeToCapture, imageOptions);
                         if (blob) {
                             const fileName = post.carouselId ? `carousel-${post.carouselId}-slide-${(post.slideIndex || 0) + 1}.png` : `post-${post.id}.png`;
-                            zip.file(fileName, blob);
+                            if (isMobile) {
+                                saveAs(blob, fileName);
+                                await new Promise(r => setTimeout(r, 500)); // Delay for mobile
+                            } else {
+                                zip!.file(fileName, blob);
+                            }
                         }
                     }
                     root.unmount();
                 }
 
                 document.body.removeChild(container);
-                const zipBlob = await zip.generateAsync({ type: "blob" });
-                saveAs(zipBlob, "posts.zip");
-                toast.success("Todos os posts foram exportados como ZIP!", { id: toastId });
+                if (isMobile) {
+                    toast.success("Exportação concluída!", { id: toastId });
+                } else {
+                    const zipBlob = await zip!.generateAsync({ type: "blob" });
+                    saveAs(zipBlob, "posts.zip");
+                    toast.success("Todos os posts foram exportados como ZIP!", { id: toastId });
+                }
 
             } else {
                  if (!editorRef.current) {
@@ -1272,8 +1300,31 @@ const App: React.FC = () => {
             />
 
             <div className="flex flex-col h-full font-sans bg-gray-950 text-gray-100">
-                <header className="w-full bg-zinc-900 border-b border-zinc-800 px-4 sm:px-6 py-3 flex-shrink-0 flex items-center justify-end">
-                    <UserProfile user={user} onLogin={() => {}} onLogout={handleLogout} onManageAccounts={handleManageAccounts} onBuyCredits={() => setBuyCreditsModalOpen(true)} />
+                <header className="w-full bg-zinc-900 border-b border-zinc-800 px-4 sm:px-6 py-3 flex-shrink-0 flex items-center justify-between lg:justify-end">
+                    {posts.length > 0 && !isLoading && (
+                        <div className="relative lg:hidden">
+                            <button
+                                onClick={() => setExportMenuOpen(prev => !prev)}
+                                className="flex items-center space-x-2 bg-zinc-800 hover:bg-zinc-700 p-2 rounded-lg transition-colors text-sm font-semibold"
+                            >
+                                <Download className="w-4 h-4" />
+                                <span>Exportar</span>
+                            </button>
+                            {isExportMenuOpen && (
+                                <div ref={exportMenuRef} className="absolute left-0 mt-2 w-56 bg-zinc-800 rounded-lg shadow-lg z-20 border border-zinc-700 overflow-hidden">
+                                    <button onClick={() => { handleExport('png'); setExportMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-zinc-700">Atual (PNG)</button>
+                                    <button onClick={() => { handleExport('jpeg'); setExportMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-zinc-700">Atual (JPEG)</button>
+                                    <button onClick={() => { handleExport('zip'); setExportMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-zinc-700">Exportar Tudo</button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                     <div className="lg:hidden" style={{ width: posts.length > 0 ? 'auto' : '100%' }}>
+                        <UserProfile user={user} onLogin={() => {}} onLogout={handleLogout} onManageAccounts={handleManageAccounts} onBuyCredits={() => setBuyCreditsModalOpen(true)} />
+                    </div>
+                     <div className="hidden lg:block">
+                        <UserProfile user={user} onLogin={() => {}} onLogout={handleLogout} onManageAccounts={handleManageAccounts} onBuyCredits={() => setBuyCreditsModalOpen(true)} />
+                    </div>
                 </header>
                 <div className="flex-1 flex flex-row min-h-0 relative">
                     {/* Painel Esquerdo (Desktop) */}
@@ -1384,10 +1435,10 @@ const App: React.FC = () => {
                             </div>
                         )}
 
-                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center space-x-2 bg-zinc-900/70 backdrop-blur-sm p-2 rounded-lg shadow-lg">
+                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center space-x-2 bg-zinc-900/70 backdrop-blur-sm p-2 rounded-lg shadow-lg max-w-[95vw] overflow-x-auto toolbar-scrollbar">
                             {selectedElement && selectedElementId && (
                                 <>
-                                    <div className="flex items-center space-x-1">
+                                    <div className="flex items-center space-x-1 flex-shrink-0">
                                         <button onClick={() => handleAlignElement('h-start')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Align Left"><AlignHorizontalJustifyStart className="w-4 h-4" /></button>
                                         <button onClick={() => handleAlignElement('h-center')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Align Center Horizontal"><AlignHorizontalJustifyCenter className="w-4 h-4" /></button>
                                         <button onClick={() => handleAlignElement('h-end')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Align Right"><AlignHorizontalJustifyEnd className="w-4 h-4" /></button>
@@ -1395,29 +1446,29 @@ const App: React.FC = () => {
                                         <button onClick={() => handleAlignElement('v-center')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Align Center Vertical"><AlignVerticalJustifyCenter className="w-4 h-4" /></button>
                                         <button onClick={() => handleAlignElement('v-end')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Align Bottom"><AlignVerticalJustifyEnd className="w-4 h-4" /></button>
                                     </div>
-                                    <div className="w-px h-5 bg-zinc-700"></div>
+                                    <div className="w-px h-5 bg-zinc-700 flex-shrink-0"></div>
                                 </>
                             )}
                             {selectedElement?.type === 'text' && (
                                  <>
-                                    <div className="flex items-center space-x-2">
+                                    <div className="flex items-center space-x-2 flex-shrink-0">
                                         <select value={selectedElement.fontFamily} onChange={e => updatePostElement(selectedElementId!, { fontFamily: e.target.value })} className="bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1 text-xs text-white focus:ring-1 focus:ring-purple-500 focus:outline-none appearance-none">
                                             {availableFonts.map(font => <option key={font.name} value={font.name}>{font.name}</option>)}
                                         </select>
                                         <input type="number" value={selectedElement.fontSize} onChange={e => updatePostElement(selectedElementId!, { fontSize: parseInt(e.target.value, 10) || 24 })} className="w-16 bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1 text-xs text-white focus:ring-1 focus:ring-purple-500 focus:outline-none" />
                                         <button onClick={() => handleOpenColorPicker(selectedElement.color, (newColor) => updatePostElement(selectedElementId!, { color: newColor }))} className="w-7 h-7 rounded-md border-2 border-zinc-700" style={{ backgroundColor: selectedElement.color }} />
                                     </div>
-                                    <div className="w-px h-5 bg-zinc-700"></div>
+                                    <div className="w-px h-5 bg-zinc-700 flex-shrink-0"></div>
                                  </>
                             )}
                             {selectedElement && selectedElementId && (
                                 <>
-                                    <div className="flex items-center space-x-2">
+                                    <div className="flex items-center space-x-2 flex-shrink-0">
                                         <span className="text-xs text-zinc-400">Opacidade</span>
                                         <input type="range" min="0" max="1" step="0.01" value={selectedElement.opacity} onChange={e => updatePostElement(selectedElementId, { opacity: parseFloat(e.target.value) })} className="w-20" />
                                     </div>
-                                    <div className="w-px h-5 bg-zinc-700"></div>
-                                    <div className="flex items-center space-x-1">
+                                    <div className="w-px h-5 bg-zinc-700 flex-shrink-0"></div>
+                                    <div className="flex items-center space-x-1 flex-shrink-0">
                                         <button onClick={() => handleToggleElementVisibility(selectedElement.id)} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Toggle Visibility">{selectedElement.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}</button>
                                         <button onClick={() => handleToggleElementLock(selectedElement.id)} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Toggle Lock">{selectedElement.locked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}</button>
                                         <button onClick={() => handleDuplicateElement(selectedElement.id)} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Duplicate Element"><Copy className="w-4 h-4"/></button>
@@ -1426,7 +1477,7 @@ const App: React.FC = () => {
                                 </>
                             )}
                              {posts.length > 0 && !isLoading && (
-                                <div className="flex items-center space-x-2 pl-2 border-l border-zinc-700">
+                                <div className="flex items-center space-x-2 pl-2 border-l border-zinc-700 flex-shrink-0">
                                     <button onClick={handleZoomOut} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Zoom Out"><ZoomOut className="w-5 h-5"/></button>
                                     <span className="text-sm font-mono w-16 text-center">{Math.round(zoom * 100)}%</span>
                                     <button onClick={handleZoomIn} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Zoom In"><ZoomIn className="w-5 h-5"/></button>
