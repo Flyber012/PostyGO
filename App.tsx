@@ -14,7 +14,7 @@ import { GenerationWizard } from './components/GenerationWizard';
 import { BrandKitPanel } from './components/BrandKitPanel';
 import saveAs from 'file-saver';
 import { v4 as uuidv4 } from 'uuid';
-import { ZoomIn, ZoomOut, Maximize, PanelLeft, PanelRight, Package } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize, PanelLeft, PanelRight, Package, Image as ImageIcon, FileText, X } from 'lucide-react';
 import AdvancedColorPicker from './components/ColorPicker';
 
 // --- HELPERS ---
@@ -47,12 +47,15 @@ const convertAILayoutToElements = (aiLayout: AIGeneratedTextElement[], postSize:
             height: (aiEl.height / 100) * postHeight,
             fontSize,
             fontFamily: aiEl.fontFamily || 'Poppins',
+            fontWeight: 400,
+            fontStyle: 'normal',
+            textDecoration: 'none',
             color: aiEl.color || (aiEl.backgroundTone === 'dark' ? '#FFFFFF' : '#0F172A'),
             textAlign: aiEl.textAlign,
             verticalAlign: 'middle',
             rotation: aiEl.rotation || 0,
             opacity: 1, locked: false, visible: true,
-            letterSpacing: 0, lineHeight: aiEl.lineHeight || 1.4,
+            letterSpacing: 0, lineHeight: aiEl.lineHeight || 1,
             highlightColor: aiEl.highlightColor, accentFontFamily: aiEl.accentFontFamily,
             backgroundColor: aiEl.backgroundColor,
             padding: aiEl.fontSize === 'cta' ? fontSize * 0.5 : 0,
@@ -63,26 +66,72 @@ const convertAILayoutToElements = (aiLayout: AIGeneratedTextElement[], postSize:
 };
 
 
-const WelcomeScreen: React.FC<{ onNewProject: () => void; onOpenProject: () => void; }> = ({ onNewProject, onOpenProject }) => (
-    <div className="flex flex-col items-center justify-center h-full text-center text-gray-300 bg-black/30 p-4">
-        <h1 className="text-3xl md:text-4xl font-bold mb-2 animated-gradient-text">Bem-vindo(a) ao Posty</h1>
-        <p className="text-base md:text-lg text-gray-400 mb-8">Sua ferramenta de IA para criar posts incríveis.</p>
-        <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
-            <button
-                onClick={onNewProject}
-                className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
-            >
-                Novo Projeto
-            </button>
-            <button
-                onClick={onOpenProject}
-                className="bg-zinc-700 hover:bg-zinc-600 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
-            >
-                Abrir Projeto
-            </button>
+const WelcomeScreen: React.FC<{ onNewProject: (size: PostSize) => void; onOpenProject: () => void; onOpenRecent: (project: Project) => void; }> = ({ onNewProject, onOpenProject, onOpenRecent }) => {
+    const [recentProjects, setRecentProjects] = useState<Project[]>([]);
+
+    useEffect(() => {
+        try {
+            const recentIds: string[] = JSON.parse(localStorage.getItem('posty_recent_project_ids') || '[]');
+            const loadedProjects: Project[] = recentIds.map(id => {
+                const projectJson = localStorage.getItem(`posty_project_${id}`);
+                return projectJson ? JSON.parse(projectJson) : null;
+            }).filter((p): p is Project => p !== null);
+            setRecentProjects(loadedProjects);
+        } catch (error) {
+            console.error("Failed to load recent projects:", error);
+            localStorage.removeItem('posty_recent_project_ids');
+        }
+    }, []);
+
+    return (
+        <div className="flex h-full w-full bg-zinc-900 text-gray-300">
+            <aside className="w-64 bg-zinc-950/50 p-6 flex flex-col space-y-4">
+                 <h1 className="text-2xl font-bold animated-gradient-text">Posty</h1>
+                <button
+                    onClick={() => onNewProject(POST_SIZES[0])}
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors text-left"
+                >
+                    Novo Projeto...
+                </button>
+                <button
+                    onClick={onOpenProject}
+                    className="w-full bg-zinc-700 hover:bg-zinc-600 text-white font-semibold py-3 px-4 rounded-lg transition-colors text-left"
+                >
+                    Abrir...
+                </button>
+            </aside>
+            <main className="flex-1 p-8 overflow-y-auto">
+                 <h2 className="text-xl font-semibold mb-4 text-gray-200">Comece com um Template</h2>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
+                    {POST_SIZES.map(size => (
+                        <button key={size.name} onClick={() => onNewProject(size)} className="bg-zinc-800 rounded-lg p-4 text-center hover:bg-zinc-700/80 transition-all group border border-transparent hover:border-purple-500">
+                            <ImageIcon className="w-12 h-12 mx-auto text-zinc-500 group-hover:text-purple-400 transition-colors" />
+                            <p className="font-semibold mt-2 text-white">{size.name}</p>
+                            <p className="text-xs text-zinc-400">{size.width} x {size.height} px</p>
+                        </button>
+                    ))}
+                </div>
+                {recentProjects.length > 0 && (
+                     <>
+                        <h2 className="text-xl font-semibold mb-4 text-gray-200">Recentes</h2>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                            {recentProjects.map(p => (
+                                <button key={p.id} onClick={() => onOpenRecent(p)} className="bg-zinc-800 rounded-lg p-4 text-left hover:bg-zinc-700/80 transition-all group border border-transparent hover:border-purple-500 overflow-hidden">
+                                    <div className="w-full aspect-square bg-zinc-700 rounded-md mb-3 flex items-center justify-center">
+                                        <FileText className="w-10 h-10 text-zinc-500" />
+                                    </div>
+                                    <p className="font-semibold text-sm text-white truncate">{p.name}</p>
+                                    <p className="text-xs text-zinc-400">{p.postSize.name}</p>
+                                </button>
+                            ))}
+                        </div>
+                    </>
+                )}
+            </main>
         </div>
-    </div>
-);
+    );
+};
+
 
 const EmptyPanelPlaceholder: React.FC<{text: string}> = ({ text }) => (
     <div className="flex flex-col items-center justify-center h-full text-center p-4 text-zinc-500">
@@ -91,12 +140,38 @@ const EmptyPanelPlaceholder: React.FC<{text: string}> = ({ text }) => (
     </div>
 );
 
+const ProjectTabs: React.FC<{
+    projects: Project[];
+    currentProjectId: string | null;
+    onSelect: (id: string) => void;
+    onClose: (id: string) => void;
+    onNew: () => void;
+}> = ({ projects, currentProjectId, onSelect, onClose, onNew }) => (
+    <div className="flex-shrink-0 bg-zinc-950/50 h-10 flex items-end">
+        <nav className="flex items-center space-x-1 flex-grow h-full overflow-x-auto pl-2">
+            {projects.map(p => (
+                 <button 
+                    key={p.id} 
+                    onClick={() => onSelect(p.id)}
+                    className={`flex items-center h-full px-4 text-sm rounded-t-md border-b-2 ${
+                        p.id === currentProjectId 
+                        ? 'bg-zinc-800 border-purple-500 text-white' 
+                        : 'bg-zinc-900 border-transparent text-gray-400 hover:bg-zinc-800/70'
+                    }`}
+                >
+                    <span>{p.name}</span>
+                    <X onClick={(e) => { e.stopPropagation(); onClose(p.id); }} className="w-4 h-4 ml-3 rounded-full p-0.5 hover:bg-white/20"/>
+                 </button>
+            ))}
+        </nav>
+    </div>
+);
+
 
 const App: React.FC = () => {
     // Project State
-    const [currentProject, setCurrentProject] = useState<Project | null>(null);
-    const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
-    const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
+    const [projects, setProjects] = useState<Project[]>([]);
+    const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
     
     // UI State
     const [isLoading, setIsLoading] = useState(false);
@@ -136,7 +211,10 @@ const App: React.FC = () => {
     const openProjectInputRef = useRef<HTMLInputElement>(null);
     const importKitRef = useRef<HTMLInputElement>(null);
 
-    // Derived State
+    // --- DERIVED STATE ---
+    const currentProject = projects.find(p => p.id === currentProjectId) || null;
+    const selectedPostId = currentProject?.selectedPostId;
+    const selectedElementId = currentProject?.selectedElementId;
     const posts = currentProject?.posts || [];
     const postSize = currentProject?.postSize || POST_SIZES[0];
     const activeBrandKitId = currentProject?.activeBrandKitId || null;
@@ -161,30 +239,32 @@ const App: React.FC = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // --- PROJECT MANAGEMENT ---
-    const createNewProject = (name: string, size: PostSize): Project => ({
-        id: uuidv4(),
-        name,
-        posts: [],
-        postSize: size,
-        activeBrandKitId: null,
-        topic: 'New Project Topic',
-    });
+    // --- PROJECT & STATE MANAGEMENT ---
+    const updateCurrentProject = (updates: Partial<Project>) => {
+        if (!currentProjectId) return;
+        setProjects(prevProjects => prevProjects.map(p => p.id === currentProjectId ? { ...p, ...updates } : p));
+    };
 
+    const setSelectedPostId = (id: string | null) => updateCurrentProject({ selectedPostId: id, selectedElementId: null });
+    const setSelectedElementId = (id: string | null) => updateCurrentProject({ selectedElementId: id });
+    const setPostSizeForCurrentProject = (size: PostSize) => updateCurrentProject({ postSize: size });
+
+    const createNewProject = (name: string, size: PostSize): Project => ({
+        id: uuidv4(), name, posts: [], postSize: size, activeBrandKitId: null, topic: 'New Project Topic', selectedPostId: null, selectedElementId: null,
+    });
+    
     const handleNewProject = (size = POST_SIZES[0]) => {
-        const newProj = createNewProject(`Untitled Project ${new Date().toLocaleTimeString()}`, size);
-        setCurrentProject(newProj);
-        setSelectedPostId(null);
-        setSelectedElementId(null);
+        const newProj = createNewProject(`Untitled Project ${projects.length + 1}`, size);
+        setProjects(prev => [...prev, newProj]);
+        setCurrentProjectId(newProj.id);
     };
 
     const handleSaveProject = () => {
-        if (!currentProject) {
-            toast.error("Nenhum projeto ativo para salvar.");
-            return;
-        }
+        if (!currentProject) { toast.error("Nenhum projeto ativo para salvar."); return; }
         localStorage.setItem(`posty_project_${currentProject.id}`, JSON.stringify(currentProject));
-        localStorage.setItem('posty_last_project_id', currentProject.id);
+        const recentIds = JSON.parse(localStorage.getItem('posty_recent_project_ids') || '[]');
+        const updatedRecents = [currentProject.id, ...recentIds.filter((id: string) => id !== currentProject.id)].slice(0, 8);
+        localStorage.setItem('posty_recent_project_ids', JSON.stringify(updatedRecents));
         toast.success(`Projeto "${currentProject.name}" salvo!`);
     };
     
@@ -196,55 +276,53 @@ const App: React.FC = () => {
         toast.success("Projeto exportado!");
     };
 
-    const handleOpenProjectClick = () => {
-        openProjectInputRef.current?.click();
+    const handleOpenProjectClick = () => openProjectInputRef.current?.click();
+    
+    const handleOpenProject = (project: Project) => {
+        if (projects.some(p => p.id === project.id)) { setCurrentProjectId(project.id); return; }
+        setProjects(prev => [...prev, project]);
+        setCurrentProjectId(project.id);
+        const recentIds = JSON.parse(localStorage.getItem('posty_recent_project_ids') || '[]');
+        const updatedRecents = [project.id, ...recentIds.filter((id: string) => id !== project.id)].slice(0, 8);
+        localStorage.setItem('posty_recent_project_ids', JSON.stringify(updatedRecents));
     };
 
     const handleOpenProjectFile = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
-
         const reader = new FileReader();
         reader.onload = (e) => {
             try {
-                const text = e.target?.result as string;
-                const importedProject = JSON.parse(text) as Project;
-                if (importedProject && importedProject.id && importedProject.name && Array.isArray(importedProject.posts)) {
-                    setCurrentProject(importedProject);
-                    setSelectedPostId(importedProject.posts[0]?.id || null);
-                    setSelectedElementId(null);
+                const importedProject = JSON.parse(e.target?.result as string) as Project;
+                if (importedProject?.id && importedProject.name) {
+                    handleOpenProject(importedProject);
                     toast.success(`Projeto "${importedProject.name}" carregado!`);
-                } else {
-                    throw new Error("Arquivo de projeto inválido.");
-                }
-            } catch (error) {
-                toast.error(error instanceof Error ? error.message : "Falha ao abrir projeto.");
-            }
+                } else { throw new Error("Arquivo de projeto inválido."); }
+            } catch (error) { toast.error(error instanceof Error ? error.message : "Falha ao abrir projeto."); }
         };
         reader.readAsText(file);
         event.target.value = '';
     };
-
-    useEffect(() => {
-        const lastProjectId = localStorage.getItem('posty_last_project_id');
-        if (lastProjectId) {
-            const savedProjectJson = localStorage.getItem(`posty_project_${lastProjectId}`);
-            if (savedProjectJson) {
-                const savedProject: Project = JSON.parse(savedProjectJson);
-                setCurrentProject(savedProject);
-                setSelectedPostId(savedProject.posts[0]?.id || null);
-            }
+    
+    const handleCloseProject = (projectIdToClose: string) => {
+        const projectIndex = projects.findIndex(p => p.id === projectIdToClose);
+        if (projectIndex === -1) return;
+        const newProjects = projects.filter(p => p.id !== projectIdToClose);
+        setProjects(newProjects);
+        if (currentProjectId === projectIdToClose) {
+            if (newProjects.length === 0) { setCurrentProjectId(null); } 
+            else { setCurrentProjectId(newProjects[Math.max(0, projectIndex - 1)].id); }
         }
-    }, []);
-
+    };
 
     // --- CORE APP LOGIC ---
     const setPosts = (newPosts: Post[] | ((prevPosts: Post[]) => Post[])) => {
-        setCurrentProject(proj => {
-            if (!proj) return null;
-            const updatedPosts = typeof newPosts === 'function' ? newPosts(proj.posts) : newPosts;
-            return { ...proj, posts: updatedPosts };
-        });
+        if (!currentProjectId) return;
+        setProjects(projs => projs.map(p => {
+            if (p.id !== currentProjectId) return p;
+            const updatedPosts = typeof newPosts === 'function' ? newPosts(p.posts) : newPosts;
+            return { ...p, posts: updatedPosts };
+        }));
     };
 
     const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>, type: 'background' | 'style') => {
@@ -293,15 +371,11 @@ const App: React.FC = () => {
         genTopic: string, count: number, genType: 'post' | 'carousel', genContentLevel: 'mínimo' | 'médio' | 'detalhado',
         genBackgroundSource: 'upload' | 'ai', genAiProvider: 'gemini' | 'freepik', genTextStyle: TextStyle
     ) => {
-        if (!currentProject || !postSize) {
-            toast.error("Por favor, crie ou abra um projeto primeiro.");
-            return;
-        }
+        if (!currentProject || !postSize) { toast.error("Por favor, crie ou abra um projeto primeiro."); return; }
         
         setIsLoading(true);
         setPosts([]);
         setSelectedPostId(null);
-        setSelectedElementId(null);
         const toastId = toast.loading('Iniciando geração...');
         const activeKit = useStyleGuide ? brandKits.find(k => k.id === activeBrandKitId) : null;
         const activeStyleGuide = useStyleGuide ? styleGuide : null;
@@ -310,21 +384,18 @@ const App: React.FC = () => {
              if (useLayoutToFill && selectedLayoutId && activeBrandKitId) {
                 const kit = brandKits.find(k => k.id === activeBrandKitId);
                 const layout = kit?.layouts.find(l => l.id === selectedLayoutId);
-
                 if (!kit || !layout) throw new Error("Layout ou Brand Kit selecionado não foi encontrado.");
                 if (customBackgrounds.length === 0) throw new Error("Por favor, envie as imagens de fundo que você deseja usar com este layout.");
                 
                 const backgroundSources = customBackgrounds.map(src => ({ src }));
                 setLoadingMessage(`Preenchendo seu layout com conteúdo...`);
                 toast.loading(`Preenchendo seu layout...`, { id: toastId });
-
                 const newPosts: Post[] = [];
                 const textElementsToFill = layout.elements.filter(el => el.type === 'text').map(el => {
                     const textEl = el as TextElement;
                     let description = textEl.fontSize > 48 ? 'título principal' : textEl.fontSize < 20 ? 'texto de rodapé' : 'corpo de texto';
                     return { id: el.id, description, exampleContent: textEl.content };
                 });
-
                 for (let i = 0; i < backgroundSources.length; i++) {
                     setLoadingMessage(`Gerando texto para o post ${i + 1}/${backgroundSources.length}...`);
                     const newContentMap = await geminiService.generateTextForLayout(textElementsToFill, genTopic, genContentLevel, activeStyleGuide, undefined, genTextStyle);
@@ -343,11 +414,9 @@ const App: React.FC = () => {
             } else { 
                 let backgroundSources: { src: string; prompt?: string; provider?: 'gemini' | 'freepik' }[] = [];
                 if (genBackgroundSource === 'ai') {
-                    setLoadingMessage('Gerando prompts de imagem...');
-                    toast.loading('Gerando prompts de imagem...', { id: toastId });
+                    setLoadingMessage('Gerando prompts de imagem...'); toast.loading('Gerando prompts de imagem...', { id: toastId });
                     const imagePrompts = await geminiService.generateImagePrompts(genTopic, count, activeStyleGuide);
-                    setLoadingMessage(`Gerando ${imagePrompts.length} imagens...`);
-                    toast.loading(`Gerando ${imagePrompts.length} imagens...`, { id: toastId });
+                    setLoadingMessage(`Gerando ${imagePrompts.length} imagens...`); toast.loading(`Gerando ${imagePrompts.length} imagens...`, { id: toastId });
                     const imageGenerator = genAiProvider === 'freepik' ? freepikService.generateBackgroundImages : geminiService.generateBackgroundImages;
                     const generatedImages = await imageGenerator(imagePrompts, postSize);
                     backgroundSources = generatedImages.map((src, i) => ({ src: `data:image/png;base64,${src}`, prompt: imagePrompts[i], provider: genAiProvider }));
@@ -355,12 +424,9 @@ const App: React.FC = () => {
                     if (customBackgrounds.length === 0) throw new Error("Nenhuma imagem de fundo foi enviada.");
                     backgroundSources = customBackgrounds.map(src => ({ src }));
                 }
-
-                setLoadingMessage('Criando layouts inteligentes...');
-                toast.loading('Criando layouts inteligentes...', { id: toastId });
+                setLoadingMessage('Criando layouts inteligentes...'); toast.loading('Criando layouts inteligentes...', { id: toastId });
                 const layoutPromises = backgroundSources.map(bg => geminiService.generateLayoutAndContentForImage(bg.src, genTopic, genContentLevel, activeKit, undefined, genTextStyle));
                 const allLayouts = await Promise.all(layoutPromises);
-
                 const newPosts: Post[] = [];
                 const carouselId = genType === 'carousel' ? uuidv4() : undefined;
                 for (let i = 0; i < backgroundSources.length; i++) {
@@ -402,7 +468,7 @@ const App: React.FC = () => {
         const newId = `${selectedPostId}-${uuidv4()}`;
         const baseElement = { id: newId, x: postSize.width/2 - 150, y: postSize.height/2 - 50, width: 300, height: 100, rotation: 0, opacity: 1, locked: false, visible: true };
         let newElement: AnyElement | null = null;
-        if (type === 'text') newElement = { ...baseElement, type, content: 'Texto Editável', fontSize: 48, fontFamily: 'Roboto', color: '#FFFFFF', textAlign: 'center', verticalAlign: 'middle', letterSpacing: 0, lineHeight: 1.2 };
+        if (type === 'text') newElement = { ...baseElement, type, content: 'Texto Editável', fontSize: 48, fontFamily: 'Roboto', color: '#FFFFFF', textAlign: 'center', verticalAlign: 'middle', letterSpacing: 0, lineHeight: 1.2, fontWeight: 400, fontStyle: 'normal', textDecoration: 'none' };
         if (type === 'shape') newElement = { ...baseElement, type, width: 150, height: 150, shape: options?.shape || 'rectangle', fillColor: '#3B82F6' };
         if (type === 'qrcode') newElement = { ...baseElement, type, width: 150, height: 150, url: 'https://posty.app', color: '#000000', backgroundColor: '#FFFFFF' };
         
@@ -473,10 +539,7 @@ const App: React.FC = () => {
     const handleOpenColorPicker = (color: string, onChange: (newColor: string) => void) => setColorPickerState({ isOpen: true, color, onChange });
     
     const handleSaveBrandKit = (name: string) => {
-        if (!selectedPost) {
-            toast.error("Nenhum post selecionado para criar um kit.");
-            return;
-        }
+        if (!selectedPost) { toast.error("Nenhum post selecionado para criar um kit."); return; }
         const newKit: BrandKit = { id: uuidv4(), name, styleGuide: styleGuide, fonts: [], palette: customPalette, layouts: [{ id: uuidv4(), name: 'Layout Padrão', elements: selectedPost.elements }], assets: [] };
         setBrandKits(prev => [...prev, newKit]);
         toast.success(`Brand Kit "${name}" salvo!`);
@@ -488,8 +551,6 @@ const App: React.FC = () => {
         setBrandKits(prev => prev.map(k => k.id === activeBrandKitId ? { ...k, layouts: [...k.layouts, newLayout] } : k));
         toast.success("Layout adicionado ao kit!");
     };
-    
-    // ... Other BrandKit handlers ...
 
     const handleFitToScreen = useCallback(() => {
         if (!viewportRef.current || !postSize) return;
@@ -499,104 +560,67 @@ const App: React.FC = () => {
         setZoom(newZoom);
     }, [postSize]);
 
-    useEffect(() => {
-        handleFitToScreen();
-        window.addEventListener('resize', handleFitToScreen);
-        return () => window.removeEventListener('resize', handleFitToScreen);
-    }, [handleFitToScreen, selectedPostId, postSize]);
+    useEffect(() => { handleFitToScreen(); }, [handleFitToScreen, selectedPostId, postSize, isLeftPanelOpen, isRightPanelOpen]);
+    useEffect(() => { window.addEventListener('resize', handleFitToScreen); return () => window.removeEventListener('resize', handleFitToScreen); }, [handleFitToScreen]);
 
     return (
         <>
             <Toaster position="top-center" reverseOrder={false} />
             {colorPickerState.isOpen && <AdvancedColorPicker color={colorPickerState.color} onChange={colorPickerState.onChange} onClose={() => setColorPickerState(s => ({...s, isOpen: false}))} palettes={{post: selectedPost?.palette, custom: customPalette}}/>}
-            {(isLeftPanelOpen || isRightPanelOpen) && isMobileView && (
-                <div className="mobile-backdrop" onClick={() => { setLeftPanelOpen(false); setRightPanelOpen(false); }} />
-            )}
+            {(isLeftPanelOpen || isRightPanelOpen) && isMobileView && <div className="mobile-backdrop" onClick={() => { setLeftPanelOpen(false); setRightPanelOpen(false); }} />}
             
             <input type="file" ref={openProjectInputRef} onChange={handleOpenProjectFile} accept=".posty" className="hidden" />
             <input type="file" ref={importKitRef} onChange={() => {}} accept=".json" className="hidden" />
 
             <div className={`app-layout font-sans bg-gray-950 text-gray-100 ${isLeftPanelOpen ? 'left-panel-open' : ''} ${isRightPanelOpen ? 'right-panel-open' : ''}`}>
-                <Header 
-                    onNewProject={handleNewProject}
-                    onSaveProject={handleSaveProject}
-                    onSaveAsProject={handleSaveAsProject}
-                    onOpenProject={handleOpenProjectClick}
-                    hasProject={!!currentProject}
-                />
+                <Header onNewProject={handleNewProject} onSaveProject={handleSaveProject} onSaveAsProject={handleSaveAsProject} onOpenProject={handleOpenProjectClick} hasProject={projects.length > 0} />
 
                 <aside className={`left-panel ${isMobileView && isLeftPanelOpen ? 'mobile-panel-open' : ''}`}>
-                    {currentProject ? (
+                    {projects.length > 0 ? (
                         <CreationPanel
-                            isLoading={isLoading}
-                            onGenerate={handleGeneratePosts}
-                            brandKits={brandKits}
-                            activeBrandKit={activeBrandKit}
-                            postSize={postSize}
-                            setPostSize={(size) => setCurrentProject(p => p ? { ...p, postSize: size } : null)}
-                            hasPosts={posts.length > 0}
-                            customBackgrounds={customBackgrounds}
-                            styleImages={styleImages}
-                            onFileChange={handleFileChange}
-                            onRemoveImage={handleRemoveImage}
-                            colorMode={colorMode} setColorMode={setColorMode}
-                            customPalette={customPalette} setCustomPalette={setCustomPalette}
-                            styleGuide={styleGuide} useStyleGuide={useStyleGuide}
-                            setUseStyleGuide={setUseStyleGuide} onAnalyzeStyle={handleAnalyzeStyle}
-                            useLayoutToFill={useLayoutToFill} setUseLayoutToFill={setUseLayoutToFill}
-                            topic={topic} setTopic={setTopic}
-                            contentLevel={contentLevel} setContentLevel={setContentLevel}
-                            generationType={generationType} setGenerationType={setGenerationType}
-                            textStyle={textStyle} setTextStyle={setTextStyle}
-                            backgroundSource={backgroundSource} setBackgroundSource={setBackgroundSource}
-                            aiPostCount={aiPostCount} setAiPostCount={setAiPostCount}
-                            aiProvider={aiProvider} setAiProvider={setAiProvider}
-                            onSaveBrandKit={handleSaveBrandKit}
-                            onAddLayoutToActiveKit={handleAddLayoutToActiveKit}
-                            onImportBrandKit={() => {}}
-                            onExportBrandKit={() => {}}
-                            onDeleteBrandKit={(kitId) => setBrandKits(prev => prev.filter(k => k.id !== kitId))}
-                            onApplyBrandKit={(kitId) => setCurrentProject(p => p ? { ...p, activeBrandKitId: kitId } : null)}
-                            onAddPostFromLayout={() => {}}
-                            onUpdateLayoutName={() => {}}
-                            onDeleteLayoutFromKit={() => {}}
-                            selectedLayoutId={selectedLayoutId}
-                            setSelectedLayoutId={setSelectedLayoutId}
+                            isLoading={isLoading} onGenerate={handleGeneratePosts} brandKits={brandKits} activeBrandKit={activeBrandKit} postSize={postSize}
+                            setPostSize={setPostSizeForCurrentProject} hasPosts={posts.length > 0} customBackgrounds={customBackgrounds} styleImages={styleImages}
+                            onFileChange={handleFileChange} onRemoveImage={handleRemoveImage} colorMode={colorMode} setColorMode={setColorMode}
+                            customPalette={customPalette} setCustomPalette={setCustomPalette} styleGuide={styleGuide} useStyleGuide={useStyleGuide}
+                            setUseStyleGuide={setUseStyleGuide} onAnalyzeStyle={handleAnalyzeStyle} useLayoutToFill={useLayoutToFill} setUseLayoutToFill={setUseLayoutToFill}
+                            topic={topic} setTopic={setTopic} contentLevel={contentLevel} setContentLevel={setContentLevel} generationType={generationType}
+                            setGenerationType={setGenerationType} textStyle={textStyle} setTextStyle={setTextStyle} backgroundSource={backgroundSource}
+                            setBackgroundSource={setBackgroundSource} aiPostCount={aiPostCount} setAiPostCount={setAiPostCount} aiProvider={aiProvider}
+                            setAiProvider={setAiProvider} onSaveBrandKit={handleSaveBrandKit} onAddLayoutToActiveKit={handleAddLayoutToActiveKit}
+                            onImportBrandKit={() => {}} onExportBrandKit={() => {}} onDeleteBrandKit={(kitId) => setBrandKits(prev => prev.filter(k => k.id !== kitId))}
+                            onApplyBrandKit={(kitId) => updateCurrentProject({ activeBrandKitId: kitId })} onAddPostFromLayout={() => {}} onUpdateLayoutName={() => {}}
+                            onDeleteLayoutFromKit={() => {}} selectedLayoutId={selectedLayoutId} setSelectedLayoutId={setSelectedLayoutId}
                         />
-                    ) : (
-                         <EmptyPanelPlaceholder text="Crie ou abra um projeto para começar."/>
-                    )}
+                    ) : <EmptyPanelPlaceholder text="Crie ou abra um projeto para começar."/>}
                 </aside>
 
                 <main className="main-content" ref={viewportRef}>
-                    {!currentProject ? (
-                        <WelcomeScreen onNewProject={handleNewProject} onOpenProject={handleOpenProjectClick} />
-                    ) : isLoading ? (
-                        <div className="flex flex-col items-center justify-center text-center h-full">
-                            <svg className="animate-spin -ml-1 mr-3 h-10 w-10 text-purple-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            <p className="mt-4 text-xl font-semibold text-gray-300">{loadingMessage}</p>
-                            <p className="text-gray-400">Aguarde, a mágica está acontecendo...</p>
-                        </div>
-                    ) : selectedPost ? (
-                        <div className="flex items-center justify-center h-full w-full">
-                            <div style={{ transform: `scale(${zoom})`, transition: 'transform 0.2s' }}>
-                                <CanvasEditor
-                                    ref={editorRef}
-                                    post={selectedPost}
-                                    postSize={postSize}
-                                    onUpdateElement={updatePostElement}
-                                    selectedElementId={selectedElementId}
-                                    onSelectElement={setSelectedElementId}
-                                />
-                            </div>
-                        </div>
+                    {projects.length === 0 ? (
+                        <WelcomeScreen onNewProject={handleNewProject} onOpenProject={handleOpenProjectClick} onOpenRecent={handleOpenProject} />
                     ) : (
-                        <div className="text-center text-gray-400 p-4">
-                            <h2 className="text-2xl font-bold mb-2">Projeto Vazio</h2>
-                            <p>Use o painel à esquerda para gerar seu primeiro conteúdo.</p>
+                         <div className="flex flex-col h-full w-full bg-zinc-800">
+                             <ProjectTabs projects={projects} currentProjectId={currentProjectId} onSelect={setCurrentProjectId} onClose={handleCloseProject} onNew={handleNewProject} />
+                            <div className="flex-grow relative flex items-center justify-center p-4 overflow-auto">
+                                {isLoading ? (
+                                    <div className="flex flex-col items-center justify-center text-center h-full">
+                                        <svg className="animate-spin -ml-1 mr-3 h-10 w-10 text-purple-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                        <p className="mt-4 text-xl font-semibold text-gray-300">{loadingMessage}</p>
+                                        <p className="text-gray-400">Aguarde, a mágica está acontecendo...</p>
+                                    </div>
+                                ) : selectedPost ? (
+                                    <div style={{ transform: `scale(${zoom})`, transition: 'transform 0.2s' }}>
+                                        <CanvasEditor ref={editorRef} post={selectedPost} postSize={postSize} onUpdateElement={updatePostElement} selectedElementId={selectedElementId} onSelectElement={setSelectedElementId} />
+                                    </div>
+                                ) : (
+                                    <div className="text-center text-gray-400 p-4">
+                                        <h2 className="text-2xl font-bold mb-2">Projeto Vazio</h2>
+                                        <p>Use o painel à esquerda para gerar seu primeiro conteúdo.</p>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     )}
 
@@ -611,7 +635,7 @@ const App: React.FC = () => {
                         </button>
                     </div>
                     
-                    {currentProject && (
+                    {projects.length > 0 && (
                         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center space-x-2 bg-zinc-900/70 backdrop-blur-sm p-2 rounded-lg shadow-lg z-10">
                             <button onClick={() => setZoom(z => Math.max(z / 1.25, 0.1))} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Zoom Out"><ZoomOut className="w-5 h-5"/></button>
                             <span className="text-sm font-mono w-16 text-center">{Math.round(zoom * 100)}%</span>
@@ -624,37 +648,17 @@ const App: React.FC = () => {
                 <aside className={`right-panel ${isMobileView && isRightPanelOpen ? 'mobile-panel-open' : ''}`}>
                     {currentProject ? (
                        <RightPanel
-                            selectedPost={selectedPost}
-                            selectedElementId={selectedElementId}
-                            onSelectElement={setSelectedElementId}
-                            onUpdateElement={updatePostElement}
-                            onAddElement={handleAddElement}
-                            onRemoveElement={removeElement}
-                            onDuplicateElement={duplicateElement}
-                            onToggleVisibility={(id) => toggleElementProperty(id, 'visible')}
-                            onToggleLock={(id) => toggleElementProperty(id, 'locked')}
-                            onReorderElements={reorderElements}
-                            onRegenerateBackground={() => {}}
-                            onUpdateBackgroundSrc={() => {}}
-                            availableFonts={availableFonts}
-                            onAddFont={handleAddFont}
-                            onOpenColorPicker={handleOpenColorPicker}
-                            palettes={{ post: selectedPost?.palette, custom: customPalette }}
+                            selectedPost={selectedPost} selectedElementId={selectedElementId} onSelectElement={setSelectedElementId} onUpdateElement={updatePostElement}
+                            onAddElement={handleAddElement} onRemoveElement={removeElement} onDuplicateElement={duplicateElement} onToggleVisibility={(id) => toggleElementProperty(id, 'visible')}
+                            onToggleLock={(id) => toggleElementProperty(id, 'locked')} onReorderElements={reorderElements} onRegenerateBackground={() => {}} onUpdateBackgroundSrc={() => {}}
+                            availableFonts={availableFonts} onAddFont={handleAddFont} onOpenColorPicker={handleOpenColorPicker} palettes={{ post: selectedPost?.palette, custom: customPalette }}
                         />
-                    ) : (
-                        <EmptyPanelPlaceholder text="Selecione um post para ver suas camadas e propriedades."/>
-                    )}
+                    ) : <EmptyPanelPlaceholder text="Selecione um post para ver suas camadas e propriedades."/>}
                 </aside>
 
                 <footer className="footer-gallery">
                     {currentProject && posts.length > 0 && (
-                        <TimelineGallery
-                            posts={posts}
-                            selectedPostId={selectedPostId}
-                            onSelectPost={setSelectedPostId}
-                            onAddPost={addPost}
-                            onDeletePost={deletePost}
-                        />
+                        <TimelineGallery posts={posts} selectedPostId={selectedPostId} onSelectPost={setSelectedPostId} onAddPost={addPost} onDeletePost={deletePost} />
                     )}
                 </footer>
             </div>

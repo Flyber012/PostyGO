@@ -153,10 +153,6 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedElement, onUp
 
             {selectedElement.type === 'text' && (
                 <Accordion title="Texto" defaultOpen={true}>
-                    <div className="grid grid-cols-2 gap-2">
-                        <NumberInput label="Tamanho" value={textEl.fontSize} onChange={val => handleInputChange('fontSize', parseInt(val, 10))} min={1} unit="px"/>
-                        <ColorInput label="Cor" color={textEl.color} onChange={val => handleInputChange('color', val)} onOpenColorPicker={onOpenColorPicker} />
-                    </div>
                      <div>
                         <label className="block text-xs font-medium text-gray-400">Fonte</label>
                         <div className="flex space-x-2 mt-1">
@@ -168,6 +164,15 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedElement, onUp
                             </button>
                             <input type="file" ref={fontInputRef} onChange={handleFontUpload} accept=".ttf, .otf, .woff, .woff2" className="hidden" />
                         </div>
+                    </div>
+                     <div className="grid grid-cols-2 gap-2">
+                        <NumberInput label="Tamanho" value={textEl.fontSize} onChange={val => handleInputChange('fontSize', parseInt(val, 10))} min={1} unit="px"/>
+                        <ColorInput label="Cor" color={textEl.color} onChange={val => handleInputChange('color', val)} onOpenColorPicker={onOpenColorPicker} />
+                    </div>
+                    <div className="flex items-center space-x-1 p-1 bg-black/30 rounded-md">
+                        <button onClick={() => handleInputChange('fontWeight', textEl.fontWeight === 700 ? 400 : 700)} className={`flex-1 text-center py-1 rounded text-xs transition-colors ${textEl.fontWeight === 700 ? 'bg-zinc-600 text-white' : 'hover:bg-zinc-700 text-gray-300'}`}><b className="font-sans">B</b></button>
+                        <button onClick={() => handleInputChange('fontStyle', textEl.fontStyle === 'italic' ? 'normal' : 'italic')} className={`flex-1 text-center py-1 rounded text-xs transition-colors ${textEl.fontStyle === 'italic' ? 'bg-zinc-600 text-white' : 'hover:bg-zinc-700 text-gray-300'}`}><i>I</i></button>
+                        <button onClick={() => handleInputChange('textDecoration', textEl.textDecoration === 'underline' ? 'none' : 'underline')} className={`flex-1 text-center py-1 rounded text-xs transition-colors ${textEl.textDecoration === 'underline' ? 'bg-zinc-600 text-white' : 'hover:bg-zinc-700 text-gray-300'}`}><u>U</u></button>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                          <SelectInput label="Alinhamento" value={textEl.textAlign} onChange={val => handleInputChange('textAlign', val)}>

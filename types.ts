@@ -23,6 +23,9 @@ export interface TextElement extends BaseElement {
     content: string;
     fontSize: number;
     fontFamily: string;
+    fontWeight: number; // e.g. 400 for regular, 700 for bold
+    fontStyle: 'normal' | 'italic';
+    textDecoration: 'none' | 'underline' | 'line-through';
     accentFontFamily?: string;
     color: string;
     highlightColor?: string;
@@ -200,7 +203,7 @@ export interface Project {
     postSize: PostSize;
     activeBrandKitId: string | null;
     topic: string;
-    // Adicione outros estados relevantes que você queira salvar com o projeto
-    // Ex: contentLevel, generationType, etc.
-    // Isso é opcional, mas pode ser útil para recarregar o contexto completo.
+    thumbnail?: string;
+    selectedPostId: string | null;
+    selectedElementId: string | null;
 }

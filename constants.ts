@@ -30,8 +30,8 @@ export const PRESET_BRAND_KITS: BrandKit[] = [
                 id: uuidv4(),
                 name: 'Citação Impactante',
                 elements: [
-                    { id: 'quote-text', type: 'text', content: '"A melhor forma de prever o futuro é criá-lo."', x: 108, y: 405, width: 864, height: 270, rotation: 0, opacity: 1, locked: false, visible: true, fontSize: 80, fontFamily: 'Poppins', color: '#FFFFFF', textAlign: 'center', verticalAlign: 'middle', letterSpacing: 0, lineHeight: 1.2, textShadow: '2px 2px 8px rgba(0,0,0,0.7)' },
-                    { id: 'author-text', type: 'text', content: '- Peter Drucker', x: 324, y: 750, width: 432, height: 54, rotation: 0, opacity: 1, locked: false, visible: true, fontSize: 32, fontFamily: 'Inter', color: '#9CA3AF', textAlign: 'center', verticalAlign: 'middle', letterSpacing: 0, lineHeight: 1.2 },
+                    { id: 'quote-text', type: 'text', content: '"A melhor forma de prever o futuro é criá-lo."', x: 108, y: 405, width: 864, height: 270, rotation: 0, opacity: 1, locked: false, visible: true, fontSize: 80, fontFamily: 'Poppins', fontWeight: 700, fontStyle: 'normal', textDecoration: 'none', color: '#FFFFFF', textAlign: 'center', verticalAlign: 'middle', letterSpacing: 0, lineHeight: 1.2, textShadow: '2px 2px 8px rgba(0,0,0,0.7)' },
+                    { id: 'author-text', type: 'text', content: '- Peter Drucker', x: 324, y: 750, width: 432, height: 54, rotation: 0, opacity: 1, locked: false, visible: true, fontSize: 32, fontFamily: 'Inter', fontWeight: 400, fontStyle: 'normal', textDecoration: 'none', color: '#9CA3AF', textAlign: 'center', verticalAlign: 'middle', letterSpacing: 0, lineHeight: 1.2 },
                 ]
             }
         ],
@@ -54,9 +54,9 @@ export const PRESET_BRAND_KITS: BrandKit[] = [
                 id: uuidv4(),
                 name: 'Anúncio de Evento',
                 elements: [
-                    { id: 'event-title', type: 'text', content: 'WORKSHOP DE CERÂMICA', x: 54, y: 100, width: 972, height: 150, rotation: 0, opacity: 1, locked: false, visible: true, fontSize: 100, fontFamily: 'Lato', color: '#344E41', textAlign: 'center', verticalAlign: 'middle', letterSpacing: 5, lineHeight: 1.1 },
-                    { id: 'event-subtitle', type: 'text', content: 'Uma Manhã Criativa', x: 216, y: 250, width: 648, height: 60, rotation: 0, opacity: 1, locked: false, visible: true, fontSize: 48, fontFamily: 'Roboto', color: '#582F0E', textAlign: 'center', verticalAlign: 'middle', letterSpacing: 0, lineHeight: 1.2 },
-                    { id: 'event-date', type: 'text', content: '25 DEZ | 10:00', x: 270, y: 745, width: 540, height: 90, rotation: 0, opacity: 1, locked: false, visible: true, fontSize: 64, fontFamily: 'Lato', color: '#344E41', textAlign: 'center', verticalAlign: 'middle', letterSpacing: 1, lineHeight: 1.2 },
+                    { id: 'event-title', type: 'text', content: 'WORKSHOP DE CERÂMICA', x: 54, y: 100, width: 972, height: 150, rotation: 0, opacity: 1, locked: false, visible: true, fontSize: 100, fontFamily: 'Lato', fontWeight: 700, fontStyle: 'normal', textDecoration: 'none', color: '#344E41', textAlign: 'center', verticalAlign: 'middle', letterSpacing: 5, lineHeight: 1.1 },
+                    { id: 'event-subtitle', type: 'text', content: 'Uma Manhã Criativa', x: 216, y: 250, width: 648, height: 60, rotation: 0, opacity: 1, locked: false, visible: true, fontSize: 48, fontFamily: 'Roboto', fontWeight: 400, fontStyle: 'normal', textDecoration: 'none', color: '#582F0E', textAlign: 'center', verticalAlign: 'middle', letterSpacing: 0, lineHeight: 1.2 },
+                    { id: 'event-date', type: 'text', content: '25 DEZ | 10:00', x: 270, y: 745, width: 540, height: 90, rotation: 0, opacity: 1, locked: false, visible: true, fontSize: 64, fontFamily: 'Lato', fontWeight: 700, fontStyle: 'normal', textDecoration: 'none', color: '#344E41', textAlign: 'center', verticalAlign: 'middle', letterSpacing: 1, lineHeight: 1.2 },
                 ],
             }
         ],
