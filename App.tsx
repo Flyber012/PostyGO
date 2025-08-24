@@ -247,7 +247,8 @@ const App: React.FC = () => {
         updateUser(updatedUser);
     };
 
-     useEffect(() => {
+    // Restaura o usuário do localStorage ao montar o componente
+    useEffect(() => {
         const savedUserJson = localStorage.getItem('user');
         if (savedUserJson) {
             const savedUser: User = JSON.parse(savedUserJson);
@@ -261,20 +262,35 @@ const App: React.FC = () => {
             }
             updateUser(savedUser);
         }
+    }, []);
 
+    // Gerencia a inicialização e renderização do Google Identity Services
+    useEffect(() => {
         if (typeof google !== 'undefined') {
             const GOOGLE_CLIENT_ID = '730562602445-6a2gav1iki25ppretrf8da1p95esm5ra.apps.googleusercontent.com';
             
             google.accounts.id.initialize({
                 client_id: GOOGLE_CLIENT_ID,
                 callback: handleLogin,
+                auto_select: !user, // Desativa o pop-up "One Tap" se o usuário já estiver logado no nosso app
             });
-            google.accounts.id.renderButton(
-                document.getElementById('signInDiv'),
-                { theme: 'outline', size: 'large', type: 'standard', text: 'signin_with' }
-            );
+
+            if (!user) {
+                // Adiciona um pequeno atraso para garantir que o #signInDiv esteja no DOM após a re-renderização
+                const renderTimeout = setTimeout(() => {
+                    const signInDiv = document.getElementById('signInDiv');
+                    if (signInDiv && signInDiv.childElementCount === 0) { // Renderiza apenas se estiver vazio
+                        google.accounts.id.renderButton(
+                            signInDiv,
+                            { theme: 'outline', size: 'large', type: 'standard', text: 'signin_with' }
+                        );
+                    }
+                }, 200);
+                 return () => clearTimeout(renderTimeout);
+            }
         }
-    }, [handleLogin]);
+    }, [user, handleLogin]);
+
 
     useEffect(() => {
         if (user) {
@@ -1255,7 +1271,7 @@ const App: React.FC = () => {
                 setSelectedLayoutId={setSelectedLayoutId}
             />
 
-            <div className="flex flex-col h-screen font-sans bg-gray-950 text-gray-100 overflow-hidden">
+            <div className="flex flex-col h-full font-sans bg-gray-950 text-gray-100">
                 <header className="w-full bg-zinc-900 border-b border-zinc-800 px-4 sm:px-6 py-3 flex-shrink-0 flex items-center justify-end">
                     <UserProfile user={user} onLogin={() => {}} onLogout={handleLogout} onManageAccounts={handleManageAccounts} onBuyCredits={() => setBuyCreditsModalOpen(true)} />
                 </header>
