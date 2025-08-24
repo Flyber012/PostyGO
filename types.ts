@@ -94,7 +94,7 @@ export interface BackgroundElement {
     type: 'background';
     src: string; // base64
     prompt?: string; // The prompt used to generate it, for regeneration
-    provider?: 'runware';
+    provider?: 'gemini' | 'freepik';
 }
 
 
@@ -148,7 +148,7 @@ export interface User {
     email: string;
     avatar: string;
     linkedAccounts: {
-        [key in 'google' | 'chatgpt' | 'runware']?: {
+        [key in 'google' | 'freepik']?: {
             status: 'connected' | 'disconnected';
             apiKey?: string;
         }

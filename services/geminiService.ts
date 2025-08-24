@@ -1,10 +1,5 @@
-
-
-
-
-
 import { GoogleGenAI, Type, Part } from "@google/genai";
-import { AIGeneratedTextElement, PaletteExtractionResult, AIGeneratedCarouselScriptSlide, TextElement, BrandKit } from '../types';
+import { AIGeneratedTextElement, PaletteExtractionResult, AIGeneratedCarouselScriptSlide, TextElement, BrandKit, PostSize } from '../types';
 
 const HARDCODED_API_KEY = 'AIzaSyCUAgZxn4OERywBC_R21kJA6SbMQJc73CY';
 
@@ -34,6 +29,66 @@ export async function verifyApiKey(apiKey: string): Promise<boolean> {
         return false;
     }
 }
+
+const getAspectRatio = (postSize: PostSize): '1:1' | '4:3' | '3:4' | '16:9' | '9:16' => {
+    const ratio = postSize.width / postSize.height;
+    if (ratio === 1) return '1:1';
+    if (ratio > 1.7) return '16:9'; 
+    if (ratio > 1.3) return '4:3';
+    if (ratio < 0.6) return '9:16';
+    if (ratio < 0.85) return '3:4';
+    return '1:1';
+}
+
+export async function generateBackgroundImages(prompts: string[], postSize: PostSize, userApiKey?: string): Promise<string[]> {
+    const ai = getAIClient(userApiKey);
+    const aspectRatio = getAspectRatio(postSize);
+
+    const imagePromises = prompts.map(prompt => {
+        return ai.models.generateImages({
+            model: 'imagen-3.0-generate-002',
+            prompt: prompt,
+            config: {
+                numberOfImages: 1,
+                outputMimeType: 'image/png',
+                aspectRatio: aspectRatio,
+            },
+        });
+    });
+
+    const responses = await Promise.all(imagePromises);
+
+    const base64Images = responses.map(response => {
+        if (response.generatedImages && response.generatedImages.length > 0) {
+            return response.generatedImages[0].image.imageBytes;
+        }
+        throw new Error('Falha ao gerar imagem com a API Gemini.');
+    });
+
+    return base64Images;
+}
+
+export async function generateSingleBackgroundImage(prompt: string, postSize: PostSize, userApiKey?: string): Promise<string> {
+    const ai = getAIClient(userApiKey);
+    const aspectRatio = getAspectRatio(postSize);
+
+    const response = await ai.models.generateImages({
+        model: 'imagen-3.0-generate-002',
+        prompt: prompt,
+        config: {
+            numberOfImages: 1,
+            outputMimeType: 'image/png',
+            aspectRatio: aspectRatio,
+        },
+    });
+
+    if (response.generatedImages && response.generatedImages.length > 0) {
+        const base64ImageBytes = response.generatedImages[0].image.imageBytes;
+        return `data:image/png;base64,${base64ImageBytes}`;
+    }
+    throw new Error('Falha ao gerar imagem com a API Gemini.');
+}
+
 
 export async function analyzeStyleFromImages(base64Images: string[], userApiKey?: string): Promise<string> {
     const ai = getAIClient(userApiKey);

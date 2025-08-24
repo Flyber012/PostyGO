@@ -1,22 +1,20 @@
-
-
 import React, { useState } from 'react';
 import { User } from '../types';
-import { X, CheckCircle, Link, XCircle, Key, Eye, EyeOff, RotateCw, Image as ImageIcon } from 'lucide-react';
+import { X, CheckCircle, Link, XCircle, Key, Eye, EyeOff, RotateCw } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import * as geminiService from '../services/geminiService';
-import * as runwareService from '../services/runwareService';
+import * as freepikService from '../services/freepikService';
 
 
 interface AccountManagerModalProps {
     isOpen: boolean;
     onClose: () => void;
     user: User | null;
-    onLinkAccount: (service: 'google' | 'runware', apiKey: string) => void;
-    onUnlinkAccount: (service: 'google' | 'runware') => void;
+    onLinkAccount: (service: 'google' | 'freepik', apiKey: string) => void;
+    onUnlinkAccount: (service: 'google' | 'freepik') => void;
 }
 
-type Service = 'google' | 'runware';
+type Service = 'google' | 'freepik';
 
 interface ServiceRowProps {
     service: Service;
@@ -153,7 +151,7 @@ const AccountManagerModal: React.FC<AccountManagerModalProps> = ({ isOpen, onClo
                     <ServiceRow 
                         service="google"
                         name="Google Gemini"
-                        description="Para geração de textos e análise de estilo."
+                        description="Para geração de textos, imagens e análise de estilo."
                         icon={<img src="https://www.gstatic.com/images/branding/product/2x/gemini_48dp.png" alt="Google Gemini" className="w-6 h-6"/>}
                         user={user}
                         onLink={onLinkAccount}
@@ -161,16 +159,16 @@ const AccountManagerModal: React.FC<AccountManagerModalProps> = ({ isOpen, onClo
                         getApiKeyUrl="https://aistudio.google.com/app/apikey"
                         verificationFn={geminiService.verifyApiKey}
                     />
-                    <ServiceRow 
-                        service="runware"
-                        name="Runware AI"
-                        description="Para geração de imagens com IA (não utilizado no momento)."
-                        icon={<ImageIcon className="w-6 h-6 text-white"/>}
+                     <ServiceRow 
+                        service="freepik"
+                        name="Freepik AI"
+                        description="Para geração de imagens de fundo alternativas."
+                        icon={<img src="https://freepik.cdnpk.net/img/logo/freepik-company_black.svg" alt="Freepik" className="w-6 h-6 invert"/>}
                         user={user}
                         onLink={onLinkAccount}
                         onUnlink={onUnlinkAccount}
-                        getApiKeyUrl="https://my.runware.ai/keys"
-                        verificationFn={runwareService.verifyApiKey}
+                        getApiKeyUrl="https://www.freepik.com/profile/api-keys"
+                        verificationFn={freepikService.verifyApiKey}
                     />
                 </div>
             </div>
