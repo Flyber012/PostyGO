@@ -40,27 +40,32 @@
 
 /* Scrollbar styles for panels */
 .left-panel > div,
-.right-panel { /* Apply directly to right-panel for unified scroll */
+.properties-scrollbar,
+.layers-scrollbar {
     scrollbar-width: thin;
     scrollbar-color: #a855f7 #3f3f46;
 }
 
 .left-panel > div::-webkit-scrollbar,
-.right-panel::-webkit-scrollbar {
+.properties-scrollbar::-webkit-scrollbar,
+.layers-scrollbar::-webkit-scrollbar {
     width: 6px;
 }
 
 .left-panel > div::-webkit-scrollbar-track,
-.right-panel::-webkit-scrollbar-track {
+.properties-scrollbar::-webkit-scrollbar-track,
+.layers-scrollbar::-webkit-scrollbar-track {
     background: #3f3f46;
 }
 
 .left-panel > div::-webkit-scrollbar-thumb,
-.right-panel::-webkit-scrollbar-thumb {
+.properties-scrollbar::-webkit-scrollbar-thumb,
+.layers-scrollbar::-webkit-scrollbar-thumb {
     background-color: #a855f7;
     border-radius: 3px;
     border: 1px solid #3f3f46;
 }
+
 
 /* Hide scrollbars when panels are collapsed on desktop */
 .app-layout:not(.left-panel-open) .left-panel,

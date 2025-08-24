@@ -763,7 +763,7 @@ const App: React.FC = () => {
                                         <p className="text-gray-400">Aguarde, a mágica está acontecendo...</p>
                                     </div>
                                 ) : selectedPost ? (
-                                    <div style={{ transform: `translate(${viewState.offset.x}px, ${viewState.offset.y}px) scale(${viewState.zoom})`, transition: 'transform 0.05s' }}>
+                                    <div style={{ transform: `translate(${viewState.offset.x}px, ${viewState.offset.y}px) scale(${viewState.zoom})` }}>
                                         <CanvasEditor post={selectedPost} postSize={postSize} onUpdateElement={updatePostElement} selectedElementId={selectedElementId} onSelectElement={setSelectedElementId} />
                                     </div>
                                 ) : (

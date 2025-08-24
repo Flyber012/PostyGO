@@ -1,7 +1,7 @@
 
 
-import React from 'react';
-import { Post, AnyElement, FontDefinition, BackgroundElement } from '../types';
+import React, { useState, useRef, useCallback } from 'react';
+import { Post, AnyElement, FontDefinition } from '../types';
 import LayersPanel from './LayersPanel';
 import PropertiesPanel from './PropertiesPanel';
 
@@ -28,27 +28,49 @@ interface RightPanelProps {
 }
 
 const RightPanel: React.FC<RightPanelProps> = (props) => {
-    const { selectedPost, selectedElementId, onUpdateElement, availableFonts, onAddFont, onOpenColorPicker } = props;
+    const { selectedPost, selectedElementId } = props;
+    const [propertiesPanelHeight, setPropertiesPanelHeight] = useState(window.innerHeight * 0.45);
+    const rightPanelRef = useRef<HTMLDivElement>(null);
 
-    const selectedElement = selectedPost?.elements.find(e => e.id === selectedElementId && e.type !== 'background') as Exclude<AnyElement, BackgroundElement> | undefined;
+    const handleMouseDown = useCallback((e: React.MouseEvent) => {
+        e.preventDefault();
+        const startPos = e.clientY;
+        const startHeight = propertiesPanelHeight;
+
+        const handleMouseMove = (moveEvent: MouseEvent) => {
+            if (!rightPanelRef.current) return;
+            const dy = moveEvent.clientY - startPos;
+            const newHeight = startHeight + dy;
+            const containerHeight = rightPanelRef.current.clientHeight;
+            
+            const minHeight = 150;
+            const maxHeight = containerHeight - 150;
+            setPropertiesPanelHeight(Math.max(minHeight, Math.min(newHeight, maxHeight)));
+        };
+
+        const handleMouseUp = () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseup', handleMouseUp);
+    }, [propertiesPanelHeight]);
+    
+    const element = selectedPost?.elements.find(e => e.id === selectedElementId);
+    const selectedElement = (element && element.type !== 'background') ? element : undefined;
 
     return (
-        <div className="w-full bg-zinc-900 flex flex-col h-full overflow-y-auto">
-            {/* Properties Panel always on top */}
-            <div className="flex-shrink-0 border-b border-zinc-800">
-                <h2 className="text-lg font-semibold text-gray-200 p-4">Propriedades</h2>
-                <PropertiesPanel 
-                    selectedElement={selectedElement}
-                    onUpdateElement={onUpdateElement}
-                    availableFonts={availableFonts}
-                    onAddFont={onAddFont}
-                    onOpenColorPicker={onOpenColorPicker}
-                />
+        <div ref={rightPanelRef} className="w-full bg-zinc-900 flex flex-col h-full">
+            <div style={{ height: `${propertiesPanelHeight}px` }} className="flex-shrink-0 overflow-hidden">
+                <PropertiesPanel {...props} selectedElement={selectedElement} />
             </div>
-            
-            {/* Layers Panel at the bottom */}
-            <div className="flex-grow min-h-0 border-t border-zinc-800">
-                 <LayersPanel {...props} />
+            <div
+                onMouseDown={handleMouseDown}
+                className="h-1.5 bg-zinc-800 hover:bg-purple-600 cursor-row-resize transition-colors flex-shrink-0"
+            />
+            <div className="flex-grow min-h-0 overflow-hidden">
+                <LayersPanel {...props} />
             </div>
         </div>
     );
