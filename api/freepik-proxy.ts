@@ -68,11 +68,16 @@ export default async function handler(req: any, res: any) {
         }
 
         const startResult = await startResponse.json();
-        const jobId = startResult.data?.[0]?.id;
+        // Tenta obter o ID do trabalho de diferentes locais na resposta para maior robustez
+        const jobId = startResult.data?.[0]?.id || startResult.data?.id;
+
         if (!jobId) {
-            res.status(500).json({ error: "Não foi possível obter o ID do trabalho do Freepik." });
+            // Se o ID do trabalho ainda não for encontrado, retorne a resposta completa para depuração
+            console.error("Freepik response did not contain a job ID. Full response:", JSON.stringify(startResult, null, 2));
+            res.status(500).json({ error: `Não foi possível obter o ID do trabalho do Freepik. Resposta completa da API: ${JSON.stringify(startResult)}` });
             return;
         }
+
 
         // Etapa 2: Consultar o resultado (polling)
         let attempts = 0;
