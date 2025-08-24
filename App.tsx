@@ -1,6 +1,7 @@
+
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
-import { Post, BrandKit, PostSize, AnyElement, TextElement, ImageElement, BackgroundElement, FontDefinition, LayoutTemplate, BrandAsset, TextStyle, Project } from './types';
+import { Post, BrandKit, PostSize, AnyElement, TextElement, ImageElement, BackgroundElement, FontDefinition, LayoutTemplate, BrandAsset, TextStyle, Project, AIGeneratedTextElement, ShapeElement, QRCodeElement } from './types';
 import { POST_SIZES, INITIAL_FONTS, PRESET_BRAND_KITS } from './constants';
 import * as geminiService from './services/geminiService';
 import * as freepikService from './services/freepikService';
@@ -14,6 +15,53 @@ import { BrandKitPanel } from './components/BrandKitPanel';
 import saveAs from 'file-saver';
 import { v4 as uuidv4 } from 'uuid';
 import { ZoomIn, ZoomOut, Maximize, PanelLeft, PanelRight, Package } from 'lucide-react';
+import AdvancedColorPicker from './components/ColorPicker';
+
+// --- HELPERS ---
+const readFileAsBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = (error) => reject(error);
+        reader.readAsDataURL(file);
+    });
+};
+
+const convertAILayoutToElements = (aiLayout: AIGeneratedTextElement[], postSize: PostSize, postId: string): TextElement[] => {
+    return aiLayout.map((aiEl, index) => {
+        const { width: postWidth, height: postHeight } = postSize;
+        const fontSizeMapping = {
+            large: postWidth * 0.08,
+            medium: postWidth * 0.04,
+            small: postWidth * 0.025,
+            cta: postWidth * 0.035,
+        };
+        const fontSize = Math.round(fontSizeMapping[aiEl.fontSize] || fontSizeMapping.medium);
+        const element: TextElement = {
+            id: `${postId}-text-${index}`,
+            type: 'text',
+            content: aiEl.content,
+            x: (aiEl.x / 100) * postWidth,
+            y: (aiEl.y / 100) * postHeight,
+            width: (aiEl.width / 100) * postWidth,
+            height: (aiEl.height / 100) * postHeight,
+            fontSize,
+            fontFamily: aiEl.fontFamily || 'Poppins',
+            color: aiEl.color || (aiEl.backgroundTone === 'dark' ? '#FFFFFF' : '#0F172A'),
+            textAlign: aiEl.textAlign,
+            verticalAlign: 'middle',
+            rotation: aiEl.rotation || 0,
+            opacity: 1, locked: false, visible: true,
+            letterSpacing: 0, lineHeight: aiEl.lineHeight || 1.4,
+            highlightColor: aiEl.highlightColor, accentFontFamily: aiEl.accentFontFamily,
+            backgroundColor: aiEl.backgroundColor,
+            padding: aiEl.fontSize === 'cta' ? fontSize * 0.5 : 0,
+            borderRadius: aiEl.fontSize === 'cta' ? 8 : 0,
+        };
+        return element;
+    });
+};
+
 
 const WelcomeScreen: React.FC<{ onNewProject: () => void; onOpenProject: () => void; }> = ({ onNewProject, onOpenProject }) => (
     <div className="flex flex-col items-center justify-center h-full text-center text-gray-300 bg-black/30 p-4">
@@ -59,6 +107,7 @@ const App: React.FC = () => {
     const [isWizardOpen, setWizardOpen] = useState(false);
     const [isBrandKitPanelOpen, setBrandKitPanelOpen] = useState(false);
     const [isMobileView, setIsMobileView] = useState(window.innerWidth <= 1024);
+    const [colorPickerState, setColorPickerState] = useState<{ isOpen: boolean, color: string, onChange: (color: string) => void }>({ isOpen: false, color: '#FFFFFF', onChange: () => {} });
 
     // Generation Settings (persist across projects for convenience)
     const [topic, setTopic] = useState('Productivity Hacks');
@@ -72,7 +121,7 @@ const App: React.FC = () => {
     const [styleImages, setStyleImages] = useState<string[]>([]);
     
     // BrandKit & Style State
-    const [brandKits, setBrandKits] = useState<BrandKit[]>([]);
+    const [brandKits, setBrandKits] = useState<BrandKit[]>(PRESET_BRAND_KITS);
     const [styleGuide, setStyleGuide] = useState<string | null>(null);
     const [useStyleGuide, setUseStyleGuide] = useState<boolean>(false);
     const [selectedLayoutId, setSelectedLayoutId] = useState<string | null>(null);
@@ -85,6 +134,7 @@ const App: React.FC = () => {
     const editorRef = useRef<HTMLDivElement>(null);
     const viewportRef = useRef<HTMLElement>(null);
     const openProjectInputRef = useRef<HTMLInputElement>(null);
+    const importKitRef = useRef<HTMLInputElement>(null);
 
     // Derived State
     const posts = currentProject?.posts || [];
@@ -98,7 +148,6 @@ const App: React.FC = () => {
         const handleResize = () => {
             const mobile = window.innerWidth <= 1024;
             setIsMobileView(mobile);
-            // On desktop, default panels to open, on mobile to closed
             if (!mobile) {
                 setLeftPanelOpen(true);
                 setRightPanelOpen(true);
@@ -107,7 +156,7 @@ const App: React.FC = () => {
                 setRightPanelOpen(false);
             }
         };
-        handleResize(); // Initial check
+        handleResize();
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
@@ -160,7 +209,6 @@ const App: React.FC = () => {
             try {
                 const text = e.target?.result as string;
                 const importedProject = JSON.parse(text) as Project;
-
                 if (importedProject && importedProject.id && importedProject.name && Array.isArray(importedProject.posts)) {
                     setCurrentProject(importedProject);
                     setSelectedPostId(importedProject.posts[0]?.id || null);
@@ -174,10 +222,9 @@ const App: React.FC = () => {
             }
         };
         reader.readAsText(file);
-        event.target.value = ''; // Reset input
+        event.target.value = '';
     };
 
-    // Auto-load last project on startup
     useEffect(() => {
         const lastProjectId = localStorage.getItem('posty_last_project_id');
         if (lastProjectId) {
@@ -192,31 +239,74 @@ const App: React.FC = () => {
 
 
     // --- CORE APP LOGIC ---
+    const setPosts = (newPosts: Post[] | ((prevPosts: Post[]) => Post[])) => {
+        setCurrentProject(proj => {
+            if (!proj) return null;
+            const updatedPosts = typeof newPosts === 'function' ? newPosts(proj.posts) : newPosts;
+            return { ...proj, posts: updatedPosts };
+        });
+    };
+
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>, type: 'background' | 'style') => {
+        const files = Array.from(event.target.files || []);
+        if (files.length === 0) return;
+        const targetStateUpdater = type === 'background' ? setCustomBackgrounds : setStyleImages;
+        const currentState = type === 'background' ? customBackgrounds : styleImages;
+        if (currentState.length + files.length > 10) {
+            toast.error(`Você só pode enviar até 10 imagens.`);
+            return;
+        }
+        const toastId = toast.loading('Carregando imagens...');
+        try {
+            const base64Results = await Promise.all(files.map(file => readFileAsBase64(file)));
+            targetStateUpdater(prev => [...prev, ...base64Results]);
+            toast.success('Imagens carregadas!', { id: toastId });
+        } catch (error) {
+            toast.error('Falha ao carregar uma ou mais imagens.', { id: toastId });
+        } finally {
+            event.target.value = '';
+        }
+    };
+
+    const handleRemoveImage = (index: number, type: 'background' | 'style') => {
+        const updater = type === 'background' ? setCustomBackgrounds : setStyleImages;
+        updater(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const handleAnalyzeStyle = async () => {
+        if (styleImages.length === 0) {
+            toast.error("Por favor, envie suas imagens de exemplo primeiro.");
+            return;
+        }
+        const toastId = toast.loading('Analisando seu estilo...');
+        try {
+            const analysis = await geminiService.analyzeStyleFromImages(styleImages);
+            setStyleGuide(analysis);
+            setUseStyleGuide(true);
+            toast.success('Guia de Estilo criado com sucesso!', { id: toastId });
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Falha ao analisar o estilo.', { id: toastId });
+        }
+    };
 
     const handleGeneratePosts = async (
         genTopic: string, count: number, genType: 'post' | 'carousel', genContentLevel: 'mínimo' | 'médio' | 'detalhado',
         genBackgroundSource: 'upload' | 'ai', genAiProvider: 'gemini' | 'freepik', genTextStyle: TextStyle
     ) => {
-        if (!currentProject) {
+        if (!currentProject || !postSize) {
             toast.error("Por favor, crie ou abra um projeto primeiro.");
             return;
         }
         
         setIsLoading(true);
-        setPosts([]); // Clear posts within the current project
+        setPosts([]);
         setSelectedPostId(null);
         setSelectedElementId(null);
-    
         const toastId = toast.loading('Iniciando geração...');
-        
         const activeKit = useStyleGuide ? brandKits.find(k => k.id === activeBrandKitId) : null;
         const activeStyleGuide = useStyleGuide ? styleGuide : null;
         
         try {
-            // ... (The entire generation logic from the previous version fits here, with one change)
-            // Instead of setPosts(newPosts), update the project state:
-            // The final step in generation logic should be:
-            // setCurrentProject(proj => proj ? { ...proj, posts: newPosts } : null);
              if (useLayoutToFill && selectedLayoutId && activeBrandKitId) {
                 const kit = brandKits.find(k => k.id === activeBrandKitId);
                 const layout = kit?.layouts.find(l => l.id === selectedLayoutId);
@@ -225,54 +315,42 @@ const App: React.FC = () => {
                 if (customBackgrounds.length === 0) throw new Error("Por favor, envie as imagens de fundo que você deseja usar com este layout.");
                 
                 const backgroundSources = customBackgrounds.map(src => ({ src }));
-                
                 setLoadingMessage(`Preenchendo seu layout com conteúdo...`);
                 toast.loading(`Preenchendo seu layout...`, { id: toastId });
 
                 const newPosts: Post[] = [];
                 const textElementsToFill = layout.elements.filter(el => el.type === 'text').map(el => {
                     const textEl = el as TextElement;
-                    let description = 'corpo de texto ou subtítulo';
-                    if (textEl.fontSize > 48) description = 'título principal';
-                    else if (textEl.fontSize < 20) description = 'texto de rodapé ou detalhe';
-                    const lowerContent = textEl.content.toLowerCase();
-                    if (lowerContent.includes('comprar') || lowerContent.includes('saiba mais') || lowerContent.includes('arraste')) description = 'chamada para ação (CTA)';
+                    let description = textEl.fontSize > 48 ? 'título principal' : textEl.fontSize < 20 ? 'texto de rodapé' : 'corpo de texto';
                     return { id: el.id, description, exampleContent: textEl.content };
                 });
 
                 for (let i = 0; i < backgroundSources.length; i++) {
-                    const bgData = backgroundSources[i];
-                    
-                    let newContentMap: Record<string, string> = {};
-                    if (textElementsToFill.length > 0) {
-                        setLoadingMessage(`Gerando texto para o post ${i + 1}/${backgroundSources.length}...`);
-                        newContentMap = await geminiService.generateTextForLayout(textElementsToFill, genTopic, genContentLevel, activeStyleGuide, undefined, genTextStyle);
-                    }
-                    
+                    setLoadingMessage(`Gerando texto para o post ${i + 1}/${backgroundSources.length}...`);
+                    const newContentMap = await geminiService.generateTextForLayout(textElementsToFill, genTopic, genContentLevel, activeStyleGuide, undefined, genTextStyle);
                     const newPostId = uuidv4();
-                    const backgroundElement: BackgroundElement = { id: `${newPostId}-background`, type: 'background', src: bgData.src };
-                    const clonedForegroundElements: AnyElement[] = JSON.parse(JSON.stringify(layout.elements.filter(el => el.type !== 'background')));
-                    const newElements: AnyElement[] = clonedForegroundElements.map(el => {
+                    const backgroundElement: BackgroundElement = { id: `${newPostId}-background`, type: 'background', src: backgroundSources[i].src };
+                    const newElements: AnyElement[] = JSON.parse(JSON.stringify(layout.elements.filter(el => el.type !== 'background'))).map((el: AnyElement) => {
                         const newEl = { ...el, id: `${newPostId}-${el.id}` };
                         if (newEl.type === 'text' && newContentMap[el.id]) (newEl as TextElement).content = newContentMap[el.id];
-                        if (newEl.type === 'image' && newEl.assetId) {
-                            const asset = kit.assets.find(a => a.id === newEl.assetId);
-                            if (asset) newEl.src = asset.dataUrl;
-                        }
-                        return newEl as AnyElement;
+                        return newEl;
                     });
                     newPosts.push({ id: newPostId, elements: [backgroundElement, ...newElements] });
                 }
-
                 setPosts(newPosts);
                 if (newPosts.length > 0) setSelectedPostId(newPosts[0].id);
                 toast.success(`${newPosts.length} posts criados com seu layout!`, { id: toastId });
-
             } else { 
                 let backgroundSources: { src: string; prompt?: string; provider?: 'gemini' | 'freepik' }[] = [];
-
                 if (genBackgroundSource === 'ai') {
-                    // ... AI background generation logic
+                    setLoadingMessage('Gerando prompts de imagem...');
+                    toast.loading('Gerando prompts de imagem...', { id: toastId });
+                    const imagePrompts = await geminiService.generateImagePrompts(genTopic, count, activeStyleGuide);
+                    setLoadingMessage(`Gerando ${imagePrompts.length} imagens...`);
+                    toast.loading(`Gerando ${imagePrompts.length} imagens...`, { id: toastId });
+                    const imageGenerator = genAiProvider === 'freepik' ? freepikService.generateBackgroundImages : geminiService.generateBackgroundImages;
+                    const generatedImages = await imageGenerator(imagePrompts, postSize);
+                    backgroundSources = generatedImages.map((src, i) => ({ src: `data:image/png;base64,${src}`, prompt: imagePrompts[i], provider: genAiProvider }));
                 } else {
                     if (customBackgrounds.length === 0) throw new Error("Nenhuma imagem de fundo foi enviada.");
                     backgroundSources = customBackgrounds.map(src => ({ src }));
@@ -280,17 +358,20 @@ const App: React.FC = () => {
 
                 setLoadingMessage('Criando layouts inteligentes...');
                 toast.loading('Criando layouts inteligentes...', { id: toastId });
-
                 const layoutPromises = backgroundSources.map(bg => geminiService.generateLayoutAndContentForImage(bg.src, genTopic, genContentLevel, activeKit, undefined, genTextStyle));
                 const allLayouts = await Promise.all(layoutPromises);
 
                 const newPosts: Post[] = [];
                 const carouselId = genType === 'carousel' ? uuidv4() : undefined;
-
                 for (let i = 0; i < backgroundSources.length; i++) {
-                    // ... post creation loop
+                    const bgData = backgroundSources[i];
+                    const layout = allLayouts[i];
+                    const newPostId = uuidv4();
+                    setLoadingMessage(`Montando post ${i + 1}/${backgroundSources.length}...`);
+                    const backgroundElement: BackgroundElement = { id: `${newPostId}-background`, type: 'background', src: bgData.src, prompt: bgData.prompt, provider: bgData.provider };
+                    const textElements = convertAILayoutToElements(layout, postSize, newPostId);
+                    newPosts.push({ id: newPostId, elements: [backgroundElement, ...textElements], carouselId: carouselId, slideIndex: carouselId ? i : undefined });
                 }
-    
                 setPosts(newPosts);
                 if (newPosts.length > 0) setSelectedPostId(newPosts[0].id);
                 toast.success('Posts criados com sucesso!', { id: toastId });
@@ -303,15 +384,8 @@ const App: React.FC = () => {
             setLoadingMessage('');
         }
     };
-
-    const setPosts = (newPosts: Post[] | ((prevPosts: Post[]) => Post[])) => {
-        setCurrentProject(proj => {
-            if (!proj) return null;
-            const updatedPosts = typeof newPosts === 'function' ? newPosts(proj.posts) : newPosts;
-            return { ...proj, posts: updatedPosts };
-        });
-    };
-
+    
+    // --- ELEMENT & POST MANIPULATION HANDLERS ---
     const updatePostElement = useCallback((elementId: string, updates: Partial<AnyElement>) => {
         if (!selectedPostId) return;
         setPosts(prevPosts =>
@@ -324,12 +398,98 @@ const App: React.FC = () => {
     }, [selectedPostId]);
 
     const handleAddElement = (type: 'text' | 'image' | 'gradient' | 'shape' | 'qrcode', options?: { src?: string, shape?: 'rectangle' | 'circle' }) => {
-        if (!selectedPostId) return;
+        if (!selectedPostId || !postSize) return;
         const newId = `${selectedPostId}-${uuidv4()}`;
-        // ... (unchanged element creation logic)
+        const baseElement = { id: newId, x: postSize.width/2 - 150, y: postSize.height/2 - 50, width: 300, height: 100, rotation: 0, opacity: 1, locked: false, visible: true };
+        let newElement: AnyElement | null = null;
+        if (type === 'text') newElement = { ...baseElement, type, content: 'Texto Editável', fontSize: 48, fontFamily: 'Roboto', color: '#FFFFFF', textAlign: 'center', verticalAlign: 'middle', letterSpacing: 0, lineHeight: 1.2 };
+        if (type === 'shape') newElement = { ...baseElement, type, width: 150, height: 150, shape: options?.shape || 'rectangle', fillColor: '#3B82F6' };
+        if (type === 'qrcode') newElement = { ...baseElement, type, width: 150, height: 150, url: 'https://posty.app', color: '#000000', backgroundColor: '#FFFFFF' };
+        
+        if (newElement) {
+             setPosts(prev => prev.map(p => p.id === selectedPostId ? { ...p, elements: [...p.elements, newElement!] } : p));
+             setSelectedElementId(newId);
+        }
+    };
+
+    const removeElement = (elementId: string) => {
+        if (!selectedPostId) return;
+        setPosts(prev => prev.map(p => p.id === selectedPostId ? { ...p, elements: p.elements.filter(el => el.id !== elementId) } : p));
+        if (selectedElementId === elementId) setSelectedElementId(null);
+    };
+
+    const duplicateElement = (elementId: string) => {
+        if (!selectedPostId) return;
+        setPosts(prev => prev.map(p => {
+            if (p.id !== selectedPostId) return p;
+            const elToDup = p.elements.find(el => el.id === elementId);
+            if (!elToDup || elToDup.type === 'background') return p;
+            const newEl = { ...elToDup, id: `${p.id}-${uuidv4()}`, x: elToDup.x + 20, y: elToDup.y + 20 };
+            const originalIndex = p.elements.findIndex(el => el.id === elementId);
+            const newElements = [...p.elements];
+            newElements.splice(originalIndex + 1, 0, newEl);
+            return { ...p, elements: newElements };
+        }));
     };
     
-    // ... (All other handler functions: handleRemoveElement, handleDuplicateElement, etc., are largely unchanged, but they now operate on `posts` derived from `currentProject`)
+    const toggleElementProperty = (elementId: string, prop: 'visible' | 'locked') => updatePostElement(elementId, { [prop]: !selectedPost?.elements.find(e => e.id === elementId)?.[prop] });
+    
+    const reorderElements = (sourceId: string, destinationId: string) => {
+        if (!selectedPostId) return;
+        setPosts(prev => prev.map(p => {
+            if (p.id !== selectedPostId) return p;
+            const elements = p.elements.filter(el => el.type !== 'background');
+            const background = p.elements.find(el => el.type === 'background');
+            const sourceIndex = elements.findIndex(el => el.id === sourceId);
+            const destIndex = elements.findIndex(el => el.id === destinationId);
+            if (sourceIndex === -1 || destIndex === -1) return p;
+            const [removed] = elements.splice(sourceIndex, 1);
+            elements.splice(destIndex, 0, removed);
+            return { ...p, elements: background ? [background, ...elements] : elements };
+        }));
+    };
+
+    const addPost = () => {
+        if (!currentProject) return;
+        const newPostId = uuidv4();
+        const newPost: Post = { id: newPostId, elements: [{ id: `${newPostId}-background`, type: 'background', src: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mN8/x8AAuMB8DtXNJsAAAAASUVORK5CYII=' }] };
+        setPosts(prev => [...prev, newPost]);
+        setSelectedPostId(newPostId);
+    };
+
+    const deletePost = ({ postId, carouselId }: { postId?: string, carouselId?: string }) => {
+        let remainingPosts: Post[];
+        if (carouselId) remainingPosts = posts.filter(p => p.carouselId !== carouselId);
+        else if (postId) remainingPosts = posts.filter(p => p.id !== postId);
+        else return;
+        setPosts(remainingPosts);
+        if (selectedPostId === postId || posts.find(p => p.id === selectedPostId)?.carouselId === carouselId) {
+            setSelectedPostId(remainingPosts[0]?.id || null);
+        }
+    };
+    
+    // --- BRANDKIT & FONT HANDLERS ---
+    const handleAddFont = (font: FontDefinition) => setAvailableFonts(prev => [...prev, font]);
+    const handleOpenColorPicker = (color: string, onChange: (newColor: string) => void) => setColorPickerState({ isOpen: true, color, onChange });
+    
+    const handleSaveBrandKit = (name: string) => {
+        if (!selectedPost) {
+            toast.error("Nenhum post selecionado para criar um kit.");
+            return;
+        }
+        const newKit: BrandKit = { id: uuidv4(), name, styleGuide: styleGuide, fonts: [], palette: customPalette, layouts: [{ id: uuidv4(), name: 'Layout Padrão', elements: selectedPost.elements }], assets: [] };
+        setBrandKits(prev => [...prev, newKit]);
+        toast.success(`Brand Kit "${name}" salvo!`);
+    };
+
+    const handleAddLayoutToActiveKit = () => {
+        if (!selectedPost || !activeBrandKitId) return;
+        const newLayout: LayoutTemplate = { id: uuidv4(), name: `Layout ${new Date().toLocaleTimeString()}`, elements: JSON.parse(JSON.stringify(selectedPost.elements)) };
+        setBrandKits(prev => prev.map(k => k.id === activeBrandKitId ? { ...k, layouts: [...k.layouts, newLayout] } : k));
+        toast.success("Layout adicionado ao kit!");
+    };
+    
+    // ... Other BrandKit handlers ...
 
     const handleFitToScreen = useCallback(() => {
         if (!viewportRef.current || !postSize) return;
@@ -348,17 +508,13 @@ const App: React.FC = () => {
     return (
         <>
             <Toaster position="top-center" reverseOrder={false} />
+            {colorPickerState.isOpen && <AdvancedColorPicker color={colorPickerState.color} onChange={colorPickerState.onChange} onClose={() => setColorPickerState(s => ({...s, isOpen: false}))} palettes={{post: selectedPost?.palette, custom: customPalette}}/>}
             {(isLeftPanelOpen || isRightPanelOpen) && isMobileView && (
-                <div 
-                    className="mobile-backdrop"
-                    onClick={() => {
-                        setLeftPanelOpen(false);
-                        setRightPanelOpen(false);
-                    }}
-                />
+                <div className="mobile-backdrop" onClick={() => { setLeftPanelOpen(false); setRightPanelOpen(false); }} />
             )}
             
             <input type="file" ref={openProjectInputRef} onChange={handleOpenProjectFile} accept=".posty" className="hidden" />
+            <input type="file" ref={importKitRef} onChange={() => {}} accept=".json" className="hidden" />
 
             <div className={`app-layout font-sans bg-gray-950 text-gray-100 ${isLeftPanelOpen ? 'left-panel-open' : ''} ${isRightPanelOpen ? 'right-panel-open' : ''}`}>
                 <Header 
@@ -381,18 +537,13 @@ const App: React.FC = () => {
                             hasPosts={posts.length > 0}
                             customBackgrounds={customBackgrounds}
                             styleImages={styleImages}
-                            onFileChange={(e, type) => { /* unchanged */ }}
-                            onRemoveImage={(index, type) => { /* unchanged */ }}
-                            colorMode={colorMode}
-                            setColorMode={setColorMode}
-                            customPalette={customPalette}
-                            setCustomPalette={setCustomPalette}
-                            styleGuide={styleGuide}
-                            useStyleGuide={useStyleGuide}
-                            setUseStyleGuide={setUseStyleGuide}
-                            onAnalyzeStyle={() => { /* unchanged */ }}
-                            useLayoutToFill={useLayoutToFill}
-                            setUseLayoutToFill={setUseLayoutToFill}
+                            onFileChange={handleFileChange}
+                            onRemoveImage={handleRemoveImage}
+                            colorMode={colorMode} setColorMode={setColorMode}
+                            customPalette={customPalette} setCustomPalette={setCustomPalette}
+                            styleGuide={styleGuide} useStyleGuide={useStyleGuide}
+                            setUseStyleGuide={setUseStyleGuide} onAnalyzeStyle={handleAnalyzeStyle}
+                            useLayoutToFill={useLayoutToFill} setUseLayoutToFill={setUseLayoutToFill}
                             topic={topic} setTopic={setTopic}
                             contentLevel={contentLevel} setContentLevel={setContentLevel}
                             generationType={generationType} setGenerationType={setGenerationType}
@@ -400,15 +551,15 @@ const App: React.FC = () => {
                             backgroundSource={backgroundSource} setBackgroundSource={setBackgroundSource}
                             aiPostCount={aiPostCount} setAiPostCount={setAiPostCount}
                             aiProvider={aiProvider} setAiProvider={setAiProvider}
-                            onSaveBrandKit={() => { /* unchanged */ }}
-                            onAddLayoutToActiveKit={() => { /* unchanged */ }}
-                            onImportBrandKit={() => { /* unchanged */ }}
-                            onExportBrandKit={() => { /* unchanged */ }}
-                            onDeleteBrandKit={() => { /* unchanged */ }}
+                            onSaveBrandKit={handleSaveBrandKit}
+                            onAddLayoutToActiveKit={handleAddLayoutToActiveKit}
+                            onImportBrandKit={() => {}}
+                            onExportBrandKit={() => {}}
+                            onDeleteBrandKit={(kitId) => setBrandKits(prev => prev.filter(k => k.id !== kitId))}
                             onApplyBrandKit={(kitId) => setCurrentProject(p => p ? { ...p, activeBrandKitId: kitId } : null)}
-                            onAddPostFromLayout={() => { /* unchanged */ }}
-                            onUpdateLayoutName={() => { /* unchanged */ }}
-                            onDeleteLayoutFromKit={() => { /* unchanged */ }}
+                            onAddPostFromLayout={() => {}}
+                            onUpdateLayoutName={() => {}}
+                            onDeleteLayoutFromKit={() => {}}
                             selectedLayoutId={selectedLayoutId}
                             setSelectedLayoutId={setSelectedLayoutId}
                         />
@@ -477,17 +628,17 @@ const App: React.FC = () => {
                             selectedElementId={selectedElementId}
                             onSelectElement={setSelectedElementId}
                             onUpdateElement={updatePostElement}
-                            onAddElement={() => {}}
-                            onRemoveElement={() => {}}
-                            onDuplicateElement={() => {}}
-                            onToggleVisibility={() => {}}
-                            onToggleLock={() => {}}
-                            onReorderElements={() => {}}
+                            onAddElement={handleAddElement}
+                            onRemoveElement={removeElement}
+                            onDuplicateElement={duplicateElement}
+                            onToggleVisibility={(id) => toggleElementProperty(id, 'visible')}
+                            onToggleLock={(id) => toggleElementProperty(id, 'locked')}
+                            onReorderElements={reorderElements}
                             onRegenerateBackground={() => {}}
                             onUpdateBackgroundSrc={() => {}}
                             availableFonts={availableFonts}
-                            onAddFont={() => {}}
-                            onOpenColorPicker={() => {}}
+                            onAddFont={handleAddFont}
+                            onOpenColorPicker={handleOpenColorPicker}
                             palettes={{ post: selectedPost?.palette, custom: customPalette }}
                         />
                     ) : (
@@ -501,8 +652,8 @@ const App: React.FC = () => {
                             posts={posts}
                             selectedPostId={selectedPostId}
                             onSelectPost={setSelectedPostId}
-                            onAddPost={() => { /* unchanged */ }}
-                            onDeletePost={() => { /* unchanged */ }}
+                            onAddPost={addPost}
+                            onDeletePost={deletePost}
                         />
                     )}
                 </footer>
