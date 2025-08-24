@@ -1,12 +1,14 @@
 import { GoogleGenAI, Type, Part } from "@google/genai";
 import { AIGeneratedTextElement, PaletteExtractionResult, AIGeneratedCarouselScriptSlide, TextElement, BrandKit, PostSize } from '../types';
 
-const HARDCODED_API_KEY = 'AIzaSyCUAgZxn4OERywBC_R21kJA6SbMQJc73CY';
+// Conforme solicitado, esta chave será usada como padrão.
+// A geração de imagens pode falhar se não estiver vinculada a uma conta com faturamento.
+const DEFAULT_API_KEY = "AIzaSyCfPECJaa9lVtmn-fXUDPTGncJYAkvkrYQ";
 
 const getAIClient = (userApiKey?: string) => {
-    const apiKey = userApiKey || HARDCODED_API_KEY;
+    const apiKey = userApiKey || DEFAULT_API_KEY;
     if (!apiKey) {
-        throw new Error("API Key não encontrada. Por favor, configure sua chave de API.");
+        throw new Error("Chave de API do Google Gemini não encontrada. Por favor, adicione sua chave em 'Gerenciar Contas' para usar esta funcionalidade.");
     }
     return new GoogleGenAI({ apiKey });
 };

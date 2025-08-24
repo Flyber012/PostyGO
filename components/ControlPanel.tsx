@@ -238,7 +238,7 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
     const isFreeTierUser = !isGeminiKeyUser;
     const generationsLeft = dailyLimit - generationsToday;
     
-    const isGeminiReady = user && (generationsLeft > 0 || !isFreeTierUser);
+    const isGeminiReady = user && (isGeminiKeyUser || generationsLeft > 0);
     const isFreepikReady = user?.linkedAccounts?.freepik?.status === 'connected';
 
     let canGenerate = false;
@@ -246,8 +246,8 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
 
     if (!user) {
         generateButtonTooltip = 'Faça login para gerar conteúdo.';
-    } else if (!isGeminiReady) {
-        generateButtonTooltip = 'Você atingiu seu limite diário de gerações do Gemini.';
+    } else if (backgroundSource === 'ai' && aiProvider === 'gemini' && !isGeminiReady) {
+        generateButtonTooltip = 'Conecte sua conta Gemini para usar este provedor.';
     } else if (backgroundSource === 'ai' && aiProvider === 'freepik' && !isFreepikReady) {
         generateButtonTooltip = 'Conecte sua conta Freepik para usar este provedor.';
     } else {
@@ -379,12 +379,15 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
                                     <button onClick={() => setAiProvider('gemini')} className={`flex-1 text-center text-xs py-1.5 rounded-md transition-all duration-300 ${aiProvider === 'gemini' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:bg-zinc-700'}`}>
                                         Google Gemini
                                     </button>
-                                    <button onClick={() => setAiProvider('freepik')} className={`flex-1 text-center text-xs py-1.5 rounded-md transition-all duration-300 ${aiProvider === 'freepik' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:bg-zinc-700'} disabled:opacity-50 disabled:cursor-not-allowed`} disabled={!user?.linkedAccounts?.freepik}>
+                                    <button onClick={() => setAiProvider('freepik')} className={`flex-1 text-center text-xs py-1.5 rounded-md transition-all duration-300 ${aiProvider === 'freepik' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:bg-zinc-700'}`}>
                                         Freepik
                                     </button>
                                 </div>
                                 {aiProvider === 'freepik' && !user?.linkedAccounts?.freepik && 
                                     <p className="text-xs text-yellow-400 mt-2 text-center">Conecte sua conta Freepik em 'Gerenciar Contas' para usar.</p>
+                                }
+                                {aiProvider === 'gemini' && !user?.linkedAccounts?.google?.apiKey && 
+                                    <p className="text-xs text-yellow-400 mt-2 text-center">Conecte sua chave de API do Gemini em 'Gerenciar Contas' para usar.</p>
                                 }
                             </div>
                             <p className="text-xs text-center text-gray-400">A IA irá gerar as imagens de fundo e o texto.</p>
@@ -400,7 +403,7 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
                     {user && isFreeTierUser && (
                         <div className="space-y-2 p-3 bg-black/20 rounded-lg">
                             <div className="flex justify-between items-center text-sm">
-                                <label className="font-medium text-gray-300">Limite Diário (Gemini)</label>
+                                <label className="font-medium text-gray-300">Limite Diário (Texto Gemini)</label>
                                 <span className="font-semibold text-gray-200">{generationsToday}/{dailyLimit}</span>
                             </div>
                             <div className="w-full bg-zinc-700 rounded-full h-2.5">
@@ -409,6 +412,7 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
                                     style={{ width: `${(generationsToday / dailyLimit) * 100}%` }}
                                 ></div>
                             </div>
+                             <p className="text-xs text-zinc-400 text-center">A geração de imagens agora requer sua própria chave de API do Gemini.</p>
                         </div>
                     )}
                      {user && isGeminiKeyUser && (
