@@ -5,7 +5,7 @@
 // Função para obter o token de acesso da Efí
 async function getEfiToken(clientId: string, clientSecret: string) {
     const auth = btoa(`${clientId}:${clientSecret}`);
-    const tokenUrl = 'https://api-pix.gerencianet.com.br/oauth/token'; // Endpoint de Produção
+    const tokenUrl = 'https://api-pix.efipay.com.br/oauth/token'; // Endpoint de Produção ATUALIZADO
 
     const tokenResponse = await fetch(tokenUrl, {
         method: 'POST',
@@ -43,7 +43,7 @@ async function checkPaymentHandler(req: any, res: any) {
     try {
         const accessToken = await getEfiToken(clientId, clientSecret);
 
-        const apiUrl = 'https://api-pix.gerencianet.com.br'; // Endpoint de Produção
+        const apiUrl = 'https://api-pix.efipay.com.br'; // Endpoint de Produção ATUALIZADO
 
         const checkResponse = await fetch(`${apiUrl}/v2/cob/${txid}`, {
             method: 'GET',

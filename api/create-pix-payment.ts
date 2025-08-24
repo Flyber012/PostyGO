@@ -2,10 +2,12 @@
 // O nome do arquivo se torna o endpoint da API: /api/create-pix-payment
 // Este endpoint usa a API de PIX da Efí (antiga Gerencianet).
 
+import { randomBytes } from 'crypto';
+
 // Função para obter o token de acesso da Efí
 async function getEfiToken(clientId: string, clientSecret: string) {
     const auth = btoa(`${clientId}:${clientSecret}`);
-    const tokenUrl = 'https://api-pix.gerencianet.com.br/oauth/token'; // Endpoint de Produção
+    const tokenUrl = 'https://api-pix.efipay.com.br/oauth/token'; // Endpoint de Produção ATUALIZADO
 
     const tokenResponse = await fetch(tokenUrl, {
         method: 'POST',
@@ -44,10 +46,10 @@ async function paymentHandler(req: any, res: any) {
     try {
         const accessToken = await getEfiToken(clientId, clientSecret);
 
-        // Gera um txid único com 32 caracteres alfanuméricos
-        const txid = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 10);
+        // Gera um txid único com 32 caracteres alfanuméricos (usando crypto para robustez)
+        const txid = randomBytes(16).toString('hex');
 
-        const apiUrl = 'https://api-pix.gerencianet.com.br'; // Endpoint de Produção
+        const apiUrl = 'https://api-pix.efipay.com.br'; // Endpoint de Produção ATUALIZADO
 
         // Etapa 1: Criar a cobrança imediata (cob)
         const cobResponse = await fetch(`${apiUrl}/v2/cob/${txid}`, {
