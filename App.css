@@ -1,4 +1,5 @@
 
+
 .app-layout {
     display: grid;
     height: 100vh;
@@ -27,7 +28,7 @@
 .left-panel { grid-area: left-panel; overflow: hidden; }
 .main-content { grid-area: main-content; position: relative; display: flex; align-items: center; justify-content: center; background-color: #18181b; overflow: hidden; }
 .right-panel { grid-area: right-panel; overflow: hidden; }
-.footer-gallery { grid-area: footer-gallery; height: 112px; /* h-28 */ }
+.footer-gallery { grid-area: footer-gallery; }
 
 /* Transitions for panels */
 .left-panel, .right-panel {
@@ -78,6 +79,7 @@
     .app-layout {
         /* Change to a single column layout, panels will be overlaid */
         grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr 96px; /* Header, Main, Footer (h-24) */
         grid-template-areas:
             "header"
             "main-content"

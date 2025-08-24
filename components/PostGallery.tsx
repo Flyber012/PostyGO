@@ -1,4 +1,5 @@
 
+
 import React, { useMemo, useRef, useEffect } from 'react';
 import { Post, BackgroundElement } from '../types';
 import { Plus, Trash2, Files } from 'lucide-react';
@@ -44,7 +45,7 @@ const TimelineGallery: React.FC<TimelineGalleryProps> = ({ posts, selectedPostId
 
     return (
         <div className="w-full h-full bg-zinc-900/80 backdrop-blur-sm p-2 flex items-center space-x-3">
-            <button onClick={onAddPost} className="h-24 w-16 flex-shrink-0 flex flex-col items-center justify-center bg-zinc-800 hover:bg-zinc-700 rounded-md text-zinc-400 transition-colors">
+            <button onClick={onAddPost} className="h-20 w-16 flex-shrink-0 flex flex-col items-center justify-center bg-zinc-800 hover:bg-zinc-700 rounded-md text-zinc-400 transition-colors">
                 <Plus className="w-6 h-6" />
                 <span className="text-xs mt-1">Novo</span>
             </button>
@@ -62,7 +63,7 @@ const TimelineGallery: React.FC<TimelineGalleryProps> = ({ posts, selectedPostId
                             key={displayPost.carouselId || displayPost.id}
                             ref={isSelected ? selectedItemRef : null}
                             onClick={() => onSelectPost(displayPost.id)}
-                            className={`relative group cursor-pointer rounded-md overflow-hidden transition-all duration-200 flex-shrink-0 h-24 w-24 transform hover:scale-105 ${
+                            className={`relative group cursor-pointer rounded-md overflow-hidden transition-all duration-200 flex-shrink-0 h-20 w-20 transform hover:scale-105 ${
                                 isSelected ? 'ring-2 ring-pink-500' : 'ring-2 ring-transparent hover:ring-pink-400/50'
                             }`}
                         >

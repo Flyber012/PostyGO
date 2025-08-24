@@ -1,4 +1,5 @@
 
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { toast } from 'react-hot-toast';
 import { parseColor, rgbaToString, rgbToHex, rgbToHsv, hsvToRgb } from '../utils/color';
@@ -122,10 +123,10 @@ const AdvancedColorPicker: React.FC<ColorPickerProps> = ({ color, onChange, onCl
     const currentHex = rgbToHex(currentRgb.r, currentRgb.g, currentRgb.b);
 
     return (
-        <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose}>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center" onClick={onClose}>
             <div 
                 ref={pickerRef} 
-                className="absolute top-1/2 right-[21rem] -translate-y-1/2 bg-zinc-800 p-4 rounded-lg shadow-2xl border border-zinc-700 w-64 space-y-4"
+                className="bg-zinc-800 p-4 rounded-lg shadow-2xl border border-zinc-700 w-64 space-y-4"
                 onClick={e => e.stopPropagation()}
             >
                 <div 

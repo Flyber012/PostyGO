@@ -15,7 +15,7 @@ import { GenerationWizard } from './components/GenerationWizard';
 import { BrandKitPanel } from './components/BrandKitPanel';
 import saveAs from 'file-saver';
 import { v4 as uuidv4 } from 'uuid';
-import { ZoomIn, ZoomOut, Maximize, PanelLeft, PanelRight, PanelLeftClose, PanelRightClose, Package, Image as ImageIcon, FileText, X, LayoutTemplate as LayoutTemplateIcon, Plus } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize, PanelLeft, PanelRight, PanelLeftClose, PanelRightClose, Package, Image as ImageIcon, FileText, X, LayoutTemplate as LayoutTemplateIcon, Plus, Layers } from 'lucide-react';
 import AdvancedColorPicker from './components/ColorPicker';
 
 // --- HELPERS ---
@@ -85,8 +85,8 @@ const WelcomeScreen: React.FC<{ onNewProject: (size: PostSize) => void; onOpenPr
     }, []);
 
     return (
-        <div className="flex h-full w-full bg-zinc-900 text-gray-300">
-            <aside className="w-64 bg-zinc-950/50 p-4 flex flex-col">
+        <div className="flex flex-col lg:flex-row h-full w-full bg-zinc-900 text-gray-300">
+            <aside className="w-full lg:w-64 bg-zinc-950/50 p-4 flex flex-col">
                 <div className="flex items-center space-x-3 px-2 pt-2 mb-6">
                     <LayoutTemplateIcon className="w-9 h-9 text-white" />
                     <h1 className="text-3xl font-bold">
@@ -108,7 +108,7 @@ const WelcomeScreen: React.FC<{ onNewProject: (size: PostSize) => void; onOpenPr
                     </button>
                 </div>
             </aside>
-            <main className="flex-1 p-8 overflow-y-auto">
+            <main className="flex-1 p-4 lg:p-8 overflow-y-auto">
                  <h2 className="text-xl font-semibold mb-4 text-gray-200">Comece com um Template</h2>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
                     {POST_SIZES.map(size => (
@@ -155,8 +155,8 @@ const ProjectTabs: React.FC<{
     onClose: (id: string) => void;
     onNew: () => void;
 }> = ({ projects, currentProjectId, onSelect, onClose, onNew }) => (
-    <div className="flex-shrink-0 bg-zinc-950/50 h-10 flex items-end">
-        <nav className="flex items-center space-x-1 h-full overflow-x-auto pl-2">
+    <div className="flex-shrink-0 bg-zinc-950/50 h-10 flex items-center">
+        <nav className="flex items-center h-full overflow-x-auto pl-2">
             {projects.map(p => (
                  <button 
                     key={p.id} 
@@ -171,14 +171,14 @@ const ProjectTabs: React.FC<{
                     <X onClick={(e) => { e.stopPropagation(); onClose(p.id); }} className="w-4 h-4 ml-3 rounded-full p-0.5 hover:bg-white/20"/>
                  </button>
             ))}
+             <button
+                onClick={onNew}
+                className="ml-1 h-8 w-8 flex-shrink-0 flex items-center justify-center rounded-md hover:bg-zinc-800/70 text-gray-400 hover:text-white transition-colors"
+                title="Novo projeto"
+            >
+                <Plus className="w-4 h-4" />
+            </button>
         </nav>
-        <button
-            onClick={onNew}
-            className="ml-1 mb-1 flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-md hover:bg-zinc-800/70 text-gray-400 hover:text-white transition-colors"
-            title="Novo projeto"
-        >
-            <Plus className="w-4 h-4" />
-        </button>
         <div className="flex-grow h-full"></div>
     </div>
 );
@@ -245,12 +245,17 @@ const App: React.FC = () => {
             if (mobile) {
                 setLeftPanelOpen(false);
                 setRightPanelOpen(false);
+            } else {
+                 if (projects.length > 0) {
+                    setLeftPanelOpen(true);
+                    setRightPanelOpen(true);
+                 }
             }
         };
         handleResize();
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
-    }, []);
+    }, [projects.length]);
 
     // --- PROJECT & STATE MANAGEMENT ---
     const updateCurrentProject = (updates: Partial<Project>) => {
@@ -273,6 +278,9 @@ const App: React.FC = () => {
         if (!isMobileView) {
             setLeftPanelOpen(true);
             setRightPanelOpen(true);
+        } else {
+            setLeftPanelOpen(true);
+            setRightPanelOpen(false);
         }
     };
 
@@ -598,7 +606,16 @@ const App: React.FC = () => {
             <input type="file" ref={importKitRef} onChange={() => {}} accept=".json" className="hidden" />
 
             <div className={`app-layout font-sans bg-gray-950 text-gray-100 ${projects.length > 0 && isLeftPanelOpen ? 'left-panel-open' : ''} ${projects.length > 0 && isRightPanelOpen ? 'right-panel-open' : ''}`}>
-                <Header onNewProject={handleNewProject} onSaveProject={handleSaveProject} onSaveAsProject={handleSaveAsProject} onOpenProject={handleOpenProjectClick} hasProject={projects.length > 0} />
+                <Header 
+                    onNewProject={handleNewProject} 
+                    onSaveProject={handleSaveProject} 
+                    onSaveAsProject={handleSaveAsProject} 
+                    onOpenProject={handleOpenProjectClick} 
+                    hasProject={projects.length > 0} 
+                    isMobileView={isMobileView}
+                    onToggleLeftPanel={() => setLeftPanelOpen(!isLeftPanelOpen)}
+                    onToggleRightPanel={() => setRightPanelOpen(!isRightPanelOpen)}
+                />
 
                 <aside className={`left-panel ${isMobileView && isLeftPanelOpen ? 'mobile-panel-open' : ''}`}>
                     {projects.length > 0 ? (
@@ -624,7 +641,7 @@ const App: React.FC = () => {
                         <WelcomeScreen onNewProject={handleNewProject} onOpenProject={handleOpenProjectClick} onOpenRecent={handleOpenProject} />
                     ) : (
                          <div className="flex flex-col h-full w-full bg-zinc-800">
-                             <ProjectTabs projects={projects} currentProjectId={currentProjectId} onSelect={setCurrentProjectId} onClose={handleCloseProject} onNew={handleNewProject} />
+                             <ProjectTabs projects={projects} currentProjectId={currentProjectId} onSelect={setCurrentProjectId} onClose={handleCloseProject} onNew={() => handleNewProject(postSize)} />
                             <div className="flex-grow relative flex items-center justify-center p-4 overflow-auto">
                                 {isLoading ? (
                                     <div className="flex flex-col items-center justify-center text-center h-full">
@@ -649,7 +666,7 @@ const App: React.FC = () => {
                         </div>
                     )}
 
-                    {projects.length > 0 && (
+                    {projects.length > 0 && !isMobileView && (
                         <>
                             <button 
                                 onClick={() => setLeftPanelOpen(!isLeftPanelOpen)} 
