@@ -261,59 +261,6 @@ const App: React.FC = () => {
         }
     }, [user]);
     
-    // Efeito para verificar o status do pagamento no redirecionamento
-    useEffect(() => {
-        const checkPaymentStatus = async () => {
-            const params = new URLSearchParams(window.location.search);
-            const paymentStatus = params.get('payment_status');
-            const orderNsu = params.get('order_nsu');
-
-            if (paymentStatus === 'success' && orderNsu) {
-                const pendingOrderId = sessionStorage.getItem('pending_payment_order_id');
-                const pendingCreditsStr = sessionStorage.getItem('pending_payment_credits');
-
-                // Limpa a URL e a sessão para evitar reprocessamento
-                const cleanup = () => {
-                    sessionStorage.removeItem('pending_payment_order_id');
-                    sessionStorage.removeItem('pending_payment_credits');
-                    window.history.replaceState({}, document.title, window.location.pathname);
-                };
-
-                if (orderNsu === pendingOrderId && pendingCreditsStr) {
-                    const toastId = toast.loading('Verificando seu pagamento...');
-                    try {
-                        const response = await fetch('/api/check-pix-payment', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ order_nsu: orderNsu }),
-                        });
-                        const data = await response.json();
-
-                        if (response.ok && data.paid) {
-                            const creditsToAdd = parseInt(pendingCreditsStr, 10);
-                            updateUserCredits(creditsToAdd);
-                            toast.success(`${creditsToAdd} créditos adicionados com sucesso!`, { id: toastId });
-                        } else {
-                            throw new Error(data.error || 'A verificação do pagamento falhou.');
-                        }
-                    } catch (error) {
-                        toast.error(error instanceof Error ? error.message : 'Não foi possível verificar seu pagamento.', { id: toastId });
-                    } finally {
-                        cleanup();
-                    }
-                } else if (pendingOrderId) {
-                     // Se o ID do pedido não corresponder ou não houver créditos pendentes, apenas limpe.
-                     cleanup();
-                }
-            }
-        };
-
-        // Só executa se o usuário estiver logado
-        if (user) {
-            checkPaymentStatus();
-        }
-    }, [user]); // Depende do 'user' para garantir que updateUserCredits funcione
-
     const handleAddFont = (font: FontDefinition) => {
         if (!availableFonts.some(f => f.name === font.name)) {
             setAvailableFonts(prev => [...prev, font]);
@@ -1202,6 +1149,7 @@ const App: React.FC = () => {
                 isOpen={isBuyCreditsModalOpen}
                 onClose={() => setBuyCreditsModalOpen(false)}
                 user={user}
+                onPurchaseSuccess={updateUserCredits}
             />
             <AddLayoutModal
                 isOpen={isAddLayoutModalOpen}
