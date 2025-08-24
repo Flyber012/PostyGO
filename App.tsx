@@ -1411,7 +1411,7 @@ const App: React.FC = () => {
                         </div>
                     </div>
                     {/* Navegação Inferior para Mobile */}
-                    <div className="lg:hidden grid grid-cols-3 items-center bg-zinc-900 border-t border-zinc-800 px-2 pt-1 flex-shrink-0">
+                    <div className="lg:hidden grid grid-cols-3 items-center bg-zinc-900 border-t border-zinc-800 px-2 pt-1 pb-[calc(0.5rem+env(safe-area-inset-bottom))] flex-shrink-0">
                         <button onClick={() => setBrandKitPanelOpen(true)} className="flex flex-col items-center space-y-1 text-xs p-2 rounded-lg text-zinc-300 hover:bg-zinc-800 hover:text-white">
                             <Package className="w-5 h-5"/>
                             <span>Kits</span>
