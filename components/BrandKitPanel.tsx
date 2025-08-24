@@ -30,9 +30,11 @@ export const BrandKitPanel: React.FC<BrandKitPanelProps> = (props) => {
     if (!isOpen) return null;
 
     return (
-        <>
-            <div className="fixed inset-0 bg-black/60 z-30 lg:hidden" onClick={onClose} />
-            <div className={`fixed top-0 left-0 h-full w-screen sm:w-96 bg-zinc-900 z-40 transform transition-transform duration-300 ease-in-out lg:hidden ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="fixed inset-0 bg-black/60 z-50 flex justify-start lg:hidden" onClick={onClose}>
+            <div 
+                className="h-full w-screen sm:w-96 bg-zinc-900 transform transition-transform duration-300 ease-in-out animate-slide-in-left"
+                onClick={e => e.stopPropagation()}
+            >
                  <div className="flex items-center p-4 border-b border-zinc-800">
                     <Package className="text-purple-400 mr-3 h-6 w-6"/>
                     <h1 className="text-xl font-bold text-white">Brand Kits</h1>
@@ -44,6 +46,15 @@ export const BrandKitPanel: React.FC<BrandKitPanelProps> = (props) => {
                      <BrandKitManagement {...props} />
                 </div>
             </div>
-        </>
+             <style>{`
+                @keyframes slide-in-left {
+                    from { transform: translateX(-100%); }
+                    to { transform: translateX(0); }
+                }
+                .animate-slide-in-left {
+                    animation: slide-in-left 0.3s ease-out forwards;
+                }
+            `}</style>
+        </div>
     );
 };

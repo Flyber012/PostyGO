@@ -1201,7 +1201,11 @@ const App: React.FC = () => {
             <GenerationWizard
                 isOpen={isWizardOpen}
                 onClose={() => setWizardOpen(false)}
-                onGenerate={handleGeneratePosts}
+                onGenerate={(...args) => {
+                    setWizardOpen(false);
+                    // Defer heavy task to allow UI to update
+                    setTimeout(() => handleGeneratePosts(...args), 50);
+                }}
                 isLoading={isLoading}
                 topic={topic} setTopic={setTopic}
                 contentLevel={contentLevel} setContentLevel={setContentLevel}

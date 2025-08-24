@@ -124,7 +124,6 @@ export const GenerationWizard: React.FC<GenerationWizardProps> = (props) => {
         }
         
         onGenerate(props.topic, finalCount, props.generationType, props.contentLevel, props.backgroundSource, props.aiProvider);
-        onClose();
     };
 
     let canGenerate = !isLoading;

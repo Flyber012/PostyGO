@@ -38,8 +38,10 @@ export default async function handler(req: any, res: any) {
         return res.status(400).json({ error: 'O "txid" da transação é obrigatório.' });
     }
 
-    const clientId = process.env.EFI_CLIENT_ID;
-    const clientSecret = process.env.EFI_CLIENT_SECRET;
+    // ATENÇÃO: As chaves estão hardcoded para fins de desenvolvimento.
+    // Em produção, use variáveis de ambiente para segurança.
+    const clientId = "Client_Id_8c0e7adf341d9277bde8448d03ea2dfa9f2bcb8a";
+    const clientSecret = "Client_Secret_443ec3ecfcb9dc34de3f36d97771dac685f25777";
     const isSandbox = process.env.EFI_SANDBOX === 'true';
 
     if (!clientId || !clientSecret) {
