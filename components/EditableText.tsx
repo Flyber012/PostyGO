@@ -34,10 +34,8 @@ const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSel
     useEffect(() => {
         if(isEditing && contentRef.current) {
             onStartEditing(element.id, contentRef.current);
-            // Focus and select all text when editing starts
+            // Focus the element, but do not select all text, allowing for partial selection.
             contentRef.current.focus();
-            document.execCommand('selectAll', false);
-
         } else {
             onStopEditing();
         }

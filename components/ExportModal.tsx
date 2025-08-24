@@ -79,7 +79,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, posts, postS
                 const toastId = toast.loading(`Exportando post como ${exportFormat.toUpperCase()}...`);
                 
                 root.render(<StaticPost post={selectedPost} postSize={postSize} />);
-                await new Promise(resolve => setTimeout(resolve, 250)); // Give React and fonts time to render
+                await new Promise(resolve => setTimeout(resolve, 500)); // Give React and fonts time to render
 
                 const imageTargetNode = rendererContainer.firstChild as HTMLElement;
                 if (!imageTargetNode) throw new Error("Componente renderizado não encontrado para exportação.");
@@ -103,7 +103,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, posts, postS
                     toast.loading(`Processando post ${i + 1} de ${posts.length}...`, { id: toastId });
                     
                     root.render(<StaticPost post={post} postSize={postSize} />);
-                    await new Promise(resolve => setTimeout(resolve, 250)); // Allow render time
+                    await new Promise(resolve => setTimeout(resolve, 500)); // Allow render time
 
                     const imageTargetNode = rendererContainer.firstChild as HTMLElement;
                     if (!imageTargetNode) throw new Error(`Componente renderizado não encontrado para o post ${i + 1}.`);

@@ -74,7 +74,7 @@ const convertAILayoutToElements = (aiLayout: AIGeneratedTextElement[], postSize:
             x: (aiEl.x / 100) * postWidth,
             y: (aiEl.y / 100) * postHeight,
             width: Math.max(100, (aiEl.width / 100) * postWidth), // Ensure a minimum width
-            height: Math.max(20, (aiEl.height / 100) * postHeight), // Use AI height, remove autosize
+            height: Math.max(20, (aiEl.height / 100) * postHeight), // Use AI height
             fontSize,
             fontFamily: aiEl.fontFamily || 'Poppins',
             fontWeight: 400,
