@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { Post, PostSize, AnyElement, TextElement, ImageElement, GradientElement, BackgroundElement, ShapeElement, QRCodeElement } from '../types';
 import QRCodeDisplay from './QRCodeDisplay';
@@ -16,7 +17,7 @@ const renderElement = (element: AnyElement) => {
     switch(element.type) {
         case 'text':
             const textEl = element as TextElement;
-            return <div dangerouslySetInnerHTML={{ __html: textEl.content }} />;
+            return <div dangerouslySetInnerHTML={{ __html: textEl.content }} style={{width: '100%', height: '100%'}}/>;
         case 'image':
             return <img src={element.src} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />;
         case 'gradient':

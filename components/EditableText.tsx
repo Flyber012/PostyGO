@@ -12,31 +12,13 @@ interface EditableElementProps {
     onSelect: (elementId: string | null) => void;
     onStartEditing: (id: string, node: HTMLDivElement) => void;
     onStopEditing: () => void;
+    onSelectionUpdate: () => void;
 }
 
-const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSelected, onSelect, onStartEditing, onStopEditing }) => {
+const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSelected, onSelect, onStartEditing, onStopEditing, onSelectionUpdate }) => {
     const nodeRef = useRef(null);
     const contentRef = useRef<HTMLDivElement>(null);
     const [isEditing, setIsEditing] = useState(false);
-
-    // Auto-resizing effect for newly created text elements
-    useEffect(() => {
-        if (element.type === 'text' && element.autosize && nodeRef.current) {
-            const node = nodeRef.current as HTMLDivElement;
-            // Temporarily remove height constraint to measure natural height
-            const originalHeight = node.style.height;
-            node.style.height = 'auto';
-
-            // Get the scrollHeight, which is the height of the content
-            const newHeight = node.scrollHeight;
-            
-            // Restore original height to prevent flicker before react re-renders
-            node.style.height = originalHeight;
-
-            // Update the element state with the new height and disable autosizing
-            onUpdate(element.id, { height: newHeight + 4, autosize: false }); // Add a small buffer
-        }
-    }, [element, onUpdate]);
 
     // This effect syncs the state (element.content) to the contentEditable div's innerHTML.
     // It's crucial that it ONLY runs when not in editing mode to prevent React from
@@ -213,6 +195,7 @@ const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSel
                     }
                 }}
                 onDoubleClick={handleDoubleClick}
+                onMouseUp={onSelectionUpdate}
             >
                 {renderContent()}
 

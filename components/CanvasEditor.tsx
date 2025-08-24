@@ -12,9 +12,10 @@ interface CanvasEditorProps {
     onSelectElement: (id: string | null) => void;
     onStartEditing: (id: string, node: HTMLDivElement) => void;
     onStopEditing: () => void;
+    onSelectionUpdate: () => void;
 }
 
-const CanvasEditor: React.FC<CanvasEditorProps> = ({ post, postSize, onUpdateElement, selectedElementId, onSelectElement, onStartEditing, onStopEditing }) => {
+const CanvasEditor: React.FC<CanvasEditorProps> = ({ post, postSize, onUpdateElement, selectedElementId, onSelectElement, onStartEditing, onStopEditing, onSelectionUpdate }) => {
 
     const deselectElement = (e: React.MouseEvent) => {
         if (e.target === e.currentTarget) {
@@ -56,6 +57,7 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({ post, postSize, onUpdateEle
                     onSelect={onSelectElement}
                     onStartEditing={onStartEditing}
                     onStopEditing={onStopEditing}
+                    onSelectionUpdate={onSelectionUpdate}
                 />
             ))}
         </div>

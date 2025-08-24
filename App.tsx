@@ -74,8 +74,7 @@ const convertAILayoutToElements = (aiLayout: AIGeneratedTextElement[], postSize:
             x: (aiEl.x / 100) * postWidth,
             y: (aiEl.y / 100) * postHeight,
             width: Math.max(100, (aiEl.width / 100) * postWidth), // Ensure a minimum width
-            height: 50, // Start with a temporary height, autosize will fix it
-            autosize: true, // Flag for the component to auto-resize itself
+            height: Math.max(20, (aiEl.height / 100) * postHeight), // Use AI height, remove autosize
             fontSize,
             fontFamily: aiEl.fontFamily || 'Poppins',
             fontWeight: 400,
@@ -225,6 +224,7 @@ const ProjectTabs: React.FC<{
                      <div 
                         key={p.id} 
                         onClick={() => onSelect(p.id)}
+                        onDoubleClick={() => handleStartEditing(p)}
                         className={`flex items-center h-full px-4 text-sm rounded-t-md border-b-2 cursor-pointer ${
                             p.id === currentProjectId 
                             ? 'bg-zinc-800 border-purple-500 text-white' 
@@ -243,7 +243,7 @@ const ProjectTabs: React.FC<{
                                 style={{ width: `${Math.max(8, editingName.length)}ch` }}
                             />
                         ) : (
-                             <span onDoubleClick={() => handleStartEditing(p)}>{p.name}</span>
+                             <span>{p.name}</span>
                         )}
                         <X onClick={(e) => { e.stopPropagation(); onClose(p.id); }} className="w-4 h-4 ml-3 rounded-full p-0.5 hover:bg-white/20"/>
                      </div>
@@ -262,7 +262,7 @@ const ProjectTabs: React.FC<{
 };
 
 
-// Hidden component used for rendering posts for export
+// Hidden container used for rendering posts for export
 const StaticPostRenderer: React.FC<{ post: Post; postSize: PostSize; ref: React.Ref<HTMLDivElement> }> = React.forwardRef(({ post, postSize }, ref) => (
     <div ref={ref} className="absolute -left-[9999px] -top-[9999px]">
       <StaticPost post={post} postSize={postSize} />
@@ -904,26 +904,23 @@ const App: React.FC = () => {
             window.removeEventListener('resize', handleFitToScreen);
         };
     }, [handleFitToScreen, selectedPostId, postSize, isLeftPanelOpen, isRightPanelOpen]);
-
-    useEffect(() => {
-        const handleSelectionChange = () => {
-            if (activeEditorRef.current) {
-                const colorStr = document.queryCommandValue('foreColor');
-                if (colorStr) {
-                    const parsed = parseColor(colorStr);
-                    const hexColor = rgbToHex(parsed.r, parsed.g, parsed.b).toUpperCase();
-                    setSelectionStyles(prev => prev.color === hexColor ? prev : { color: hexColor });
-                }
-            } else {
-                setSelectionStyles(prev => prev.color === null ? prev : { color: null });
-            }
-        };
     
-        document.addEventListener('selectionchange', handleSelectionChange);
-        return () => {
-            document.removeEventListener('selectionchange', handleSelectionChange);
-        };
-    }, []);
+    // This handler is now called on mouse up from the editable text component.
+    // It replaces the global 'selectionchange' listener to fix the selection bug.
+    const handleSelectionUpdate = () => {
+        if (activeEditorRef.current) {
+            const colorStr = document.queryCommandValue('foreColor');
+            // 'foreColor' can return rgb(r, g, b) or a hex string. We parse it to be safe.
+            if (colorStr) {
+                const parsed = parseColor(colorStr);
+                const hexColor = rgbToHex(parsed.r, parsed.g, parsed.b).toUpperCase();
+                setSelectionStyles(prev => prev.color === hexColor ? prev : { color: hexColor });
+            }
+        } else {
+            // Clear selection styles if no editor is active
+            setSelectionStyles(prev => prev.color === null ? prev : { color: null });
+        }
+    };
 
 
     // --- BRANDKIT & FONT HANDLERS ---
@@ -955,7 +952,7 @@ const App: React.FC = () => {
             <input type="file" ref={imageUploadRef} onChange={handleImageUploadForElement} accept="image/*" className="hidden" />
             
             {/* Hidden renderer for exports */}
-            {selectedPost && <StaticPostRenderer ref={staticPostRef} post={selectedPost} postSize={postSize} />}
+            <div ref={staticPostRef} className="absolute -left-[9999px] -top-[9999px]"/>
 
 
             <div className={`app-layout font-sans bg-gray-950 text-gray-100 ${projects.length > 0 && isLeftPanelOpen ? 'left-panel-open' : ''} ${projects.length > 0 && isRightPanelOpen ? 'right-panel-open' : ''}`}>
@@ -1036,6 +1033,7 @@ const App: React.FC = () => {
                                             onSelectElement={setSelectedElementId}
                                             onStartEditing={handleStartEditing}
                                             onStopEditing={handleStopEditing}
+                                            onSelectionUpdate={handleSelectionUpdate}
                                         />
                                     </div>
                                 ) : (

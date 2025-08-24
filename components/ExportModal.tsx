@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import ReactDOM from 'react-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { createRoot, Root } from 'react-dom/client';
 import { X, Download, FileImage, FileText, Archive, RotateCw } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { Post, PostSize, Project } from '../types';
@@ -25,13 +25,17 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, posts, postS
     const [exportScope, setExportScope] = useState<ExportScope>('current');
     const [exportFormat, setExportFormat] = useState<ExportFormat>('png');
     const [isExporting, setIsExporting] = useState(false);
-    const [postToRender, setPostToRender] = useState<Post | null>(null);
+    const rendererRootRef = useRef<Root | null>(null);
 
     useEffect(() => {
         if (!isOpen) {
             setIsExporting(false);
             setExportScope('current');
             setExportFormat('png');
+            if (rendererRootRef.current) {
+                rendererRootRef.current.unmount();
+                rendererRootRef.current = null;
+            }
             return;
         }
         if (!selectedPost) {
@@ -55,23 +59,36 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, posts, postS
         if (!staticPostRendererRef.current || !project) return;
     
         setIsExporting(true);
-        const rendererNode = staticPostRendererRef.current;
+        const rendererContainer = staticPostRendererRef.current;
         const projectName = project.name.replace(/ /g, '_');
+
+        if (!rendererContainer) {
+            toast.error("Erro: Não foi possível encontrar o container para exportar.");
+            setIsExporting(false);
+            return;
+        }
+
+        // Create the root if it doesn't exist
+        if (!rendererRootRef.current) {
+            rendererRootRef.current = createRoot(rendererContainer);
+        }
+        const root = rendererRootRef.current;
     
         try {
             if (exportScope === 'current' && selectedPost) {
                 const toastId = toast.loading(`Exportando post como ${exportFormat.toUpperCase()}...`);
                 
-                await new Promise<void>(resolve => {
-                    setPostToRender(selectedPost);
-                    setTimeout(resolve, 100); // Give React time to render the component
-                });
+                root.render(<StaticPost post={selectedPost} postSize={postSize} />);
+                await new Promise(resolve => setTimeout(resolve, 250)); // Give React and fonts time to render
+
+                const imageTargetNode = rendererContainer.firstChild as HTMLElement;
+                if (!imageTargetNode) throw new Error("Componente renderizado não encontrado para exportação.");
 
                 let dataUrl;
                 if (exportFormat === 'jpeg') {
-                    dataUrl = await htmlToImage.toJpeg(rendererNode, { quality: 0.95 });
+                    dataUrl = await htmlToImage.toJpeg(imageTargetNode, { quality: 0.95, pixelRatio: 2 });
                 } else {
-                    dataUrl = await htmlToImage.toPng(rendererNode);
+                    dataUrl = await htmlToImage.toPng(imageTargetNode, { pixelRatio: 2 });
                 }
                 
                 saveAs(dataUrl, `${projectName}_post.${exportFormat}`);
@@ -85,12 +102,13 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, posts, postS
                     const post = posts[i];
                     toast.loading(`Processando post ${i + 1} de ${posts.length}...`, { id: toastId });
                     
-                    await new Promise<void>(resolve => {
-                       setPostToRender(post);
-                       setTimeout(resolve, 100); // Allow render time
-                    });
+                    root.render(<StaticPost post={post} postSize={postSize} />);
+                    await new Promise(resolve => setTimeout(resolve, 250)); // Allow render time
 
-                    const pngDataUrl = await htmlToImage.toPng(rendererNode);
+                    const imageTargetNode = rendererContainer.firstChild as HTMLElement;
+                    if (!imageTargetNode) throw new Error(`Componente renderizado não encontrado para o post ${i + 1}.`);
+
+                    const pngDataUrl = await htmlToImage.toPng(imageTargetNode, { pixelRatio: 2 });
                     const base64Data = pngDataUrl.split(',')[1];
                     zip.file(`post_${i + 1}.png`, base64Data, { base64: true });
                 }
@@ -102,10 +120,14 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, posts, postS
             }
         } catch (error) {
             console.error("Export failed:", error);
-            toast.error("Ocorreu um erro durante a exportação.");
+            toast.error(error instanceof Error ? error.message : "Ocorreu um erro durante a exportação.");
         } finally {
+            // Unmount the component from the portal
+            if (rendererRootRef.current) {
+                rendererRootRef.current.unmount();
+                rendererRootRef.current = null;
+            }
             setIsExporting(false);
-            setPostToRender(null);
             onClose();
         }
     };
@@ -114,11 +136,6 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, posts, postS
     if (!isOpen) return null;
 
     return (
-        <>
-        {postToRender && ReactDOM.createPortal(
-            <StaticPost post={postToRender} postSize={postSize} />,
-            staticPostRendererRef.current!
-        )}
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center backdrop-blur-sm" onClick={onClose}>
             <div className="bg-zinc-900 rounded-lg shadow-2xl border border-zinc-700 w-full max-w-md p-6 animate-fade-in" onClick={e => e.stopPropagation()}>
                 <div className="flex justify-between items-center mb-4">
@@ -196,7 +213,6 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, posts, postS
                 }
             `}</style>
         </div>
-        </>
     );
 };
 
