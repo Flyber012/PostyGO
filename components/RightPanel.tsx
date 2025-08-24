@@ -1,5 +1,6 @@
 
-import React, { useState } from 'react';
+
+import React from 'react';
 import { Post, AnyElement, FontDefinition, BackgroundElement } from '../types';
 import LayersPanel from './LayersPanel';
 import PropertiesPanel from './PropertiesPanel';
@@ -26,51 +27,28 @@ interface RightPanelProps {
     };
 }
 
-type ActiveTab = 'layers' | 'properties';
-
 const RightPanel: React.FC<RightPanelProps> = (props) => {
     const { selectedPost, selectedElementId, onUpdateElement, availableFonts, onAddFont, onOpenColorPicker } = props;
-    const [activeTab, setActiveTab] = useState<ActiveTab>('layers');
 
     const selectedElement = selectedPost?.elements.find(e => e.id === selectedElementId && e.type !== 'background') as Exclude<AnyElement, BackgroundElement> | undefined;
 
-    // Automatically switch to properties tab when an element is selected
-    React.useEffect(() => {
-        if (selectedElementId && selectedPost?.elements.find(e => e.id === selectedElementId)?.type !== 'background') {
-            setActiveTab('properties');
-        }
-    }, [selectedElementId, selectedPost]);
-
     return (
-        <div className="w-full bg-zinc-900 flex flex-col h-full">
+        <div className="w-full bg-zinc-900 flex flex-col h-full overflow-y-auto">
+            {/* Properties Panel always on top */}
             <div className="flex-shrink-0 border-b border-zinc-800">
-                <div className="flex items-center p-1 bg-zinc-950/50 m-2 rounded-lg">
-                    <button 
-                        onClick={() => setActiveTab('layers')}
-                        className={`flex-1 text-center text-sm py-1.5 rounded-md transition-colors ${activeTab === 'layers' ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:bg-zinc-800'}`}
-                    >
-                        Camadas
-                    </button>
-                    <button 
-                        onClick={() => setActiveTab('properties')}
-                        className={`flex-1 text-center text-sm py-1.5 rounded-md transition-colors ${activeTab === 'properties' ? 'bg-zinc-700 text-white' : 'text-zinc-400 hover:bg-zinc-800'}`}
-                    >
-                        Propriedades
-                    </button>
-                </div>
+                <h2 className="text-lg font-semibold text-gray-200 p-4">Propriedades</h2>
+                <PropertiesPanel 
+                    selectedElement={selectedElement}
+                    onUpdateElement={onUpdateElement}
+                    availableFonts={availableFonts}
+                    onAddFont={onAddFont}
+                    onOpenColorPicker={onOpenColorPicker}
+                />
             </div>
             
-            <div className="flex-grow min-h-0">
-                {activeTab === 'layers' && <LayersPanel {...props} />}
-                {activeTab === 'properties' && (
-                    <PropertiesPanel 
-                        selectedElement={selectedElement}
-                        onUpdateElement={onUpdateElement}
-                        availableFonts={availableFonts}
-                        onAddFont={onAddFont}
-                        onOpenColorPicker={onOpenColorPicker}
-                    />
-                )}
+            {/* Layers Panel at the bottom */}
+            <div className="flex-grow min-h-0 border-t border-zinc-800">
+                 <LayersPanel {...props} />
             </div>
         </div>
     );

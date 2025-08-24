@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useRef } from 'react';
 import { AnyElement, TextElement, ImageElement, GradientElement, ShapeElement, QRCodeElement, FontDefinition, BlendMode, BackgroundElement } from '../types';
 import { Plus, ChevronDown, ArrowUpFromLine, GripVertical, ArrowDownFromLine, FileUp } from 'lucide-react';
@@ -114,7 +115,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedElement, onUp
 
 
     return (
-        <div className="h-full overflow-y-auto text-sm">
+        <div className="text-sm p-2">
             <Accordion title="Transformar" defaultOpen={true}>
                  <div className="grid grid-cols-2 gap-2">
                     <NumberInput label="X" value={Math.round(selectedElement.x)} onChange={val => handleInputChange('x', parseInt(val, 10) || 0)} unit="px" />
@@ -153,6 +154,15 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedElement, onUp
 
             {selectedElement.type === 'text' && (
                 <Accordion title="Texto" defaultOpen={true}>
+                    <div>
+                        <label className="block text-xs font-medium text-gray-400">Conteúdo</label>
+                        <textarea 
+                            value={textEl.content}
+                            onChange={e => handleInputChange('content', e.target.value)}
+                            className="w-full mt-1 bg-black/50 border border-zinc-600 rounded-md px-2 py-1 text-white text-xs"
+                            rows={3}
+                        />
+                    </div>
                      <div>
                         <label className="block text-xs font-medium text-gray-400">Fonte</label>
                         <div className="flex space-x-2 mt-1">

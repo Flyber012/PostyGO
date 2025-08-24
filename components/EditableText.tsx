@@ -1,4 +1,5 @@
-import React, { useRef } from 'react';
+
+import React, { useRef, useState, useEffect } from 'react';
 import Draggable from 'react-draggable';
 import { AnyElement, TextElement, ImageElement, GradientElement, ShapeElement, QRCodeElement } from '../types';
 import QRCodeDisplay from './QRCodeDisplay';
@@ -14,10 +15,9 @@ interface TextParserProps {
     content: string;
     highlightColor?: string;
     accentFontFamily?: string;
-    baseFontFamily: string;
 }
 
-const TextParser: React.FC<TextParserProps> = ({ content, highlightColor, accentFontFamily, baseFontFamily }) => {
+const TextParser: React.FC<TextParserProps> = ({ content, highlightColor, accentFontFamily }) => {
     const parts = content.split(/(\*\*.*?\*\*)/g).filter(Boolean);
     return (
         <>
@@ -32,43 +32,40 @@ const TextParser: React.FC<TextParserProps> = ({ content, highlightColor, accent
     );
 };
 
-const renderContent = (element: AnyElement) => {
-    const baseStyle: React.CSSProperties = {
-        width: '100%',
-        height: '100%',
-        pointerEvents: 'none',
-    };
-
-    switch (element.type) {
-        case 'text':
-            const textEl = element as TextElement;
-            // Note: No height: '100%' para permitir que o alinhamento vertical funcione
-            return <div style={{width: '100%', pointerEvents: 'none'}}><TextParser content={textEl.content} highlightColor={textEl.highlightColor} accentFontFamily={textEl.accentFontFamily} baseFontFamily={textEl.fontFamily}/></div>;
-        case 'image':
-            return <img src={element.src} style={{ ...baseStyle, objectFit: 'cover' }} alt="user content" />;
-        case 'gradient':
-            return <div style={{ ...baseStyle, background: `linear-gradient(${element.angle}deg, ${element.color1}, ${element.color2})` }} />;
-        case 'shape':
-            const shapeEl = element as ShapeElement;
-            const shapeStyle: React.CSSProperties = {
-                ...baseStyle,
-                backgroundColor: shapeEl.fillColor,
-                borderRadius: shapeEl.shape === 'circle' ? '50%' : '0%',
-            };
-            return <div style={shapeStyle} />;
-        case 'qrcode':
-            const qrEl = element as QRCodeElement;
-            return <QRCodeDisplay url={qrEl.url} color={qrEl.color} backgroundColor={qrEl.backgroundColor} width={qrEl.width} />;
-        case 'background':
-            return null;
-        default:
-            return null;
-    }
-};
-
-
 const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSelected, onSelect }) => {
     const nodeRef = useRef(null);
+    const textSpanRef = useRef<HTMLSpanElement>(null);
+    const [isEditing, setIsEditing] = useState(false);
+    const [editText, setEditText] = useState(element.type === 'text' ? element.content : '');
+
+    useEffect(() => {
+        if (element.type === 'text') {
+            setEditText(element.content);
+        }
+    }, [element.type, (element as TextElement).content]);
+
+    useEffect(() => {
+        if (element.type === 'text' && textSpanRef.current && element.content) {
+            const span = textSpanRef.current;
+            const container = span.parentElement;
+            if (!container) return;
+
+            // Reset scale to measure natural size
+            span.style.transform = 'scale(1)';
+            span.style.whiteSpace = 'nowrap'; // Measure as single line first for width
+            const naturalWidth = span.scrollWidth;
+            span.style.whiteSpace = 'pre-wrap'; // Then allow wrapping
+            const naturalHeight = span.scrollHeight;
+
+            if (naturalWidth > 0 && naturalHeight > 0) {
+                const scaleX = element.width / naturalWidth;
+                const scaleY = element.height / naturalHeight;
+                const scale = Math.min(scaleX, scaleY); // Use min to maintain aspect ratio
+                span.style.transform = `scale(${scale})`;
+            }
+        }
+    }, [element]);
+
 
     if (element.type === 'background' || !element.visible) {
         return null;
@@ -105,13 +102,23 @@ const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSel
         window.addEventListener('mouseup', stopDrag);
     };
 
+    const handleDoubleClick = () => {
+        if (element.type === 'text' && !element.locked) {
+            setIsEditing(true);
+        }
+    };
+    
+    const handleTextBlur = () => {
+        onUpdate(element.id, { content: editText });
+        setIsEditing(false);
+    };
+
     const styles: React.CSSProperties = {
         width: element.width,
         height: element.height,
         transform: `rotate(${element.rotation}deg)`,
         opacity: element.opacity,
         boxSizing: 'border-box',
-        overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
         mixBlendMode: 'blendMode' in element ? element.blendMode : 'normal',
@@ -127,18 +134,6 @@ const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSel
         styles.textAlign = element.textAlign;
         styles.letterSpacing = `${element.letterSpacing}px`;
         styles.lineHeight = element.lineHeight;
-
-        let combinedTextShadow = element.textShadow || '';
-        if (element.strokeWidth && element.strokeColor && element.strokeColor !== 'transparent') {
-            const { strokeWidth, strokeColor } = element;
-            const strokeShadows = [
-                `-${strokeWidth}px -${strokeWidth}px 0 ${strokeColor}`, `${strokeWidth}px -${strokeWidth}px 0 ${strokeColor}`,
-                `-${strokeWidth}px ${strokeWidth}px 0 ${strokeColor}`, `${strokeWidth}px ${strokeWidth}px 0 ${strokeColor}`
-            ].join(', ');
-            combinedTextShadow = combinedTextShadow ? `${strokeShadows}, ${combinedTextShadow}` : strokeShadows;
-        }
-        styles.textShadow = combinedTextShadow;
-        
         styles.justifyContent =
             element.verticalAlign === 'top' ? 'flex-start' :
             element.verticalAlign === 'bottom' ? 'flex-end' :
@@ -146,13 +141,8 @@ const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSel
        
         styles.backgroundColor = element.backgroundColor;
         styles.padding = `${element.padding || 0}px`;
-        if (element.borderRadius) {
-            styles.borderRadius = `${element.borderRadius}px`;
-        }
-        if (element.backdropFilters) {
-            const bf = element.backdropFilters;
-            styles.backdropFilter = `blur(${bf.blur || 0}px) brightness(${bf.brightness ?? 1}) contrast(${bf.contrast ?? 1}) saturate(${bf.saturate ?? 1})`;
-        }
+        styles.borderRadius = `${element.borderRadius || 0}px`;
+        styles.overflow = 'hidden';
     }
 
     if (element.type === 'image') {
@@ -164,6 +154,60 @@ const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSel
         styles.border = `${element.borderWidth || 0}px ${element.borderStyle || 'solid'} ${element.borderColor || 'transparent'}`;
     }
 
+    const renderContent = () => {
+        if (element.type === 'text' && isEditing) {
+            return (
+                <textarea
+                    value={editText}
+                    onChange={(e) => setEditText(e.target.value)}
+                    onBlur={handleTextBlur}
+                    autoFocus
+                    onKeyDown={(e) => e.stopPropagation()} // Prevent pan on space
+                    style={{
+                        ...styles,
+                        width: '100%',
+                        height: '100%',
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        margin: 0,
+                        padding: 0,
+                        border: 'none',
+                        background: 'transparent',
+                        outline: 'none',
+                        resize: 'none',
+                        transform: 'none',
+                        zIndex: 10,
+                        overflowWrap: 'break-word'
+                    }}
+                />
+            );
+        }
+        
+        const baseStyle: React.CSSProperties = { width: '100%', height: '100%', pointerEvents: 'none' };
+
+        switch (element.type) {
+            case 'text':
+                return (
+                    <span ref={textSpanRef} style={{ transformOrigin: '0 0', display: 'inline-block', whiteSpace: 'pre-wrap' }}>
+                        <TextParser content={element.content} highlightColor={element.highlightColor} accentFontFamily={element.accentFontFamily}/>
+                    </span>
+                );
+            case 'image':
+                return <img src={element.src} style={{ ...baseStyle, objectFit: 'cover' }} alt="user content" />;
+            case 'gradient':
+                return <div style={{ ...baseStyle, background: `linear-gradient(${element.angle}deg, ${element.color1}, ${element.color2})` }} />;
+            case 'shape':
+                const shapeEl = element as ShapeElement;
+                return <div style={{...baseStyle, backgroundColor: shapeEl.fillColor, borderRadius: shapeEl.shape === 'circle' ? '50%' : '0%'}} />;
+            case 'qrcode':
+                const qrEl = element as QRCodeElement;
+                return <QRCodeDisplay url={qrEl.url} color={qrEl.color} backgroundColor={qrEl.backgroundColor} width={qrEl.width} />;
+            default:
+                return null;
+        }
+    };
+
     const isLocked = element.locked;
 
     return (
@@ -171,25 +215,23 @@ const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSel
             nodeRef={nodeRef}
             position={{ x: element.x, y: element.y }}
             onDrag={handleDrag}
-            handle={!isLocked ? ".handle" : undefined}
+            handle={!isLocked && !isEditing ? ".handle" : undefined}
             onStart={() => onSelect(element.id)}
-            disabled={isLocked}
+            disabled={isLocked || isEditing}
         >
             <div
                 ref={nodeRef}
-                className={`absolute group ${isSelected && !isLocked ? 'border-2 border-purple-500 border-dashed' : 'border-2 border-transparent hover:border-purple-500/30'} ${!isLocked ? 'handle cursor-move' : 'cursor-default'}`}
+                className={`absolute group ${isSelected && !isLocked ? 'border-2 border-purple-500 border-dashed' : 'border-2 border-transparent hover:border-purple-500/30'} ${!isLocked && !isEditing ? 'handle cursor-move' : 'cursor-default'}`}
                 style={styles}
-                onClick={(e) => {
-                    e.stopPropagation();
-                    onSelect(element.id)}
-                }
+                onClick={(e) => { e.stopPropagation(); onSelect(element.id); }}
+                onDoubleClick={handleDoubleClick}
             >
-                {renderContent(element)}
+                {renderContent()}
 
-                {isSelected && !isLocked && (
+                {isSelected && !isLocked && !isEditing && (
                     <div
                         onMouseDown={handleResizeMouseDown}
-                        className="absolute -right-1 -bottom-1 w-4 h-4 bg-purple-500 rounded-full border-2 border-gray-900 cursor-nwse-resize"
+                        className="absolute -right-1 -bottom-1 w-4 h-4 bg-purple-500 rounded-full border-2 border-gray-900 cursor-nwse-resize z-10"
                         onClick={(e) => e.stopPropagation()}
                     />
                 )}

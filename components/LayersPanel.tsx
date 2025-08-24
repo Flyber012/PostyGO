@@ -24,15 +24,16 @@ const LayersPanel: React.FC<LayersPanelProps> = (props) => {
     } = props;
     
     const [isAddMenuOpen, setAddMenuOpen] = useState(false);
-    const imageInputRef = useRef<HTMLInputElement>(null);
     const dragItem = useRef<string | null>(null);
     const dragOverItem = useRef<string | null>(null);
 
+    const handleAddClick = (type: 'text' | 'shape' | 'qrcode', options?: any) => {
+        onAddElement(type, options);
+        setAddMenuOpen(false);
+    };
+
     if (!selectedPost) return <div className="p-4 text-sm text-zinc-500">Selecione um post para ver suas camadas.</div>;
 
-    const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-        // ... (Image upload logic is unchanged)
-    };
     
     const LayerItem: React.FC<{element: Exclude<AnyElement, BackgroundElement>}> = ({ element }) => (
         <li
@@ -66,11 +67,13 @@ const LayersPanel: React.FC<LayersPanelProps> = (props) => {
                 <div className="relative">
                     <button onClick={() => setAddMenuOpen(!isAddMenuOpen)} className="p-1 hover:bg-zinc-700 rounded"><Plus className="w-5 h-5" /></button>
                     {isAddMenuOpen && (
-                        <div className="absolute right-0 mt-2 w-48 bg-zinc-800 rounded-md shadow-lg z-10 border border-zinc-700">
-                             {/* ... (Add menu items unchanged) ... */}
+                        <div className="absolute right-0 mt-2 w-48 bg-zinc-800 rounded-md shadow-lg z-20 border border-zinc-700 p-1">
+                            <button onClick={() => handleAddClick('text')} className="w-full text-left flex items-center p-2 text-sm rounded hover:bg-zinc-700"><Type className="w-4 h-4 mr-2"/> Texto</button>
+                            <button onClick={() => handleAddClick('shape', {shape: 'rectangle'})} className="w-full text-left flex items-center p-2 text-sm rounded hover:bg-zinc-700"><Square className="w-4 h-4 mr-2"/> Retângulo</button>
+                            <button onClick={() => handleAddClick('shape', {shape: 'circle'})} className="w-full text-left flex items-center p-2 text-sm rounded hover:bg-zinc-700"><Circle className="w-4 h-4 mr-2"/> Círculo</button>
+                            <button onClick={() => handleAddClick('qrcode')} className="w-full text-left flex items-center p-2 text-sm rounded hover:bg-zinc-700"><QrCode className="w-4 h-4 mr-2"/> QR Code</button>
                         </div>
                     )}
-                     <input type="file" ref={imageInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
                 </div>
             </div>
             <ul className="space-y-1 flex-grow overflow-y-auto">

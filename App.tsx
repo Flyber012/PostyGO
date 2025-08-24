@@ -15,8 +15,9 @@ import { GenerationWizard } from './components/GenerationWizard';
 import { BrandKitPanel } from './components/BrandKitPanel';
 import saveAs from 'file-saver';
 import { v4 as uuidv4 } from 'uuid';
-import { ZoomIn, ZoomOut, Maximize, PanelLeft, PanelRight, PanelLeftClose, PanelRightClose, Package, Image as ImageIcon, FileText, X, LayoutTemplate as LayoutTemplateIcon, Plus, Layers } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize, Package, Image as ImageIcon, FileText, X, LayoutTemplate as LayoutTemplateIcon, Plus, Layers, AlignHorizontalJustifyCenter, AlignHorizontalJustifyStart, AlignHorizontalJustifyEnd, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd } from 'lucide-react';
 import AdvancedColorPicker from './components/ColorPicker';
+import Draggable from 'react-draggable';
 
 // --- HELPERS ---
 const readFileAsBase64 = (file: File): Promise<string> => {
@@ -192,13 +193,15 @@ const App: React.FC = () => {
     // UI State
     const [isLoading, setIsLoading] = useState(false);
     const [loadingMessage, setLoadingMessage] = useState('');
-    const [isLeftPanelOpen, setLeftPanelOpen] = useState(false);
-    const [isRightPanelOpen, setRightPanelOpen] = useState(false);
+    const [isLeftPanelOpen, setLeftPanelOpen] = useState(true);
+    const [isRightPanelOpen, setRightPanelOpen] = useState(true);
     const [zoom, setZoom] = useState(1);
     const [isWizardOpen, setWizardOpen] = useState(false);
     const [isBrandKitPanelOpen, setBrandKitPanelOpen] = useState(false);
     const [isMobileView, setIsMobileView] = useState(window.innerWidth <= 1024);
     const [colorPickerState, setColorPickerState] = useState<{ isOpen: boolean, color: string, onChange: (color: string) => void }>({ isOpen: false, color: '#FFFFFF', onChange: () => {} });
+    const [canvasPosition, setCanvasPosition] = useState({ x: 0, y: 0 });
+    const [isPanning, setIsPanning] = useState(false);
 
     // Generation Settings (persist across projects for convenience)
     const [topic, setTopic] = useState('Productivity Hacks');
@@ -235,6 +238,7 @@ const App: React.FC = () => {
     const postSize = currentProject?.postSize || POST_SIZES[0];
     const activeBrandKitId = currentProject?.activeBrandKitId || null;
     const selectedPost = posts.find(p => p.id === selectedPostId);
+    const selectedElement = selectedPost?.elements.find(el => el.id === selectedElementId);
     const activeBrandKit = brandKits.find(k => k.id === activeBrandKitId);
 
     // --- RESPONSIVE & UI LOGIC ---
@@ -265,7 +269,10 @@ const App: React.FC = () => {
 
     const setSelectedPostId = (id: string | null) => updateCurrentProject({ selectedPostId: id, selectedElementId: null });
     const setSelectedElementId = (id: string | null) => updateCurrentProject({ selectedElementId: id });
-    const setPostSizeForCurrentProject = (size: PostSize) => updateCurrentProject({ postSize: size });
+    const setPostSizeForCurrentProject = (size: PostSize) => {
+        updateCurrentProject({ postSize: size });
+        handleFitToScreen(); // Recalculate zoom when size changes
+    };
 
     const createNewProject = (name: string, size: PostSize): Project => ({
         id: uuidv4(), name, posts: [], postSize: size, activeBrandKitId: null, topic: 'New Project Topic', selectedPostId: null, selectedElementId: null,
@@ -567,6 +574,63 @@ const App: React.FC = () => {
         }
     };
     
+    // --- CANVAS INTERACTION & ALIGNMENT ---
+    const handleFitToScreen = useCallback(() => {
+        if (!viewportRef.current || !postSize) return;
+        setCanvasPosition({x: 0, y: 0}); // Reset pan on fit
+        const { width: vw, height: vh } = viewportRef.current.getBoundingClientRect();
+        const { width: cw, height: ch } = postSize;
+        const newZoom = Math.min(vw / cw, vh / ch) * 0.9;
+        setZoom(newZoom);
+    }, [postSize]);
+
+    const handleWheel = (e: React.WheelEvent) => {
+        e.preventDefault();
+        const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+        setZoom(prevZoom => Math.max(0.1, Math.min(prevZoom * zoomFactor, 5)));
+    };
+
+    const handleAlignElement = (alignment: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => {
+        if (!selectedElement || !postSize || selectedElement.type === 'background') return;
+        const { width: elW, height: elH } = selectedElement;
+        const { width: pW, height: pH } = postSize;
+        let newX = selectedElement.x;
+        let newY = selectedElement.y;
+
+        switch(alignment) {
+            case 'left': newX = 0; break;
+            case 'center': newX = (pW - elW) / 2; break;
+            case 'right': newX = pW - elW; break;
+            case 'top': newY = 0; break;
+            case 'middle': newY = (pH - elH) / 2; break;
+            case 'bottom': newY = pH - elH; break;
+        }
+        updatePostElement(selectedElement.id, { x: newX, y: newY });
+    };
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.code === 'Space' && !e.repeat) {
+                setIsPanning(true);
+            }
+        };
+        const handleKeyUp = (e: KeyboardEvent) => {
+            if (e.code === 'Space') {
+                setIsPanning(false);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('keyup', handleKeyUp);
+        };
+    }, []);
+
+    useEffect(() => { handleFitToScreen(); }, [handleFitToScreen, selectedPostId, postSize, isLeftPanelOpen, isRightPanelOpen]);
+    useEffect(() => { window.addEventListener('resize', handleFitToScreen); return () => window.removeEventListener('resize', handleFitToScreen); }, [handleFitToScreen]);
+
+
     // --- BRANDKIT & FONT HANDLERS ---
     const handleAddFont = (font: FontDefinition) => setAvailableFonts(prev => [...prev, font]);
     const handleOpenColorPicker = (color: string, onChange: (newColor: string) => void) => setColorPickerState({ isOpen: true, color, onChange });
@@ -584,17 +648,6 @@ const App: React.FC = () => {
         setBrandKits(prev => prev.map(k => k.id === activeBrandKitId ? { ...k, layouts: [...k.layouts, newLayout] } : k));
         toast.success("Layout adicionado ao kit!");
     };
-
-    const handleFitToScreen = useCallback(() => {
-        if (!viewportRef.current || !postSize) return;
-        const { width: vw, height: vh } = viewportRef.current.getBoundingClientRect();
-        const { width: cw, height: ch } = postSize;
-        const newZoom = Math.min(vw / cw, vh / ch) * 0.9;
-        setZoom(newZoom);
-    }, [postSize]);
-
-    useEffect(() => { handleFitToScreen(); }, [handleFitToScreen, selectedPostId, postSize, isLeftPanelOpen, isRightPanelOpen]);
-    useEffect(() => { window.addEventListener('resize', handleFitToScreen); return () => window.removeEventListener('resize', handleFitToScreen); }, [handleFitToScreen]);
 
     return (
         <>
@@ -636,13 +689,13 @@ const App: React.FC = () => {
                     ) : <EmptyPanelPlaceholder text="Crie ou abra um projeto para começar."/>}
                 </aside>
 
-                <main className="main-content" ref={viewportRef}>
+                <main className={`main-content ${isPanning ? 'cursor-grab' : ''}`} ref={viewportRef} onWheel={handleWheel}>
                     {projects.length === 0 ? (
                         <WelcomeScreen onNewProject={handleNewProject} onOpenProject={handleOpenProjectClick} onOpenRecent={handleOpenProject} />
                     ) : (
                          <div className="flex flex-col h-full w-full bg-zinc-800">
                              <ProjectTabs projects={projects} currentProjectId={currentProjectId} onSelect={setCurrentProjectId} onClose={handleCloseProject} onNew={() => handleNewProject(postSize)} />
-                            <div className="flex-grow relative flex items-center justify-center p-4 overflow-auto">
+                            <div className="flex-grow relative flex items-center justify-center p-4 overflow-hidden">
                                 {isLoading ? (
                                     <div className="flex flex-col items-center justify-center text-center h-full">
                                         <svg className="animate-spin -ml-1 mr-3 h-10 w-10 text-purple-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -653,9 +706,17 @@ const App: React.FC = () => {
                                         <p className="text-gray-400">Aguarde, a mágica está acontecendo...</p>
                                     </div>
                                 ) : selectedPost ? (
-                                    <div style={{ transform: `scale(${zoom})`, transition: 'transform 0.2s' }}>
-                                        <CanvasEditor ref={editorRef} post={selectedPost} postSize={postSize} onUpdateElement={updatePostElement} selectedElementId={selectedElementId} onSelectElement={setSelectedElementId} />
-                                    </div>
+                                    <Draggable
+                                        position={canvasPosition}
+                                        onDrag={(e, data) => setCanvasPosition({ x: data.x, y: data.y })}
+                                        disabled={!isPanning}
+                                        nodeRef={editorRef}
+                                    >
+                                        <div ref={editorRef} style={{ transform: `scale(${zoom})`, transition: 'transform 0.1s' }}>
+                                            <CanvasEditor post={selectedPost} postSize={postSize} onUpdateElement={updatePostElement} selectedElementId={selectedElementId} onSelectElement={setSelectedElementId} />
+                                        </div>
+                                    </Draggable>
+
                                 ) : (
                                     <div className="text-center text-gray-400 p-4">
                                         <h2 className="text-2xl font-bold mb-2">Projeto Vazio</h2>
@@ -666,27 +727,24 @@ const App: React.FC = () => {
                         </div>
                     )}
 
-                    {projects.length > 0 && !isMobileView && (
-                        <>
-                            <button 
-                                onClick={() => setLeftPanelOpen(!isLeftPanelOpen)} 
-                                className="absolute top-1/2 -translate-y-1/2 left-3 z-20 p-1.5 bg-zinc-900/60 text-zinc-400 hover:bg-zinc-800 hover:text-white rounded-md transition-all backdrop-blur-sm shadow-lg"
-                                aria-label={isLeftPanelOpen ? "Fechar painel esquerdo" : "Abrir painel esquerdo"}
-                            >
-                                {isLeftPanelOpen ? <PanelLeftClose className="w-4 h-4"/> : <PanelLeft className="w-4 h-4"/>}
-                            </button>
-                            <button 
-                                onClick={() => setRightPanelOpen(!isRightPanelOpen)} 
-                                className="absolute top-1/2 -translate-y-1/2 right-3 z-20 p-1.5 bg-zinc-900/60 text-zinc-400 hover:bg-zinc-800 hover:text-white rounded-md transition-all backdrop-blur-sm shadow-lg"
-                                aria-label={isRightPanelOpen ? "Fechar painel direito" : "Abrir painel direito"}
-                            >
-                                {isRightPanelOpen ? <PanelRightClose className="w-4 h-4"/> : <PanelRight className="w-4 h-4"/>}
-                            </button>
-                        </>
-                    )}
-                    
                     {projects.length > 0 && (
                         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center space-x-2 bg-zinc-900/70 backdrop-blur-sm p-2 rounded-lg shadow-lg z-10">
+                             {selectedElement && selectedElement.type !== 'background' && (
+                                <>
+                                <div className="flex items-center space-x-1">
+                                    <button onClick={() => handleAlignElement('left')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Alinhar à Esquerda"><AlignHorizontalJustifyStart className="w-5 h-5"/></button>
+                                    <button onClick={() => handleAlignElement('center')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Centralizar Horizontalmente"><AlignHorizontalJustifyCenter className="w-5 h-5"/></button>
+                                    <button onClick={() => handleAlignElement('right')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Alinhar à Direita"><AlignHorizontalJustifyEnd className="w-5 h-5"/></button>
+                                </div>
+                                 <div className="w-px h-5 bg-zinc-700 mx-1"></div>
+                                 <div className="flex items-center space-x-1">
+                                    <button onClick={() => handleAlignElement('top')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Alinhar ao Topo"><AlignVerticalJustifyStart className="w-5 h-5"/></button>
+                                    <button onClick={() => handleAlignElement('middle')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Centralizar Verticalmente"><AlignVerticalJustifyCenter className="w-5 h-5"/></button>
+                                    <button onClick={() => handleAlignElement('bottom')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Alinhar à Base"><AlignVerticalJustifyEnd className="w-5 h-5"/></button>
+                                 </div>
+                                 <div className="w-px h-5 bg-zinc-700 mx-1"></div>
+                                </>
+                             )}
                             <button onClick={() => setZoom(z => Math.max(z / 1.25, 0.1))} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Zoom Out"><ZoomOut className="w-5 h-5"/></button>
                             <span className="text-sm font-mono w-16 text-center">{Math.round(zoom * 100)}%</span>
                             <button onClick={() => setZoom(z => Math.min(z * 1.25, 5))} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Zoom In"><ZoomIn className="w-5 h-5"/></button>

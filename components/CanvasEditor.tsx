@@ -1,4 +1,5 @@
 
+
 import React, { forwardRef } from 'react';
 import { Post, AnyElement, PostSize, BackgroundElement } from '../types';
 import EditableText from './EditableText';

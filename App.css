@@ -40,23 +40,23 @@
 
 /* Scrollbar styles for panels */
 .left-panel > div,
-.right-panel > div {
+.right-panel { /* Apply directly to right-panel for unified scroll */
     scrollbar-width: thin;
     scrollbar-color: #a855f7 #3f3f46;
 }
 
 .left-panel > div::-webkit-scrollbar,
-.right-panel > div::-webkit-scrollbar {
+.right-panel::-webkit-scrollbar {
     width: 6px;
 }
 
 .left-panel > div::-webkit-scrollbar-track,
-.right-panel > div::-webkit-scrollbar-track {
+.right-panel::-webkit-scrollbar-track {
     background: #3f3f46;
 }
 
 .left-panel > div::-webkit-scrollbar-thumb,
-.right-panel > div::-webkit-scrollbar-thumb {
+.right-panel::-webkit-scrollbar-thumb {
     background-color: #a855f7;
     border-radius: 3px;
     border: 1px solid #3f3f46;
@@ -71,6 +71,13 @@
 
 .mobile-backdrop {
     display: none;
+}
+
+.cursor-grab {
+    cursor: grab;
+}
+.cursor-grab:active {
+    cursor: grabbing;
 }
 
 
