@@ -74,7 +74,7 @@ const convertAILayoutToElements = (aiLayout: AIGeneratedTextElement[], postSize:
             x: (aiEl.x / 100) * postWidth,
             y: (aiEl.y / 100) * postHeight,
             width: Math.max(100, (aiEl.width / 100) * postWidth), // Ensure a minimum width
-            height: Math.max(20, (aiEl.height / 100) * postHeight), // Use AI height
+            height: (aiEl.height / 100) * postHeight, // Use AI height without autosize
             fontSize,
             fontFamily: aiEl.fontFamily || 'Poppins',
             fontWeight: 400,
@@ -293,7 +293,7 @@ const App: React.FC = () => {
 
     // Rich Text Editing State
     const activeEditorRef = useRef<{ id: string, node: HTMLDivElement } | null>(null);
-    const [selectionStyles, setSelectionStyles] = useState<{ color: string | null }>({ color: null });
+    const [selectionStyles, setSelectionStyles] = useState<{ color: string | null; bold: boolean; italic: boolean; underline: boolean; }>({ color: null, bold: false, italic: false, underline: false });
 
 
     // Generation Settings (persist across projects for convenience)
@@ -817,7 +817,7 @@ const App: React.FC = () => {
     };
     const handleStopEditing = () => {
         activeEditorRef.current = null;
-        setSelectionStyles({ color: null });
+        setSelectionStyles({ color: null, bold: false, italic: false, underline: false });
     };
 
     const handleToggleTextStyle = (style: 'bold' | 'italic' | 'underline') => {
@@ -828,6 +828,7 @@ const App: React.FC = () => {
             const newContent = activeEditorRef.current.node.innerHTML;
             updatePostElement(selectedElement.id, { content: newContent });
             activeEditorRef.current.node.focus();
+            handleSelectionUpdate(); // Update style state immediately
         } else {
             const propMap = { bold: 'fontWeight', italic: 'fontStyle', underline: 'textDecoration' };
             const prop = propMap[style];
@@ -855,6 +856,7 @@ const App: React.FC = () => {
                 const newContent = activeEditorRef.current.node.innerHTML;
                 updatePostElement(selectedElement.id, { content: newContent });
                 activeEditorRef.current.node.focus();
+                handleSelectionUpdate();
             } else {
                  updatePostElement(selectedElement.id, { [prop]: value });
             }
@@ -905,20 +907,21 @@ const App: React.FC = () => {
         };
     }, [handleFitToScreen, selectedPostId, postSize, isLeftPanelOpen, isRightPanelOpen]);
     
-    // This handler is now called on mouse up from the editable text component.
-    // It replaces the global 'selectionchange' listener to fix the selection bug.
     const handleSelectionUpdate = () => {
         if (activeEditorRef.current) {
             const colorStr = document.queryCommandValue('foreColor');
-            // 'foreColor' can return rgb(r, g, b) or a hex string. We parse it to be safe.
+            const isBold = document.queryCommandState('bold');
+            const isItalic = document.queryCommandState('italic');
+            const isUnderline = document.queryCommandState('underline');
+            let hexColor: string | null = null;
+
             if (colorStr) {
                 const parsed = parseColor(colorStr);
-                const hexColor = rgbToHex(parsed.r, parsed.g, parsed.b).toUpperCase();
-                setSelectionStyles(prev => prev.color === hexColor ? prev : { color: hexColor });
+                hexColor = rgbToHex(parsed.r, parsed.g, parsed.b).toUpperCase();
             }
+            setSelectionStyles({ color: hexColor, bold: isBold, italic: isItalic, underline: isUnderline });
         } else {
-            // Clear selection styles if no editor is active
-            setSelectionStyles(prev => prev.color === null ? prev : { color: null });
+             setSelectionStyles({ color: null, bold: false, italic: false, underline: false });
         }
     };
 
@@ -1067,9 +1070,15 @@ const App: React.FC = () => {
                               {selectedElement?.type === 'text' && (
                                 <>
                                 <div className="flex items-center space-x-1">
-                                    <button onMouseDown={e => e.preventDefault()} onClick={() => handleToggleTextStyle('bold')} className={`p-2 hover:bg-zinc-700 rounded-md ${selectedElement.fontWeight === 700 ? 'text-purple-400' : ''}`}><Bold className="w-5 h-5"/></button>
-                                    <button onMouseDown={e => e.preventDefault()} onClick={() => handleToggleTextStyle('italic')} className={`p-2 hover:bg-zinc-700 rounded-md ${selectedElement.fontStyle === 'italic' ? 'text-purple-400' : ''}`}><Italic className="w-5 h-5"/></button>
-                                    <button onMouseDown={e => e.preventDefault()} onClick={() => handleToggleTextStyle('underline')} className={`p-2 hover:bg-zinc-700 rounded-md ${selectedElement.textDecoration === 'underline' ? 'text-purple-400' : ''}`}><Underline className="w-5 h-5"/></button>
+                                     <button onMouseDown={e => e.preventDefault()} onClick={() => handleToggleTextStyle('bold')} className={`p-2 hover:bg-zinc-700 rounded-md ${
+                                        (activeEditorRef.current && activeEditorRef.current.id === selectedElement.id) ? (selectionStyles.bold ? 'text-purple-400' : '') : (selectedElement.fontWeight === 700 ? 'text-purple-400' : '')
+                                     }`}><Bold className="w-5 h-5"/></button>
+                                     <button onMouseDown={e => e.preventDefault()} onClick={() => handleToggleTextStyle('italic')} className={`p-2 hover:bg-zinc-700 rounded-md ${
+                                        (activeEditorRef.current && activeEditorRef.current.id === selectedElement.id) ? (selectionStyles.italic ? 'text-purple-400' : '') : (selectedElement.fontStyle === 'italic' ? 'text-purple-400' : '')
+                                     }`}><Italic className="w-5 h-5"/></button>
+                                     <button onMouseDown={e => e.preventDefault()} onClick={() => handleToggleTextStyle('underline')} className={`p-2 hover:bg-zinc-700 rounded-md ${
+                                        (activeEditorRef.current && activeEditorRef.current.id === selectedElement.id) ? (selectionStyles.underline ? 'text-purple-400' : '') : (selectedElement.textDecoration === 'underline' ? 'text-purple-400' : '')
+                                     }`}><Underline className="w-5 h-5"/></button>
                                 </div>
                                 <div className="w-px h-5 bg-zinc-700 mx-1"></div>
                                 <button
@@ -1110,7 +1119,9 @@ const App: React.FC = () => {
                             onToggleLock={(id) => toggleElementProperty(id, 'locked')} onReorderElements={reorderElements} onRegenerateBackground={() => {}} onUpdateBackgroundSrc={() => {}}
                             availableFonts={availableFonts} onAddFont={handleAddFont} onOpenColorPicker={handleOpenColorPicker} palettes={{ post: selectedPost?.palette, custom: customPalette }}
                             onUpdateTextProperty={handleUpdateTextProperty}
+                            onToggleTextStyle={handleToggleTextStyle}
                             selectionStyles={selectionStyles}
+                            isEditingText={!!(activeEditorRef.current && activeEditorRef.current.id === selectedElementId)}
                         />
                     ) : <EmptyPanelPlaceholder text="Selecione um post para ver suas camadas e propriedades."/>}
                 </aside>

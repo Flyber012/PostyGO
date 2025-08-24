@@ -22,7 +22,9 @@ interface RightPanelProps {
     onAddFont: (font: FontDefinition) => void;
     onOpenColorPicker: (currentColor: string, onColorChange: (color: string) => void) => void;
     onUpdateTextProperty: (prop: string, value: any) => void;
-    selectionStyles: { color: string | null };
+    onToggleTextStyle: (style: 'bold' | 'italic' | 'underline') => void;
+    selectionStyles: { color: string | null; bold: boolean; italic: boolean; underline: boolean; };
+    isEditingText: boolean;
     palettes: {
         post?: string[];
         custom?: string[];

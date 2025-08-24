@@ -68,10 +68,12 @@ interface PropertiesPanelProps {
     selectedElement: Exclude<AnyElement, BackgroundElement> | undefined;
     onUpdateElement: (elementId: string, updates: Partial<AnyElement>) => void;
     onUpdateTextProperty: (prop: string, value: any) => void;
+    onToggleTextStyle: (style: 'bold' | 'italic' | 'underline') => void;
     availableFonts: FontDefinition[];
     onAddFont: (font: FontDefinition) => void;
     onOpenColorPicker: (currentColor: string, onColorChange: (color: string) => void) => void;
-    selectionStyles: { color: string | null };
+    selectionStyles: { color: string | null; bold: boolean; italic: boolean; underline: boolean; };
+    isEditingText: boolean;
 }
 
 const blendModes: BlendMode[] = [
@@ -79,7 +81,7 @@ const blendModes: BlendMode[] = [
     'hard-light', 'soft-light', 'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity'
 ];
 
-const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedElement, onUpdateElement, onUpdateTextProperty, availableFonts, onAddFont, onOpenColorPicker, selectionStyles }) => {
+const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedElement, onUpdateElement, onUpdateTextProperty, onToggleTextStyle, availableFonts, onAddFont, onOpenColorPicker, selectionStyles, isEditingText }) => {
     
     const fontInputRef = useRef<HTMLInputElement>(null);
 
@@ -181,9 +183,9 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedElement, onUp
                                     <ColorInput label="Cor" color={selectionStyles?.color || (selectedElement as TextElement).color} onChange={val => onUpdateTextProperty('color', val)} onOpenColorPicker={onOpenColorPicker} />
                                 </div>
                                 <div className="flex items-center space-x-1 p-1 bg-black/30 rounded-md">
-                                    <button onMouseDown={e => e.preventDefault()} onClick={() => onUpdateTextProperty('fontWeight', (selectedElement as TextElement).fontWeight === 700 ? 400 : 700)} className={`flex-1 text-center py-1 rounded text-xs transition-colors ${(selectedElement as TextElement).fontWeight === 700 ? 'bg-zinc-600 text-white' : 'hover:bg-zinc-700 text-gray-300'}`}><b className="font-sans">B</b></button>
-                                    <button onMouseDown={e => e.preventDefault()} onClick={() => onUpdateTextProperty('fontStyle', (selectedElement as TextElement).fontStyle === 'italic' ? 'normal' : 'italic')} className={`flex-1 text-center py-1 rounded text-xs transition-colors ${(selectedElement as TextElement).fontStyle === 'italic' ? 'bg-zinc-600 text-white' : 'hover:bg-zinc-700 text-gray-300'}`}><i>I</i></button>
-                                    <button onMouseDown={e => e.preventDefault()} onClick={() => onUpdateTextProperty('textDecoration', (selectedElement as TextElement).textDecoration === 'underline' ? 'none' : 'underline')} className={`flex-1 text-center py-1 rounded text-xs transition-colors ${(selectedElement as TextElement).textDecoration === 'underline' ? 'bg-zinc-600 text-white' : 'hover:bg-zinc-700 text-gray-300'}`}><u>U</u></button>
+                                    <button onMouseDown={e => e.preventDefault()} onClick={() => onToggleTextStyle('bold')} className={`flex-1 text-center py-1 rounded text-xs transition-colors ${isEditingText ? (selectionStyles.bold ? 'bg-zinc-600 text-white' : 'hover:bg-zinc-700 text-gray-300') : ((selectedElement as TextElement).fontWeight === 700 ? 'bg-zinc-600 text-white' : 'hover:bg-zinc-700 text-gray-300')}`}><b className="font-sans">B</b></button>
+                                    <button onMouseDown={e => e.preventDefault()} onClick={() => onToggleTextStyle('italic')} className={`flex-1 text-center py-1 rounded text-xs transition-colors ${isEditingText ? (selectionStyles.italic ? 'bg-zinc-600 text-white' : 'hover:bg-zinc-700 text-gray-300') : ((selectedElement as TextElement).fontStyle === 'italic' ? 'bg-zinc-600 text-white' : 'hover:bg-zinc-700 text-gray-300')}`}><i>I</i></button>
+                                    <button onMouseDown={e => e.preventDefault()} onClick={() => onToggleTextStyle('underline')} className={`flex-1 text-center py-1 rounded text-xs transition-colors ${isEditingText ? (selectionStyles.underline ? 'bg-zinc-600 text-white' : 'hover:bg-zinc-700 text-gray-300') : ((selectedElement as TextElement).textDecoration === 'underline' ? 'bg-zinc-600 text-white' : 'hover:bg-zinc-700 text-gray-300')}`}><u>U</u></button>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2">
                                      <SelectInput label="Alinhamento" value={(selectedElement as TextElement).textAlign} onChange={val => handleInputChange('textAlign', val)}>
