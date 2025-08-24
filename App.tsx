@@ -156,7 +156,7 @@ const ProjectTabs: React.FC<{
     onNew: () => void;
 }> = ({ projects, currentProjectId, onSelect, onClose, onNew }) => (
     <div className="flex-shrink-0 bg-zinc-950/50 h-10 flex items-end">
-        <nav className="flex items-center space-x-1 flex-grow h-full overflow-x-auto pl-2">
+        <nav className="flex items-center space-x-1 h-full overflow-x-auto pl-2">
             {projects.map(p => (
                  <button 
                     key={p.id} 
@@ -174,11 +174,12 @@ const ProjectTabs: React.FC<{
         </nav>
         <button
             onClick={onNew}
-            className="mx-2 mb-1 flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-md bg-zinc-800/70 hover:bg-zinc-700 text-gray-400 hover:text-white transition-colors"
+            className="ml-1 mb-1 flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-md hover:bg-zinc-800/70 text-gray-400 hover:text-white transition-colors"
             title="Novo projeto"
         >
             <Plus className="w-4 h-4" />
         </button>
+        <div className="flex-grow h-full"></div>
     </div>
 );
 
