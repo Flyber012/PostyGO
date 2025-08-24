@@ -2,10 +2,11 @@
 
 
 
+
 import React, { useState, useRef, useEffect } from 'react';
 import { PostSize, BrandKit, LayoutTemplate, User } from '../types';
 import { POST_SIZES } from '../constants';
-import { FileDown, Image, Save, Download, Sparkles, Upload, X, Trash2, Plus, File, Files, BrainCircuit, ShieldCheck, Copy, Package, Check, LayoutTemplate as LayoutIcon, ChevronDown, AlertCircle } from 'lucide-react';
+import { FileDown, Image, Save, Download, Sparkles, Upload, X, Trash2, Plus, File, Files, BrainCircuit, ShieldCheck, Copy, Package, Check, LayoutTemplate as LayoutIcon, ChevronDown, AlertCircle, Coins } from 'lucide-react';
 import AdvancedColorPicker from './ColorPicker';
 import { toast } from 'react-hot-toast';
 import * as freepikService from '../services/freepikService';
@@ -116,6 +117,7 @@ interface ControlPanelProps {
     user: User | null;
     generationsToday: number;
     dailyLimit: number;
+    onBuyCredits: () => void;
 }
 
 const ControlPanel: React.FC<ControlPanelProps> = (props) => {
@@ -127,7 +129,7 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
         colorMode, setColorMode, customPalette, setCustomPalette,
         styleGuide, useStyleGuide, setUseStyleGuide, onAnalyzeStyle,
         selectedLayoutId, setSelectedLayoutId, useLayoutToFill, setUseLayoutToFill,
-        user, generationsToday, dailyLimit
+        user, generationsToday, dailyLimit, onBuyCredits
      } = props;
     const [topic, setTopic] = useState('Productivity Hacks');
     const [generationType, setGenerationType] = useState<'post' | 'carousel'>('post');
@@ -241,9 +243,7 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
 
     const isGeminiKeyUser = !!user?.linkedAccounts?.google?.apiKey;
     const isFreeTierUser = !isGeminiKeyUser;
-    const generationsLeft = dailyLimit - generationsToday;
     
-    const isGeminiReady = user && (isGeminiKeyUser || generationsLeft > 0);
     const isFreepikReady = user && (!!user.linkedAccounts?.freepik?.apiKey || !!freepikService.DEFAULT_API_KEY);
 
     let canGenerate = !isLoading;
@@ -253,8 +253,9 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
         generateButtonTooltip = 'Faça login para gerar conteúdo.';
         canGenerate = false;
     } else if (backgroundSource === 'ai') {
-        if (aiProvider === 'gemini' && !isGeminiReady) {
-            generateButtonTooltip = 'Conecte sua conta Gemini ou aguarde para usar a cota diária.';
+        const creditsNeeded = aiPostCount;
+        if ((user.credits || 0) < creditsNeeded) {
+            generateButtonTooltip = `Créditos insuficientes. Você precisa de ${creditsNeeded}.`;
             canGenerate = false;
         } else if (aiProvider === 'freepik' && !isFreepikReady) {
             generateButtonTooltip = 'Conecte sua conta Freepik para usar este provedor.';
@@ -264,7 +265,7 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
 
 
     return (
-        <aside className="w-96 bg-zinc-900 p-6 flex flex-col h-full overflow-y-auto shadow-2xl flex-shrink-0 relative">
+        <aside className="w-full bg-zinc-900 p-6 flex flex-col h-full overflow-y-auto shadow-2xl flex-shrink-0 relative">
             {colorPickerState.isOpen && (
                 <AdvancedColorPicker 
                     color={colorPickerState.color}
@@ -405,19 +406,18 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
                 </Accordion>
                 
                 <Accordion title={<>4. Formato e Geração</>} defaultOpen>
-                    {user && isFreeTierUser && (
+                    {user && (
                         <div className="space-y-2 p-3 bg-black/20 rounded-lg">
                             <div className="flex justify-between items-center text-sm">
-                                <label className="font-medium text-gray-300">Limite Diário (Texto Gemini)</label>
-                                <span className="font-semibold text-gray-200">{generationsToday}/{dailyLimit}</span>
+                                <div className="flex items-center font-medium text-gray-300">
+                                    <Coins className="w-4 h-4 mr-2 text-yellow-400"/>
+                                    <span>Créditos de Imagem</span>
+                                </div>
+                                <span className="font-semibold text-gray-200">{user.credits || 0}</span>
                             </div>
-                            <div className="w-full bg-zinc-700 rounded-full h-2.5">
-                                <div 
-                                    className="bg-purple-600 h-2.5 rounded-full transition-all duration-500" 
-                                    style={{ width: `${(generationsToday / dailyLimit) * 100}%` }}
-                                ></div>
-                            </div>
-                             <p className="text-xs text-zinc-400 text-center">A geração de imagens agora requer sua própria chave de API do Gemini.</p>
+                             <button onClick={onBuyCredits} className="w-full text-center text-xs bg-green-600/20 text-green-300 hover:bg-green-600/40 font-semibold py-1 rounded-md">
+                                Comprar mais créditos
+                            </button>
                         </div>
                     )}
                      {user && isGeminiKeyUser && (

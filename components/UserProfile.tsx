@@ -1,16 +1,17 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { User } from '../types';
-import { LogIn, LogOut, Settings, ChevronDown } from 'lucide-react';
+import { LogIn, LogOut, Settings, ChevronDown, Coins } from 'lucide-react';
 
 interface UserProfileProps {
     user: User | null;
     onLogin: () => void;
     onLogout: () => void;
     onManageAccounts: () => void;
+    onBuyCredits: () => void;
 }
 
-const UserProfile: React.FC<UserProfileProps> = ({ user, onLogin, onLogout, onManageAccounts }) => {
+const UserProfile: React.FC<UserProfileProps> = ({ user, onLogin, onLogout, onManageAccounts, onBuyCredits }) => {
     const [isMenuOpen, setMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -45,7 +46,13 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onLogin, onLogout, onMa
                 className="flex items-center space-x-3 bg-zinc-800 hover:bg-zinc-700 p-1.5 pr-3 rounded-full transition-colors"
             >
                 <img src={user.avatar} alt={user.name} className="w-8 h-8 rounded-full" />
-                <span className="text-sm font-medium text-white">{user.name}</span>
+                <div className="flex flex-col items-start">
+                    <span className="text-sm font-medium text-white">{user.name}</span>
+                    <div className="flex items-center text-xs text-yellow-400">
+                        <Coins className="w-3 h-3 mr-1"/>
+                        <span>{user.credits || 0}</span>
+                    </div>
+                </div>
                 <ChevronDown className={`w-4 h-4 text-zinc-400 transition-transform ${isMenuOpen ? 'rotate-180' : ''}`} />
             </button>
 
@@ -56,6 +63,13 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onLogin, onLogout, onMa
                         <p className="text-xs text-zinc-400 truncate">{user.email}</p>
                     </div>
                     <div className="p-1">
+                        <button
+                            onClick={() => { onBuyCredits(); setMenuOpen(false); }}
+                            className="w-full text-left flex items-center px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-700 rounded-md"
+                        >
+                            <Coins className="w-4 h-4 mr-3 text-yellow-400" />
+                            Comprar Créditos
+                        </button>
                         <button
                             onClick={() => { onManageAccounts(); setMenuOpen(false); }}
                             className="w-full text-left flex items-center px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-700 rounded-md"

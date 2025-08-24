@@ -156,6 +156,7 @@ export interface User {
     };
     generationsToday?: number;
     lastGenerationDate?: string; // Store as 'YYYY-MM-DD'
+    credits: number;
 }
 
 

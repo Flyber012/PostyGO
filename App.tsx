@@ -1,6 +1,3 @@
-
-
-
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import { createRoot } from 'react-dom/client';
@@ -15,11 +12,12 @@ import LayersPanel from './components/LayersPanel';
 import StaticPost from './components/StaticPost';
 import UserProfile from './components/UserProfile';
 import AccountManagerModal from './components/AccountManagerModal';
+import BuyCreditsModal from './components/BuyCreditsModal';
 import saveAs from 'file-saver';
 import { v4 as uuidv4 } from 'uuid';
 import * as htmlToImage from 'html-to-image';
 import JSZip from 'jszip';
-import { ZoomIn, ZoomOut, Maximize, AlignHorizontalJustifyStart, AlignHorizontalJustifyCenter, AlignHorizontalJustifyEnd, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Copy, Trash2, ChevronLeft, ChevronRight, Eye, EyeOff, Lock, Unlock, X } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize, AlignHorizontalJustifyStart, AlignHorizontalJustifyCenter, AlignHorizontalJustifyEnd, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Copy, Trash2, ChevronLeft, ChevronRight, Eye, EyeOff, Lock, Unlock, X, Sparkles, Layers } from 'lucide-react';
 
 declare global {
     const google: any;
@@ -127,6 +125,7 @@ const AddLayoutModal: React.FC<{
 const App: React.FC = () => {
     const [user, setUser] = useState<User | null>(null);
     const [isAccountModalOpen, setAccountModalOpen] = useState(false);
+    const [isBuyCreditsModalOpen, setBuyCreditsModalOpen] = useState(false);
     const [posts, setPosts] = useState<Post[]>([]);
     const [brandKits, setBrandKits] = useState<BrandKit[]>([]);
     const [activeBrandKitId, setActiveBrandKitId] = useState<string | null>(null);
@@ -149,6 +148,8 @@ const App: React.FC = () => {
 
     const [zoom, setZoom] = useState(1);
     const [isAddLayoutModalOpen, setAddLayoutModalOpen] = useState(false);
+    const [isLeftPanelOpen, setLeftPanelOpen] = useState(false);
+    const [isRightPanelOpen, setRightPanelOpen] = useState(false);
 
     const editorRef = useRef<HTMLDivElement>(null);
     const viewportRef = useRef<HTMLElement>(null);
@@ -173,6 +174,7 @@ const App: React.FC = () => {
                 linkedAccounts: {},
                 generationsToday: 0,
                 lastGenerationDate: new Date().toISOString().split('T')[0],
+                credits: 10, // Créditos iniciais
             };
             updateUser(newUser);
             toast.success(`Bem-vindo(a), ${newUser.name}!`);
@@ -210,6 +212,12 @@ const App: React.FC = () => {
         toast.success(`${service.charAt(0).toUpperCase() + service.slice(1)} desconectado.`);
     };
 
+    const updateUserCredits = (amount: number) => {
+        if (!user) return;
+        const updatedUser = { ...user, credits: (user.credits || 0) + amount };
+        updateUser(updatedUser);
+    };
+
      useEffect(() => {
         const savedUserJson = localStorage.getItem('user');
         if (savedUserJson) {
@@ -218,6 +226,9 @@ const App: React.FC = () => {
             if (savedUser.lastGenerationDate !== today) {
                 savedUser.generationsToday = 0;
                 savedUser.lastGenerationDate = today;
+            }
+            if (typeof savedUser.credits === 'undefined') {
+                savedUser.credits = 10;
             }
             updateUser(savedUser);
         }
@@ -249,6 +260,59 @@ const App: React.FC = () => {
             setActiveBrandKitId(null);
         }
     }, [user]);
+    
+    // Efeito para verificar o status do pagamento no redirecionamento
+    useEffect(() => {
+        const checkPaymentStatus = async () => {
+            const params = new URLSearchParams(window.location.search);
+            const paymentStatus = params.get('payment_status');
+            const orderNsu = params.get('order_nsu');
+
+            if (paymentStatus === 'success' && orderNsu) {
+                const pendingOrderId = sessionStorage.getItem('pending_payment_order_id');
+                const pendingCreditsStr = sessionStorage.getItem('pending_payment_credits');
+
+                // Limpa a URL e a sessão para evitar reprocessamento
+                const cleanup = () => {
+                    sessionStorage.removeItem('pending_payment_order_id');
+                    sessionStorage.removeItem('pending_payment_credits');
+                    window.history.replaceState({}, document.title, window.location.pathname);
+                };
+
+                if (orderNsu === pendingOrderId && pendingCreditsStr) {
+                    const toastId = toast.loading('Verificando seu pagamento...');
+                    try {
+                        const response = await fetch('/api/check-pix-payment', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ order_nsu: orderNsu }),
+                        });
+                        const data = await response.json();
+
+                        if (response.ok && data.paid) {
+                            const creditsToAdd = parseInt(pendingCreditsStr, 10);
+                            updateUserCredits(creditsToAdd);
+                            toast.success(`${creditsToAdd} créditos adicionados com sucesso!`, { id: toastId });
+                        } else {
+                            throw new Error(data.error || 'A verificação do pagamento falhou.');
+                        }
+                    } catch (error) {
+                        toast.error(error instanceof Error ? error.message : 'Não foi possível verificar seu pagamento.', { id: toastId });
+                    } finally {
+                        cleanup();
+                    }
+                } else if (pendingOrderId) {
+                     // Se o ID do pedido não corresponder ou não houver créditos pendentes, apenas limpe.
+                     cleanup();
+                }
+            }
+        };
+
+        // Só executa se o usuário estiver logado
+        if (user) {
+            checkPaymentStatus();
+        }
+    }, [user]); // Depende do 'user' para garantir que updateUserCredits funcione
 
     const handleAddFont = (font: FontDefinition) => {
         if (!availableFonts.some(f => f.name === font.name)) {
@@ -358,6 +422,15 @@ const App: React.FC = () => {
             }
         }
         
+        // Verificação de créditos para geração de imagens AI
+        if (backgroundSource === 'ai') {
+            if ((user.credits || 0) < count) {
+                toast.error(`Créditos insuficientes. Você precisa de ${count} créditos, mas tem apenas ${user.credits || 0}.`);
+                setBuyCreditsModalOpen(true);
+                return;
+            }
+        }
+        
         setIsLoading(true);
         setPosts([]);
         setSelectedPostId(null);
@@ -445,6 +518,10 @@ const App: React.FC = () => {
                         provider: aiProvider
                     }));
 
+                    // Deduzir créditos
+                    updateUserCredits(-count);
+                    toast.success(`${count} créditos utilizados.`, { icon: '🪙' });
+
                 } else {
                     if (customBackgrounds.length === 0) throw new Error("Nenhuma imagem de fundo foi enviada.");
                     backgroundSources = customBackgrounds.map(src => ({ src }));
@@ -505,7 +582,7 @@ const App: React.FC = () => {
                 if (newPosts.length > 0) setSelectedPostId(newPosts[0].id);
                 toast.success('Posts criados com sucesso!', { id: toastId });
             }
-             if (isFreeTierUser) {
+             if (isFreeTierUser && backgroundSource !== 'ai') { // Créditos são para imagens de IA, não para texto
                 const generationsToday = user.generationsToday || 0;
                 updateUser({
                     ...user,
@@ -935,24 +1012,29 @@ const App: React.FC = () => {
             const userApiKey = user.linkedAccounts?.google?.apiKey;
             const isFreeTierUser = !userApiKey;
 
-            if (provider === 'gemini' && isFreeTierUser && (user.generationsToday || 0) >= DAILY_GENERATION_LIMIT) {
-                toast.error("Você atingiu seu limite diário de gerações.", { id: toastId });
-                return;
+            if (provider === 'gemini') {
+                if(isFreeTierUser && (user.generationsToday || 0) >= DAILY_GENERATION_LIMIT) {
+                    toast.error("Você atingiu seu limite diário de gerações.", { id: toastId });
+                    return;
+                }
+            } else {
+                 if ((user.credits || 0) < 1) {
+                    toast.error("Créditos insuficientes para gerar um novo fundo.", { id: toastId });
+                    setBuyCreditsModalOpen(true);
+                    return;
+                 }
             }
             
             let newSrc = '';
             if (provider === 'gemini') {
                  newSrc = await geminiService.generateSingleBackgroundImage(prompt, postSize, userApiKey);
+                 if (isFreeTierUser) {
+                    updateUser({ ...user, generationsToday: (user.generationsToday || 0) + 1, lastGenerationDate: new Date().toISOString().split('T')[0] });
+                }
             } else if (provider === 'freepik') {
                 newSrc = await freepikService.generateSingleBackgroundImage(prompt, postSize, user.linkedAccounts?.freepik?.apiKey);
-            }
-
-            if (provider === 'gemini' && isFreeTierUser) {
-                updateUser({
-                    ...user,
-                    generationsToday: (user.generationsToday || 0) + 1,
-                    lastGenerationDate: new Date().toISOString().split('T')[0]
-                });
+                updateUserCredits(-1);
+                toast.success("1 crédito utilizado.", { icon: '🪙' });
             }
             
             updatePostElement(elementId, { src: newSrc, provider: provider });
@@ -1051,7 +1133,17 @@ const App: React.FC = () => {
         setZoom(newZoom);
     }, [postSize]);
 
-    useEffect(() => { handleFitToScreen(); }, [selectedPostId, postSize, handleFitToScreen]);
+    useEffect(() => {
+        handleFitToScreen();
+    }, [selectedPostId, postSize, handleFitToScreen]);
+
+    useEffect(() => {
+        handleFitToScreen();
+        window.addEventListener('resize', handleFitToScreen);
+        return () => {
+            window.removeEventListener('resize', handleFitToScreen);
+        };
+    }, [handleFitToScreen]);
     
     const handleWheel = (e: React.WheelEvent) => {
         e.preventDefault();
@@ -1106,6 +1198,11 @@ const App: React.FC = () => {
                 onLinkAccount={handleLinkAccount}
                 onUnlinkAccount={handleUnlinkAccount}
             />
+             <BuyCreditsModal
+                isOpen={isBuyCreditsModalOpen}
+                onClose={() => setBuyCreditsModalOpen(false)}
+                user={user}
+            />
             <AddLayoutModal
                 isOpen={isAddLayoutModalOpen}
                 onClose={() => setAddLayoutModalOpen(false)}
@@ -1113,49 +1210,62 @@ const App: React.FC = () => {
                 postToPreview={selectedPost}
                 postSize={postSize}
             />
-            <div className="flex flex-col h-screen font-sans bg-gray-950 text-gray-100" style={{ minWidth: '1400px' }}>
-                <header className="w-full bg-zinc-900 border-b border-zinc-800 px-6 py-3 flex-shrink-0 flex items-center justify-end">
-                    <UserProfile user={user} onLogin={() => {}} onLogout={handleLogout} onManageAccounts={handleManageAccounts} />
+            <div className="flex flex-col h-screen font-sans bg-gray-950 text-gray-100 overflow-hidden">
+                <header className="w-full bg-zinc-900 border-b border-zinc-800 px-4 sm:px-6 py-3 flex-shrink-0 flex items-center justify-end">
+                    <UserProfile user={user} onLogin={() => {}} onLogout={handleLogout} onManageAccounts={handleManageAccounts} onBuyCredits={() => setBuyCreditsModalOpen(true)} />
                 </header>
-                <div className="flex flex-row flex-grow min-h-0">
-                    <ControlPanel
-                        isLoading={isLoading}
-                        onGenerate={handleGeneratePosts}
-                        onExport={handleExport}
-                        onSaveBrandKit={handleSaveBrandKit}
-                        onAddLayoutToActiveKit={handleOpenAddLayoutModal}
-                        onImportBrandKit={handleImportBrandKit}
-                        onExportBrandKit={handleExportBrandKit}
-                        onDeleteBrandKit={handleDeleteBrandKit}
-                        onApplyBrandKit={handleApplyBrandKit}
-                        onAddPostFromLayout={handleAddPostFromLayout}
-                        onUpdateLayoutName={handleUpdateLayoutName}
-                        onDeleteLayoutFromKit={handleDeleteLayoutFromKit}
-                        brandKits={brandKits}
-                        activeBrandKit={activeBrandKit}
-                        postSize={postSize}
-                        setPostSize={setPostSize}
-                        hasPosts={posts.length > 0}
-                        customBackgrounds={customBackgrounds}
-                        styleImages={styleImages}
-                        onFileChange={handleFileChange}
-                        onRemoveImage={handleRemoveImage}
-                        colorMode={colorMode}
-                        setColorMode={setColorMode}
-                        customPalette={customPalette}
-                        setCustomPalette={setCustomPalette}
-                        styleGuide={styleGuide}
-                        useStyleGuide={useStyleGuide}
-                        setUseStyleGuide={setUseStyleGuide}
-                        onAnalyzeStyle={handleAnalyzeStyle}
-                        selectedLayoutId={selectedLayoutId}
-                        setSelectedLayoutId={setSelectedLayoutId}
-                        useLayoutToFill={useLayoutToFill}
-                        setUseLayoutToFill={setUseLayoutToFill}
-                        user={user}
-                        generationsToday={user?.generationsToday || 0}
-                        dailyLimit={DAILY_GENERATION_LIMIT}
-                    />
+                <div className="flex flex-row flex-grow min-h-0 relative">
+                    {/* Painel Esquerdo */}
+                    <div className={`fixed lg:relative top-0 left-0 h-full z-40 transform transition-transform duration-300 ease-in-out ${isLeftPanelOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
+                        <div className="w-screen sm:w-96 h-full relative">
+                            <ControlPanel
+                                isLoading={isLoading}
+                                onGenerate={handleGeneratePosts}
+                                onExport={handleExport}
+                                onSaveBrandKit={handleSaveBrandKit}
+                                onAddLayoutToActiveKit={handleOpenAddLayoutModal}
+                                onImportBrandKit={handleImportBrandKit}
+                                onExportBrandKit={handleExportBrandKit}
+                                onDeleteBrandKit={handleDeleteBrandKit}
+                                onApplyBrandKit={handleApplyBrandKit}
+                                onAddPostFromLayout={handleAddPostFromLayout}
+                                onUpdateLayoutName={handleUpdateLayoutName}
+                                onDeleteLayoutFromKit={handleDeleteLayoutFromKit}
+                                brandKits={brandKits}
+                                activeBrandKit={activeBrandKit}
+                                postSize={postSize}
+                                setPostSize={setPostSize}
+                                hasPosts={posts.length > 0}
+                                customBackgrounds={customBackgrounds}
+                                styleImages={styleImages}
+                                onFileChange={handleFileChange}
+                                onRemoveImage={handleRemoveImage}
+                                colorMode={colorMode}
+                                setColorMode={setColorMode}
+                                customPalette={customPalette}
+                                setCustomPalette={setCustomPalette}
+                                styleGuide={styleGuide}
+                                useStyleGuide={useStyleGuide}
+                                setUseStyleGuide={setUseStyleGuide}
+                                onAnalyzeStyle={handleAnalyzeStyle}
+                                selectedLayoutId={selectedLayoutId}
+                                setSelectedLayoutId={setSelectedLayoutId}
+                                useLayoutToFill={useLayoutToFill}
+                                setUseLayoutToFill={setUseLayoutToFill}
+                                user={user}
+                                generationsToday={user?.generationsToday || 0}
+                                dailyLimit={DAILY_GENERATION_LIMIT}
+                                onBuyCredits={() => setBuyCreditsModalOpen(true)}
+                            />
+                            <button onClick={() => setLeftPanelOpen(false)} className="lg:hidden absolute top-4 right-4 p-2 bg-zinc-800/80 rounded-full backdrop-blur-sm text-white">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Overlay para fechar painéis em mobile */}
+                    {(isLeftPanelOpen || isRightPanelOpen) && <div onClick={() => { setLeftPanelOpen(false); setRightPanelOpen(false); }} className="fixed inset-0 bg-black/60 z-30 lg:hidden" />}
+
                     <main 
                         className="flex-1 flex flex-col items-center justify-center bg-black/30 overflow-hidden relative"
                         ref={viewportRef}
@@ -1242,44 +1352,67 @@ const App: React.FC = () => {
                             )}
                         </div>
                     </main>
-                    <aside className="w-80 bg-zinc-900 flex flex-col h-full shadow-lg transition-all duration-300 flex-shrink-0">
-                        {posts.length > 0 && !isLoading && (
-                            <>
-                                <PostGallery
-                                    posts={posts}
-                                    selectedPostId={selectedPostId}
-                                    onSelectPost={handleSelectPost}
-                                    onAddPost={handleAddPost}
-                                    onDeletePost={handleDeletePost}
-                                />
-                                <LayersPanel
-                                    selectedPost={selectedPost}
-                                    selectedElementId={selectedElementId}
-                                    onSelectElement={setSelectedElementId}
-                                    onUpdateElement={updatePostElement}
-                                    onAddElement={handleAddElement}
-                                    onRemoveElement={handleRemoveElement}
-                                    onDuplicateElement={handleDuplicateElement}
-                                    onToggleVisibility={handleToggleElementVisibility}
-                                    onToggleLock={handleToggleElementLock}
-                                    onReorderElements={handleReorderElements}
-                                    onRegenerateBackground={handleRegenerateBackground}
-                                    onUpdateBackgroundSrc={handleUpdateBackgroundSrc}
-                                    availableFonts={availableFonts}
-                                    onAddFont={handleAddFont}
-                                    palettes={{
-                                        post: selectedPost?.palette,
-                                        custom: customPalette,
-                                    }}
-                                />
-                            </>
-                        )}
-                        {posts.length === 0 && !isLoading && (
-                            <div className="flex-grow flex items-center justify-center text-center p-4">
-                                <p className="text-zinc-500">A galeria e as camadas aparecerão aqui quando o conteúdo for gerado.</p>
-                            </div>
-                        )}
-                    </aside>
+                    {/* Painel Direito */}
+                    <div className={`fixed lg:relative top-0 right-0 h-full z-40 transform transition-transform duration-300 ease-in-out ${isRightPanelOpen ? 'translate-x-0' : 'translate-x-full'} lg:translate-x-0`}>
+                        <div className="w-screen sm:w-80 h-full relative">
+                            <aside className="w-full bg-zinc-900 flex flex-col h-full shadow-lg transition-all duration-300 flex-shrink-0">
+                                {posts.length > 0 && !isLoading && (
+                                    <>
+                                        <PostGallery
+                                            posts={posts}
+                                            selectedPostId={selectedPostId}
+                                            onSelectPost={handleSelectPost}
+                                            onAddPost={handleAddPost}
+                                            onDeletePost={handleDeletePost}
+                                        />
+                                        <LayersPanel
+                                            selectedPost={selectedPost}
+                                            selectedElementId={selectedElementId}
+                                            onSelectElement={setSelectedElementId}
+                                            onUpdateElement={updatePostElement}
+                                            onAddElement={handleAddElement}
+                                            onRemoveElement={handleRemoveElement}
+                                            onDuplicateElement={handleDuplicateElement}
+                                            onToggleVisibility={handleToggleElementVisibility}
+                                            onToggleLock={handleToggleElementLock}
+                                            onReorderElements={handleReorderElements}
+                                            onRegenerateBackground={handleRegenerateBackground}
+                                            onUpdateBackgroundSrc={handleUpdateBackgroundSrc}
+                                            availableFonts={availableFonts}
+                                            onAddFont={handleAddFont}
+                                            palettes={{
+                                                post: selectedPost?.palette,
+                                                custom: customPalette,
+                                            }}
+                                        />
+                                    </>
+                                )}
+                                {posts.length === 0 && !isLoading && (
+                                    <div className="flex-grow flex items-center justify-center text-center p-4">
+                                        <p className="text-zinc-500">A galeria e as camadas aparecerão aqui quando o conteúdo for gerado.</p>
+                                    </div>
+                                )}
+                            </aside>
+                            <button onClick={() => setRightPanelOpen(false)} className="lg:hidden absolute top-4 left-4 p-2 bg-zinc-800/80 rounded-full backdrop-blur-sm text-white">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                {/* Navegação Inferior para Mobile */}
+                <div className="lg:hidden flex items-center justify-around bg-zinc-900 border-t border-zinc-800 p-1 flex-shrink-0">
+                    <button onClick={() => { setLeftPanelOpen(true); setRightPanelOpen(false); }} className="flex flex-col items-center space-y-1 text-xs p-2 rounded-lg text-zinc-300 hover:bg-zinc-800 hover:text-white w-24">
+                        <Sparkles className="w-5 h-5"/>
+                        <span>Gerar</span>
+                    </button>
+                    <button 
+                        onClick={() => { setRightPanelOpen(true); setLeftPanelOpen(false); }} 
+                        className={`flex flex-col items-center space-y-1 text-xs p-2 rounded-lg w-24 ${posts.length > 0 ? 'text-zinc-300 hover:bg-zinc-800 hover:text-white' : 'text-zinc-600 cursor-not-allowed'}`} 
+                        disabled={posts.length === 0}
+                    >
+                        <Layers className="w-5 h-5"/>
+                        <span>Camadas</span>
+                    </button>
                 </div>
             </div>
         </>
