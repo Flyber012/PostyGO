@@ -202,7 +202,7 @@ const App: React.FC = () => {
     // Canvas View State
     const [viewState, setViewState] = useState({ zoom: 1, offset: { x: 0, y: 0 } });
     const [isPanning, setIsPanning] = useState(false);
-    const panStart = useRef({ x: 0, y: 0 });
+    const panStart = useRef<{x: number, y: number} | null>(null);
 
     // Generation Settings (persist across projects for convenience)
     const [topic, setTopic] = useState('Productivity Hacks');
@@ -630,8 +630,10 @@ const App: React.FC = () => {
     };
     
     const handleMouseUp = () => {
+        if (panStart.current) {
+            panStart.current = null;
+        }
         if (viewportRef.current) {
-            panStart.current = { x: 0, y: 0 };
             viewportRef.current.style.cursor = isPanning ? 'grab' : 'default';
         }
     };
