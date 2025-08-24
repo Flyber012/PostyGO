@@ -1259,217 +1259,217 @@ const App: React.FC = () => {
                 <header className="w-full bg-zinc-900 border-b border-zinc-800 px-4 sm:px-6 py-3 flex-shrink-0 flex items-center justify-end">
                     <UserProfile user={user} onLogin={() => {}} onLogout={handleLogout} onManageAccounts={handleManageAccounts} onBuyCredits={() => setBuyCreditsModalOpen(true)} />
                 </header>
-                <div className="flex-1 flex flex-col min-h-0">
-                    <div className="flex flex-row flex-1 min-h-0 relative">
-                        {/* Painel Esquerdo (Desktop) */}
-                        <div className="hidden lg:flex w-96 h-full flex-shrink-0">
-                            <ControlPanel
-                                isLoading={isLoading}
-                                onGenerate={handleGeneratePosts}
-                                onExport={handleExport}
-                                brandKits={brandKits}
-                                activeBrandKit={activeBrandKit}
-                                postSize={postSize}
-                                setPostSize={setPostSize}
-                                hasPosts={posts.length > 0}
-                                customBackgrounds={customBackgrounds}
-                                styleImages={styleImages}
-                                onFileChange={handleFileChange}
-                                onRemoveImage={handleRemoveImage}
-                                colorMode={colorMode}
-                                setColorMode={setColorMode}
-                                customPalette={customPalette}
-                                setCustomPalette={setCustomPalette}
-                                styleGuide={styleGuide}
-                                useStyleGuide={useStyleGuide}
-                                setUseStyleGuide={setUseStyleGuide}
-                                onAnalyzeStyle={handleAnalyzeStyle}
-                                useLayoutToFill={useLayoutToFill}
-                                setUseLayoutToFill={setUseLayoutToFill}
-                                user={user}
-                                onBuyCredits={() => setBuyCreditsModalOpen(true)}
-                                // Pass state down
-                                topic={topic} setTopic={setTopic}
-                                contentLevel={contentLevel} setContentLevel={setContentLevel}
-                                generationType={generationType} setGenerationType={setGenerationType}
-                                backgroundSource={backgroundSource} setBackgroundSource={setBackgroundSource}
-                                aiPostCount={aiPostCount} setAiPostCount={setAiPostCount}
-                                aiProvider={aiProvider} setAiProvider={setAiProvider}
-                                // Brand Kit specific props
-                                onSaveBrandKit={handleSaveBrandKit}
-                                onAddLayoutToActiveKit={handleOpenAddLayoutModal}
-                                onImportBrandKit={handleImportBrandKit}
-                                onExportBrandKit={handleExportBrandKit}
-                                onDeleteBrandKit={handleDeleteBrandKit}
-                                onApplyBrandKit={handleApplyBrandKit}
-                                onAddPostFromLayout={handleAddPostFromLayout}
-                                onUpdateLayoutName={handleUpdateLayoutName}
-                                onDeleteLayoutFromKit={handleDeleteLayoutFromKit}
-                                selectedLayoutId={selectedLayoutId}
-                                setSelectedLayoutId={setSelectedLayoutId}
-                            />
-                        </div>
+                <div className="flex-1 flex flex-row min-h-0 relative">
+                    {/* Painel Esquerdo (Desktop) */}
+                    <div className="hidden lg:flex w-96 h-full flex-shrink-0">
+                        <ControlPanel
+                            isLoading={isLoading}
+                            onGenerate={handleGeneratePosts}
+                            onExport={handleExport}
+                            brandKits={brandKits}
+                            activeBrandKit={activeBrandKit}
+                            postSize={postSize}
+                            setPostSize={setPostSize}
+                            hasPosts={posts.length > 0}
+                            customBackgrounds={customBackgrounds}
+                            styleImages={styleImages}
+                            onFileChange={handleFileChange}
+                            onRemoveImage={handleRemoveImage}
+                            colorMode={colorMode}
+                            setColorMode={setColorMode}
+                            customPalette={customPalette}
+                            setCustomPalette={setCustomPalette}
+                            styleGuide={styleGuide}
+                            useStyleGuide={useStyleGuide}
+                            setUseStyleGuide={setUseStyleGuide}
+                            onAnalyzeStyle={handleAnalyzeStyle}
+                            useLayoutToFill={useLayoutToFill}
+                            setUseLayoutToFill={setUseLayoutToFill}
+                            user={user}
+                            onBuyCredits={() => setBuyCreditsModalOpen(true)}
+                            // Pass state down
+                            topic={topic} setTopic={setTopic}
+                            contentLevel={contentLevel} setContentLevel={setContentLevel}
+                            generationType={generationType} setGenerationType={setGenerationType}
+                            backgroundSource={backgroundSource} setBackgroundSource={setBackgroundSource}
+                            aiPostCount={aiPostCount} setAiPostCount={setAiPostCount}
+                            aiProvider={aiProvider} setAiProvider={setAiProvider}
+                            // Brand Kit specific props
+                            onSaveBrandKit={handleSaveBrandKit}
+                            onAddLayoutToActiveKit={handleOpenAddLayoutModal}
+                            onImportBrandKit={handleImportBrandKit}
+                            onExportBrandKit={handleExportBrandKit}
+                            onDeleteBrandKit={handleDeleteBrandKit}
+                            onApplyBrandKit={handleApplyBrandKit}
+                            onAddPostFromLayout={handleAddPostFromLayout}
+                            onUpdateLayoutName={handleUpdateLayoutName}
+                            onDeleteLayoutFromKit={handleDeleteLayoutFromKit}
+                            selectedLayoutId={selectedLayoutId}
+                            setSelectedLayoutId={setSelectedLayoutId}
+                        />
+                    </div>
 
-                        {/* Overlay para fechar painéis em mobile */}
-                        {(isRightPanelOpen) && <div onClick={() => { setRightPanelOpen(false); }} className="fixed inset-0 bg-black/60 z-30 lg:hidden" />}
+                    {/* Overlay para fechar painéis em mobile */}
+                    {(isRightPanelOpen) && <div onClick={() => { setRightPanelOpen(false); }} className="fixed inset-0 bg-black/60 z-40 lg:hidden" />}
 
-                        <main 
-                            className="flex-1 flex flex-col items-center justify-center bg-black/30 overflow-hidden relative"
-                            ref={viewportRef}
-                            onWheel={handleWheel}
-                        >
-                            {isLoading && (
-                                <div className="flex flex-col items-center justify-center text-center">
-                                    <svg className="animate-spin -ml-1 mr-3 h-10 w-10 text-purple-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                    <p className="mt-4 text-xl font-semibold text-gray-300">{loadingMessage}</p>
-                                    <p className="text-gray-400">Aguarde, a mágica está acontecendo...</p>
-                                </div>
-                            )}
-                            {!isLoading && posts.length === 0 && (
-                                 <div className="text-center text-gray-400">
-                                     <h2 className="text-2xl font-bold mb-2">Tudo pronto!</h2>
-                                     <p>Use o botão ✨ Gerar ✨ para começar a criar.</p>
-                                 </div>
-                            )}
-                            {selectedPost && (
-                                 <div 
-                                    className="flex items-center justify-center transition-transform duration-100 ease-out"
-                                    style={{ transform: `scale(${zoom})` }}
-                                >
-                                    <CanvasEditor
-                                        ref={editorRef}
-                                        post={selectedPost}
-                                        postSize={postSize}
-                                        onUpdateElement={updatePostElement}
-                                        selectedElementId={selectedElementId}
-                                        onSelectElement={setSelectedElementId}
-                                    />
-                                </div>
-                            )}
-
-                            {currentCarouselSlides.length > 1 && (
-                                 <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex justify-between px-4">
-                                    <button 
-                                        onClick={() => handleSelectPost(currentCarouselSlides[currentSlideIndex - 1].id)}
-                                        disabled={currentSlideIndex === 0}
-                                        className="p-2 bg-black/50 rounded-full hover:bg-black/80 disabled:opacity-30 transition-all"
-                                    >
-                                        <ChevronLeft className="w-6 h-6"/>
-                                    </button>
-                                    <button
-                                        onClick={() => handleSelectPost(currentCarouselSlides[currentSlideIndex + 1].id)}
-                                        disabled={currentSlideIndex === currentCarouselSlides.length - 1}
-                                        className="p-2 bg-black/50 rounded-full hover:bg-black/80 disabled:opacity-30 transition-all"
-                                    >
-                                        <ChevronRight className="w-6 h-6"/>
-                                    </button>
-                                </div>
-                            )}
-
-                            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center space-x-2 bg-zinc-900/70 backdrop-blur-sm p-2 rounded-lg shadow-lg">
-                                {selectedElement && selectedElementId && (
-                                    <>
-                                        <div className="flex items-center space-x-1">
-                                            <button onClick={() => handleAlignElement('h-start')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Align Left"><AlignHorizontalJustifyStart className="w-4 h-4" /></button>
-                                            <button onClick={() => handleAlignElement('h-center')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Align Center Horizontal"><AlignHorizontalJustifyCenter className="w-4 h-4" /></button>
-                                            <button onClick={() => handleAlignElement('h-end')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Align Right"><AlignHorizontalJustifyEnd className="w-4 h-4" /></button>
-                                            <button onClick={() => handleAlignElement('v-start')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Align Top"><AlignVerticalJustifyStart className="w-4 h-4" /></button>
-                                            <button onClick={() => handleAlignElement('v-center')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Align Center Vertical"><AlignVerticalJustifyCenter className="w-4 h-4" /></button>
-                                            <button onClick={() => handleAlignElement('v-end')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Align Bottom"><AlignVerticalJustifyEnd className="w-4 h-4" /></button>
-                                        </div>
-                                        <div className="w-px h-5 bg-zinc-700"></div>
-                                    </>
-                                )}
-                                {selectedElement?.type === 'text' && (
-                                     <>
-                                        <div className="flex items-center space-x-2">
-                                            <select value={selectedElement.fontFamily} onChange={e => updatePostElement(selectedElementId!, { fontFamily: e.target.value })} className="bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1 text-xs text-white focus:ring-1 focus:ring-purple-500 focus:outline-none appearance-none">
-                                                {availableFonts.map(font => <option key={font.name} value={font.name}>{font.name}</option>)}
-                                            </select>
-                                            <input type="number" value={selectedElement.fontSize} onChange={e => updatePostElement(selectedElementId!, { fontSize: parseInt(e.target.value, 10) || 24 })} className="w-16 bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1 text-xs text-white focus:ring-1 focus:ring-purple-500 focus:outline-none" />
-                                            <button onClick={() => handleOpenColorPicker(selectedElement.color, (newColor) => updatePostElement(selectedElementId!, { color: newColor }))} className="w-7 h-7 rounded-md border-2 border-zinc-700" style={{ backgroundColor: selectedElement.color }} />
-                                        </div>
-                                        <div className="w-px h-5 bg-zinc-700"></div>
-                                     </>
-                                )}
-                                {selectedElement && selectedElementId && (
-                                    <>
-                                        <div className="flex items-center space-x-2">
-                                            <span className="text-xs text-zinc-400">Opacidade</span>
-                                            <input type="range" min="0" max="1" step="0.01" value={selectedElement.opacity} onChange={e => updatePostElement(selectedElementId, { opacity: parseFloat(e.target.value) })} className="w-20" />
-                                        </div>
-                                        <div className="w-px h-5 bg-zinc-700"></div>
-                                        <div className="flex items-center space-x-1">
-                                            <button onClick={() => handleToggleElementVisibility(selectedElement.id)} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Toggle Visibility">{selectedElement.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}</button>
-                                            <button onClick={() => handleToggleElementLock(selectedElement.id)} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Toggle Lock">{selectedElement.locked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}</button>
-                                            <button onClick={() => handleDuplicateElement(selectedElement.id)} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Duplicate Element"><Copy className="w-4 h-4"/></button>
-                                            <button onClick={() => handleRemoveElement(selectedElement.id)} className="p-2 text-red-400 hover:bg-red-500/20 rounded-md" aria-label="Remove Element"><Trash2 className="w-4 h-4"/></button>
-                                        </div>
-                                    </>
-                                )}
-                                 {posts.length > 0 && !isLoading && (
-                                    <div className="flex items-center space-x-2 pl-2 border-l border-zinc-700">
-                                        <button onClick={handleZoomOut} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Zoom Out"><ZoomOut className="w-5 h-5"/></button>
-                                        <span className="text-sm font-mono w-16 text-center">{Math.round(zoom * 100)}%</span>
-                                        <button onClick={handleZoomIn} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Zoom In"><ZoomIn className="w-5 h-5"/></button>
-                                        <button onClick={handleFitToScreen} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Fit to Screen"><Maximize className="w-5 h-5"/></button>
-                                    </div>
-                                )}
+                    <main 
+                        className="flex-1 flex flex-col items-center justify-center bg-black/30 overflow-hidden relative"
+                        ref={viewportRef}
+                        onWheel={handleWheel}
+                    >
+                        {isLoading && (
+                            <div className="flex flex-col items-center justify-center text-center">
+                                <svg className="animate-spin -ml-1 mr-3 h-10 w-10 text-purple-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                <p className="mt-4 text-xl font-semibold text-gray-300">{loadingMessage}</p>
+                                <p className="text-gray-400">Aguarde, a mágica está acontecendo...</p>
                             </div>
-                        </main>
-                        {/* Painel Direito */}
-                        <div className={`fixed lg:relative top-0 right-0 h-full z-40 transform transition-transform duration-300 ease-in-out ${isRightPanelOpen ? 'translate-x-0' : 'translate-x-full'} lg:translate-x-0`}>
-                            <div className="w-screen sm:w-80 h-full relative">
-                                <aside className="w-full bg-zinc-900 flex flex-col h-full shadow-lg transition-all duration-300 flex-shrink-0">
-                                    {posts.length > 0 && !isLoading && (
-                                        <>
-                                            <PostGallery
-                                                posts={posts}
-                                                selectedPostId={selectedPostId}
-                                                onSelectPost={handleSelectPost}
-                                                onAddPost={handleAddPost}
-                                                onDeletePost={handleDeletePost}
-                                            />
-                                            <LayersPanel
-                                                selectedPost={selectedPost}
-                                                selectedElementId={selectedElementId}
-                                                onSelectElement={setSelectedElementId}
-                                                onUpdateElement={updatePostElement}
-                                                onAddElement={handleAddElement}
-                                                onRemoveElement={handleRemoveElement}
-                                                onDuplicateElement={handleDuplicateElement}
-                                                onToggleVisibility={handleToggleElementVisibility}
-                                                onToggleLock={handleToggleElementLock}
-                                                onReorderElements={handleReorderElements}
-                                                onRegenerateBackground={handleRegenerateBackground}
-                                                onUpdateBackgroundSrc={handleUpdateBackgroundSrc}
-                                                availableFonts={availableFonts}
-                                                onAddFont={handleAddFont}
-                                                onOpenColorPicker={handleOpenColorPicker}
-                                                palettes={{
-                                                    post: selectedPost?.palette,
-                                                    custom: customPalette,
-                                                }}
-                                            />
-                                        </>
-                                    )}
-                                    {posts.length === 0 && !isLoading && (
-                                        <div className="flex-grow flex items-center justify-center text-center p-4">
-                                            <p className="text-zinc-500">A galeria e as camadas aparecerão aqui quando o conteúdo for gerado.</p>
-                                        </div>
-                                    )}
-                                </aside>
-                                <button onClick={() => setRightPanelOpen(false)} className="lg:hidden absolute top-4 left-4 p-2 bg-zinc-800/80 rounded-full backdrop-blur-sm text-white">
-                                    <X className="w-5 h-5" />
+                        )}
+                        {!isLoading && posts.length === 0 && (
+                             <div className="text-center text-gray-400">
+                                 <h2 className="text-2xl font-bold mb-2">Tudo pronto!</h2>
+                                 <p>Use o botão ✨ Gerar ✨ para começar a criar.</p>
+                             </div>
+                        )}
+                        {selectedPost && (
+                             <div 
+                                className="flex items-center justify-center transition-transform duration-100 ease-out"
+                                style={{ transform: `scale(${zoom})` }}
+                            >
+                                <CanvasEditor
+                                    ref={editorRef}
+                                    post={selectedPost}
+                                    postSize={postSize}
+                                    onUpdateElement={updatePostElement}
+                                    selectedElementId={selectedElementId}
+                                    onSelectElement={setSelectedElementId}
+                                />
+                            </div>
+                        )}
+
+                        {currentCarouselSlides.length > 1 && (
+                             <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex justify-between px-4">
+                                <button 
+                                    onClick={() => handleSelectPost(currentCarouselSlides[currentSlideIndex - 1].id)}
+                                    disabled={currentSlideIndex === 0}
+                                    className="p-2 bg-black/50 rounded-full hover:bg-black/80 disabled:opacity-30 transition-all"
+                                >
+                                    <ChevronLeft className="w-6 h-6"/>
+                                </button>
+                                <button
+                                    onClick={() => handleSelectPost(currentCarouselSlides[currentSlideIndex + 1].id)}
+                                    disabled={currentSlideIndex === currentCarouselSlides.length - 1}
+                                    className="p-2 bg-black/50 rounded-full hover:bg-black/80 disabled:opacity-30 transition-all"
+                                >
+                                    <ChevronRight className="w-6 h-6"/>
                                 </button>
                             </div>
+                        )}
+
+                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center space-x-2 bg-zinc-900/70 backdrop-blur-sm p-2 rounded-lg shadow-lg">
+                            {selectedElement && selectedElementId && (
+                                <>
+                                    <div className="flex items-center space-x-1">
+                                        <button onClick={() => handleAlignElement('h-start')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Align Left"><AlignHorizontalJustifyStart className="w-4 h-4" /></button>
+                                        <button onClick={() => handleAlignElement('h-center')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Align Center Horizontal"><AlignHorizontalJustifyCenter className="w-4 h-4" /></button>
+                                        <button onClick={() => handleAlignElement('h-end')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Align Right"><AlignHorizontalJustifyEnd className="w-4 h-4" /></button>
+                                        <button onClick={() => handleAlignElement('v-start')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Align Top"><AlignVerticalJustifyStart className="w-4 h-4" /></button>
+                                        <button onClick={() => handleAlignElement('v-center')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Align Center Vertical"><AlignVerticalJustifyCenter className="w-4 h-4" /></button>
+                                        <button onClick={() => handleAlignElement('v-end')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Align Bottom"><AlignVerticalJustifyEnd className="w-4 h-4" /></button>
+                                    </div>
+                                    <div className="w-px h-5 bg-zinc-700"></div>
+                                </>
+                            )}
+                            {selectedElement?.type === 'text' && (
+                                 <>
+                                    <div className="flex items-center space-x-2">
+                                        <select value={selectedElement.fontFamily} onChange={e => updatePostElement(selectedElementId!, { fontFamily: e.target.value })} className="bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1 text-xs text-white focus:ring-1 focus:ring-purple-500 focus:outline-none appearance-none">
+                                            {availableFonts.map(font => <option key={font.name} value={font.name}>{font.name}</option>)}
+                                        </select>
+                                        <input type="number" value={selectedElement.fontSize} onChange={e => updatePostElement(selectedElementId!, { fontSize: parseInt(e.target.value, 10) || 24 })} className="w-16 bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1 text-xs text-white focus:ring-1 focus:ring-purple-500 focus:outline-none" />
+                                        <button onClick={() => handleOpenColorPicker(selectedElement.color, (newColor) => updatePostElement(selectedElementId!, { color: newColor }))} className="w-7 h-7 rounded-md border-2 border-zinc-700" style={{ backgroundColor: selectedElement.color }} />
+                                    </div>
+                                    <div className="w-px h-5 bg-zinc-700"></div>
+                                 </>
+                            )}
+                            {selectedElement && selectedElementId && (
+                                <>
+                                    <div className="flex items-center space-x-2">
+                                        <span className="text-xs text-zinc-400">Opacidade</span>
+                                        <input type="range" min="0" max="1" step="0.01" value={selectedElement.opacity} onChange={e => updatePostElement(selectedElementId, { opacity: parseFloat(e.target.value) })} className="w-20" />
+                                    </div>
+                                    <div className="w-px h-5 bg-zinc-700"></div>
+                                    <div className="flex items-center space-x-1">
+                                        <button onClick={() => handleToggleElementVisibility(selectedElement.id)} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Toggle Visibility">{selectedElement.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}</button>
+                                        <button onClick={() => handleToggleElementLock(selectedElement.id)} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Toggle Lock">{selectedElement.locked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}</button>
+                                        <button onClick={() => handleDuplicateElement(selectedElement.id)} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Duplicate Element"><Copy className="w-4 h-4"/></button>
+                                        <button onClick={() => handleRemoveElement(selectedElement.id)} className="p-2 text-red-400 hover:bg-red-500/20 rounded-md" aria-label="Remove Element"><Trash2 className="w-4 h-4"/></button>
+                                    </div>
+                                </>
+                            )}
+                             {posts.length > 0 && !isLoading && (
+                                <div className="flex items-center space-x-2 pl-2 border-l border-zinc-700">
+                                    <button onClick={handleZoomOut} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Zoom Out"><ZoomOut className="w-5 h-5"/></button>
+                                    <span className="text-sm font-mono w-16 text-center">{Math.round(zoom * 100)}%</span>
+                                    <button onClick={handleZoomIn} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Zoom In"><ZoomIn className="w-5 h-5"/></button>
+                                    <button onClick={handleFitToScreen} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Fit to Screen"><Maximize className="w-5 h-5"/></button>
+                                </div>
+                            )}
+                        </div>
+                    </main>
+                    {/* Painel Direito */}
+                    <div className={`fixed lg:relative top-0 right-0 h-full z-50 transform transition-transform duration-300 ease-in-out ${isRightPanelOpen ? 'translate-x-0' : 'translate-x-full'} lg:translate-x-0`}>
+                        <div className="w-screen sm:w-80 h-full relative">
+                            <aside className="w-full bg-zinc-900 flex flex-col h-full shadow-lg transition-all duration-300 flex-shrink-0">
+                                {posts.length > 0 && !isLoading && (
+                                    <>
+                                        <PostGallery
+                                            posts={posts}
+                                            selectedPostId={selectedPostId}
+                                            onSelectPost={handleSelectPost}
+                                            onAddPost={handleAddPost}
+                                            onDeletePost={handleDeletePost}
+                                        />
+                                        <LayersPanel
+                                            selectedPost={selectedPost}
+                                            selectedElementId={selectedElementId}
+                                            onSelectElement={setSelectedElementId}
+                                            onUpdateElement={updatePostElement}
+                                            onAddElement={handleAddElement}
+                                            onRemoveElement={handleRemoveElement}
+                                            onDuplicateElement={handleDuplicateElement}
+                                            onToggleVisibility={handleToggleElementVisibility}
+                                            onToggleLock={handleToggleElementLock}
+                                            onReorderElements={handleReorderElements}
+                                            onRegenerateBackground={handleRegenerateBackground}
+                                            onUpdateBackgroundSrc={handleUpdateBackgroundSrc}
+                                            availableFonts={availableFonts}
+                                            onAddFont={handleAddFont}
+                                            onOpenColorPicker={handleOpenColorPicker}
+                                            palettes={{
+                                                post: selectedPost?.palette,
+                                                custom: customPalette,
+                                            }}
+                                        />
+                                    </>
+                                )}
+                                {posts.length === 0 && !isLoading && (
+                                    <div className="flex-grow flex items-center justify-center text-center p-4">
+                                        <p className="text-zinc-500">A galeria e as camadas aparecerão aqui quando o conteúdo for gerado.</p>
+                                    </div>
+                                )}
+                            </aside>
+                            <button onClick={() => setRightPanelOpen(false)} className="lg:hidden absolute top-4 left-4 p-2 bg-zinc-800/80 rounded-full backdrop-blur-sm text-white">
+                                <X className="w-5 h-5" />
+                            </button>
                         </div>
                     </div>
-                    {/* Navegação Inferior para Mobile */}
-                    <div className="lg:hidden grid grid-cols-3 items-center bg-zinc-900 border-t border-zinc-800 px-2 pt-1 pb-[calc(0.5rem+env(safe-area-inset-bottom))] flex-shrink-0">
+                </div>
+                {/* Navegação Inferior para Mobile */}
+                <div className="lg:hidden flex-shrink-0 bg-zinc-900 border-t border-zinc-800">
+                    <div className="grid grid-cols-3 items-center px-2 pt-1 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
                         <button onClick={() => setBrandKitPanelOpen(true)} className="flex flex-col items-center space-y-1 text-xs p-2 rounded-lg text-zinc-300 hover:bg-zinc-800 hover:text-white">
                             <Package className="w-5 h-5"/>
                             <span>Kits</span>
