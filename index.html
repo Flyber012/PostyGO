@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -10,11 +11,13 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;700&family=Lato:wght@400;700&family=Montserrat:wght@400;700&family=Oswald:wght@400;700&family=Poppins:wght@400;700&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/App.css">
     <style>
       html, body, #root {
         height: 100%;
         margin: 0;
         padding: 0;
+        overflow: hidden; /* Prevent body scroll */
       }
       /* 
         Para usar fontes personalizadas, crie uma pasta 'public/fonts' 
@@ -53,10 +56,6 @@
           background-position: 200% center;
         }
       }
-      /* Custom Scrollbar for Toolbar */
-      .toolbar-scrollbar::-webkit-scrollbar { height: 4px; }
-      .toolbar-scrollbar::-webkit-scrollbar-track { background: #3f3f46; } /* zinc-700 */
-      .toolbar-scrollbar::-webkit-scrollbar-thumb { background: #a855f7; border-radius: 2px; } /* purple-500 */
     </style>
   <script type="importmap">
 {

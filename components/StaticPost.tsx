@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Post, PostSize, AnyElement, TextElement, ImageElement, GradientElement, BackgroundElement, ShapeElement, QRCodeElement } from '../types';
 import QRCodeDisplay from './QRCodeDisplay';
@@ -30,26 +31,26 @@ interface StaticPostProps {
 }
 
 const renderElement = (element: AnyElement) => {
-    if (!('visible' in element && !element.visible)) {
-        switch(element.type) {
-            case 'text':
-                const textEl = element as TextElement;
-                // Envolver em um div para atuar como um único item flexível para alinhamento
-                return <div><TextParser content={textEl.content} highlightColor={textEl.highlightColor} accentFontFamily={textEl.accentFontFamily} baseFontFamily={textEl.fontFamily} /></div>;
-            case 'image':
-                return <img src={element.src} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />;
-            case 'gradient':
-                 return <div style={{ width: '100%', height: '100%', background: `linear-gradient(${element.angle}deg, ${element.color1}, ${element.color2})` }} />;
-            case 'shape':
-                return <div style={{ width: '100%', height: '100%' }} />; // The styling is handled by getElementStyles
-            case 'qrcode':
-                const qrEl = element as QRCodeElement;
-                return <QRCodeDisplay url={qrEl.url} color={qrEl.color} backgroundColor={qrEl.backgroundColor} width={qrEl.width} />;
-            default:
-                return null;
-        }
+    if ('visible' in element && !element.visible) {
+      return null;
     }
-    return null;
+
+    switch(element.type) {
+        case 'text':
+            const textEl = element as TextElement;
+            return <div><TextParser content={textEl.content} highlightColor={textEl.highlightColor} accentFontFamily={textEl.accentFontFamily} baseFontFamily={textEl.fontFamily} /></div>;
+        case 'image':
+            return <img src={element.src} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />;
+        case 'gradient':
+             return <div style={{ width: '100%', height: '100%', background: `linear-gradient(${element.angle}deg, ${element.color1}, ${element.color2})` }} />;
+        case 'shape':
+            return <div style={{ width: '100%', height: '100%' }} />;
+        case 'qrcode':
+            const qrEl = element as QRCodeElement;
+            return <QRCodeDisplay url={qrEl.url} color={qrEl.color} backgroundColor={qrEl.backgroundColor} width={qrEl.width} />;
+        default:
+            return null;
+    }
 };
 
 const getElementStyles = (element: AnyElement): React.CSSProperties => {

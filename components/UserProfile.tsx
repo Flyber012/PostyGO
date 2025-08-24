@@ -5,13 +5,12 @@ import { LogIn, LogOut, Settings, ChevronDown, Coins } from 'lucide-react';
 
 interface UserProfileProps {
     user: User | null;
-    onLogin: () => void;
     onLogout: () => void;
     onManageAccounts: () => void;
     onBuyCredits: () => void;
 }
 
-const UserProfile: React.FC<UserProfileProps> = ({ user, onLogin, onLogout, onManageAccounts, onBuyCredits }) => {
+const UserProfile: React.FC<UserProfileProps> = ({ user, onLogout, onManageAccounts, onBuyCredits }) => {
     const [isMenuOpen, setMenuOpen] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
@@ -29,7 +28,6 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onLogin, onLogout, onMa
         return (
             <div id="signInDiv">
                  <button
-                    onClick={onLogin}
                     className="flex items-center justify-center bg-zinc-700 hover:bg-zinc-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
                 >
                     <LogIn className="w-4 h-4 mr-2" />

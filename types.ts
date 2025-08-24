@@ -1,4 +1,5 @@
 
+
 export type TextStyle = 'padrão' | 'profissional' | 'amigável' | 'inspirador' | 'divertido';
 
 export interface BaseElement {
@@ -190,4 +191,16 @@ export interface AIGeneratedCarouselScriptSlide {
 export interface PaletteExtractionResult {
     palette: string[];
     imageTone: 'light' | 'dark';
+}
+
+export interface Project {
+    id: string;
+    name: string;
+    posts: Post[];
+    postSize: PostSize;
+    activeBrandKitId: string | null;
+    topic: string;
+    // Adicione outros estados relevantes que você queira salvar com o projeto
+    // Ex: contentLevel, generationType, etc.
+    // Isso é opcional, mas pode ser útil para recarregar o contexto completo.
 }

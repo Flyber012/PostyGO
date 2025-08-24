@@ -1,0 +1,69 @@
+
+.app-layout {
+    display: grid;
+    height: 100vh;
+    grid-template-rows: auto 1fr auto;
+    grid-template-columns: 0 1fr 0;
+    grid-template-areas:
+        "header header header"
+        "left-panel main-content right-panel"
+        "footer-gallery footer-gallery footer-gallery";
+    transition: grid-template-columns 0.3s ease-in-out;
+}
+
+/* Panel visibility states */
+.app-layout.left-panel-open {
+    grid-template-columns: 384px 1fr 0; /* 384px = w-96 */
+}
+.app-layout.right-panel-open {
+    grid-template-columns: 0 1fr 320px; /* 320px = w-80 */
+}
+.app-layout.left-panel-open.right-panel-open {
+    grid-template-columns: 384px 1fr 320px;
+}
+
+/* Grid area assignments */
+.header { grid-area: header; }
+.left-panel { grid-area: left-panel; overflow: hidden; }
+.main-content { grid-area: main-content; position: relative; display: flex; align-items: center; justify-content: center; background-color: #18181b; overflow: hidden; }
+.right-panel { grid-area: right-panel; overflow: hidden; }
+.footer-gallery { grid-area: footer-gallery; height: 112px; /* h-28 */ }
+
+/* Transitions for panels */
+.left-panel, .right-panel {
+    transition: all 0.3s ease-in-out;
+    background-color: #18181b;
+    border-left: 1px solid #27272a;
+    border-right: 1px solid #27272a;
+}
+
+/* Scrollbar styles for panels */
+.left-panel > div,
+.right-panel > div {
+    scrollbar-width: thin;
+    scrollbar-color: #a855f7 #3f3f46;
+}
+
+.left-panel > div::-webkit-scrollbar,
+.right-panel > div::-webkit-scrollbar {
+    width: 6px;
+}
+
+.left-panel > div::-webkit-scrollbar-track,
+.right-panel > div::-webkit-scrollbar-track {
+    background: #3f3f46;
+}
+
+.left-panel > div::-webkit-scrollbar-thumb,
+.right-panel > div::-webkit-scrollbar-thumb {
+    background-color: #a855f7;
+    border-radius: 3px;
+    border: 1px solid #3f3f46;
+}
+
+/* Hide scrollbars when panels are collapsed */
+.app-layout:not(.left-panel-open) .left-panel,
+.app-layout:not(.right-panel-open) .right-panel {
+    border-left: none;
+    border-right: none;
+}

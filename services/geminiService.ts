@@ -1,4 +1,5 @@
 
+
 import { GoogleGenAI, Type, Part } from "@google/genai";
 import { AIGeneratedTextElement, PaletteExtractionResult, AIGeneratedCarouselScriptSlide, TextElement, BrandKit, PostSize, TextStyle } from '../types';
 
@@ -206,7 +207,7 @@ export async function generateLayoutAndContentForImage(base64Image: string, topi
     - ${textStyleInstructions[textStyle]}
 
     **Seu Processo Criativo (Regras Inquebráveis):**
-    1.  **Conteúdo Criativo com Personalidade:** Primeiro, crie o texto. Seja envolvente, use markdown (\`**destaque**\`) para ênfase e emojis relevantes.
+    1.  **Conteúdo Criativo com Personalidade:** Primeiro, crie o texto. Seja envolvente, use markdown (\`**destaque**\`) para ênfase e emojis relevantes. Use 'Poppins' como a fontFamily padrão se nenhuma outra for especificada.
     2.  **ANÁLISE VISUAL CRÍTICA:** Depois de ter o texto, analise a imagem. Identifique as "zonas seguras" com espaço negativo (céu, paredes, áreas desfocadas).
     3.  **NUNCA OBSTRUA O ESSENCIAL:** É PROIBIDO posicionar texto sobre rostos, produtos, ou o ponto focal principal da imagem. A legibilidade e o respeito pela imagem são fundamentais.
     4.  **HIERARQUIA E POSICIONAMENTO:** Decomponha seu texto em elementos lógicos (título, corpo, etc.) e distribua-os harmonicamente nas zonas seguras que você identificou.
