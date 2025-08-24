@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
 import { createRoot } from 'react-dom/client';
@@ -187,7 +188,7 @@ const App: React.FC = () => {
 
     const handleManageAccounts = () => setAccountModalOpen(true);
     
-    const handleLinkAccount = (service: 'google' | 'freepik', apiKey: string) => {
+    const handleLinkAccount = (service: 'google', apiKey: string) => {
         if (!user) return;
         const updatedUser: User = {
             ...user,
@@ -199,7 +200,7 @@ const App: React.FC = () => {
         updateUser(updatedUser);
     };
 
-    const handleUnlinkAccount = (service: 'google' | 'freepik') => {
+    const handleUnlinkAccount = (service: 'google') => {
         if (!user) return;
         const updatedUser: User = { ...user, linkedAccounts: { ...user.linkedAccounts } };
         delete updatedUser.linkedAccounts[service];
@@ -431,10 +432,9 @@ const App: React.FC = () => {
                         toast.loading(`Criando imagens de fundo com Gemini...`, { id: toastId });
                         generatedBase64Images = await geminiService.generateBackgroundImages(imagePrompts, postSize, userApiKey);
                     } else if (aiProvider === 'freepik') {
-                        const freepikUserApiKey = user.linkedAccounts?.freepik?.apiKey;
                         setLoadingMessage(`Criando imagens de fundo com Freepik...`);
                         toast.loading(`Criando imagens de fundo com Freepik...`, { id: toastId });
-                        generatedBase64Images = await freepikService.generateBackgroundImages(imagePrompts, postSize, freepikUserApiKey);
+                        generatedBase64Images = await freepikService.generateBackgroundImages(imagePrompts, postSize);
                     }
                     
                     backgroundSources = generatedBase64Images.map((b64, index) => ({
@@ -932,8 +932,7 @@ const App: React.FC = () => {
             const provider = bgElement.provider || 'gemini';
     
             if (provider === 'freepik') {
-                const freepikUserApiKey = user.linkedAccounts?.freepik?.apiKey;
-                newSrc = await freepikService.generateSingleBackgroundImage(prompt, postSize, freepikUserApiKey);
+                newSrc = await freepikService.generateSingleBackgroundImage(prompt, postSize);
             } else { // Gemini
                 const userApiKey = user.linkedAccounts?.google?.apiKey;
                 const isFreeTierUser = !userApiKey;

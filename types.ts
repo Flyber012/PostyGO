@@ -1,6 +1,7 @@
 
 
 
+
 export interface BaseElement {
     id: string;
     type: string;
@@ -148,7 +149,7 @@ export interface User {
     email: string;
     avatar: string;
     linkedAccounts: {
-        [key in 'google' | 'freepik']?: {
+        [key in 'google']?: {
             status: 'connected' | 'disconnected';
             apiKey?: string;
         }

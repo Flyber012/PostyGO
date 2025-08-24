@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { PostSize, BrandKit, LayoutTemplate, User } from '../types';
 import { POST_SIZES } from '../constants';
@@ -239,8 +240,7 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
     const generationsLeft = dailyLimit - generationsToday;
     
     const isGeminiReady = user && (isGeminiKeyUser || generationsLeft > 0);
-    const isFreepikReady = user?.linkedAccounts?.freepik?.status === 'connected';
-
+    
     let canGenerate = false;
     let generateButtonTooltip = '';
 
@@ -248,8 +248,6 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
         generateButtonTooltip = 'Faça login para gerar conteúdo.';
     } else if (backgroundSource === 'ai' && aiProvider === 'gemini' && !isGeminiReady) {
         generateButtonTooltip = 'Conecte sua conta Gemini para usar este provedor.';
-    } else if (backgroundSource === 'ai' && aiProvider === 'freepik' && !isFreepikReady) {
-        generateButtonTooltip = 'Conecte sua conta Freepik para usar este provedor.';
     } else {
         canGenerate = !isLoading;
     }
@@ -383,9 +381,6 @@ const ControlPanel: React.FC<ControlPanelProps> = (props) => {
                                         Freepik
                                     </button>
                                 </div>
-                                {aiProvider === 'freepik' && !user?.linkedAccounts?.freepik && 
-                                    <p className="text-xs text-yellow-400 mt-2 text-center">Conecte sua conta Freepik em 'Gerenciar Contas' para usar.</p>
-                                }
                                 {aiProvider === 'gemini' && !user?.linkedAccounts?.google?.apiKey && 
                                     <p className="text-xs text-yellow-400 mt-2 text-center">Conecte sua chave de API do Gemini em 'Gerenciar Contas' para usar.</p>
                                 }

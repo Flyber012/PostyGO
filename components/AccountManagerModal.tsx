@@ -1,20 +1,20 @@
+
 import React, { useState } from 'react';
 import { User } from '../types';
 import { X, CheckCircle, Link, XCircle, Key, Eye, EyeOff, RotateCw } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import * as geminiService from '../services/geminiService';
-import * as freepikService from '../services/freepikService';
 
 
 interface AccountManagerModalProps {
     isOpen: boolean;
     onClose: () => void;
     user: User | null;
-    onLinkAccount: (service: 'google' | 'freepik', apiKey: string) => void;
-    onUnlinkAccount: (service: 'google' | 'freepik') => void;
+    onLinkAccount: (service: 'google', apiKey: string) => void;
+    onUnlinkAccount: (service: 'google') => void;
 }
 
-type Service = 'google' | 'freepik';
+type Service = 'google';
 
 interface ServiceRowProps {
     service: Service;
@@ -158,17 +158,6 @@ const AccountManagerModal: React.FC<AccountManagerModalProps> = ({ isOpen, onClo
                         onUnlink={onUnlinkAccount}
                         getApiKeyUrl="https://aistudio.google.com/app/apikey"
                         verificationFn={geminiService.verifyApiKey}
-                    />
-                     <ServiceRow 
-                        service="freepik"
-                        name="Freepik AI"
-                        description="Para geração de imagens de fundo alternativas."
-                        icon={<img src="https://freepik.cdnpk.net/img/logo/freepik-company_black.svg" alt="Freepik" className="w-6 h-6 invert"/>}
-                        user={user}
-                        onLink={onLinkAccount}
-                        onUnlink={onUnlinkAccount}
-                        getApiKeyUrl="https://www.freepik.com/profile/api-keys"
-                        verificationFn={freepikService.verifyApiKey}
                     />
                 </div>
             </div>
