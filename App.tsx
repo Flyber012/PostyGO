@@ -15,7 +15,7 @@ import { GenerationWizard } from './components/GenerationWizard';
 import { BrandKitPanel } from './components/BrandKitPanel';
 import saveAs from 'file-saver';
 import { v4 as uuidv4 } from 'uuid';
-import { ZoomIn, ZoomOut, Maximize, PanelLeft, PanelRight, Package, Image as ImageIcon, FileText, X, LayoutTemplate as LayoutTemplateIcon } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize, PanelLeft, PanelRight, PanelLeftClose, PanelRightClose, Package, Image as ImageIcon, FileText, X, LayoutTemplate as LayoutTemplateIcon, Plus } from 'lucide-react';
 import AdvancedColorPicker from './components/ColorPicker';
 
 // --- HELPERS ---
@@ -172,6 +172,13 @@ const ProjectTabs: React.FC<{
                  </button>
             ))}
         </nav>
+        <button
+            onClick={onNew}
+            className="mx-2 mb-1 flex-shrink-0 h-8 w-8 flex items-center justify-center rounded-md bg-zinc-800/70 hover:bg-zinc-700 text-gray-400 hover:text-white transition-colors"
+            title="Novo projeto"
+        >
+            <Plus className="w-4 h-4" />
+        </button>
     </div>
 );
 
@@ -643,16 +650,20 @@ const App: React.FC = () => {
 
                     {projects.length > 0 && (
                         <>
-                            <div className="absolute top-4 left-4 flex flex-col space-y-2 z-10">
-                                <button onClick={() => setLeftPanelOpen(!isLeftPanelOpen)} className="p-2 bg-zinc-900/70 backdrop-blur-sm rounded-lg shadow-lg hover:bg-zinc-800 transition-colors">
-                                    <PanelLeft className="w-5 h-5"/>
-                                </button>
-                            </div>
-                             <div className="absolute top-4 right-4 flex flex-col space-y-2 z-10">
-                                <button onClick={() => setRightPanelOpen(!isRightPanelOpen)} className="p-2 bg-zinc-900/70 backdrop-blur-sm rounded-lg shadow-lg hover:bg-zinc-800 transition-colors">
-                                    <PanelRight className="w-5 h-5"/>
-                                </button>
-                            </div>
+                            <button 
+                                onClick={() => setLeftPanelOpen(!isLeftPanelOpen)} 
+                                className="absolute top-1/2 -translate-y-1/2 left-3 z-20 p-1.5 bg-zinc-900/60 text-zinc-400 hover:bg-zinc-800 hover:text-white rounded-md transition-all backdrop-blur-sm shadow-lg"
+                                aria-label={isLeftPanelOpen ? "Fechar painel esquerdo" : "Abrir painel esquerdo"}
+                            >
+                                {isLeftPanelOpen ? <PanelLeftClose className="w-4 h-4"/> : <PanelLeft className="w-4 h-4"/>}
+                            </button>
+                            <button 
+                                onClick={() => setRightPanelOpen(!isRightPanelOpen)} 
+                                className="absolute top-1/2 -translate-y-1/2 right-3 z-20 p-1.5 bg-zinc-900/60 text-zinc-400 hover:bg-zinc-800 hover:text-white rounded-md transition-all backdrop-blur-sm shadow-lg"
+                                aria-label={isRightPanelOpen ? "Fechar painel direito" : "Abrir painel direito"}
+                            >
+                                {isRightPanelOpen ? <PanelRightClose className="w-4 h-4"/> : <PanelRight className="w-4 h-4"/>}
+                            </button>
                         </>
                     )}
                     
