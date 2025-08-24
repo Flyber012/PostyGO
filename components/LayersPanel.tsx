@@ -1,11 +1,11 @@
 
 
 
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Post, AnyElement, TextElement, ImageElement, GradientElement, BackgroundElement, ShapeElement, BlendMode, QRCodeElement, FontDefinition } from '../types';
 import { Plus, Trash2, Type, Image as ImageIcon, GitCommitHorizontal, RefreshCw, Upload, FileUp, Copy, Eye, EyeOff, Lock, Unlock, Square, Circle, QrCode, ChevronDown, ArrowUpFromLine, GripVertical, ArrowDownFromLine } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import AdvancedColorPicker from './ColorPicker';
 
 // Accordion Component for collapsible sections
 const Accordion: React.FC<{ title: string; children: React.ReactNode; defaultOpen?: boolean }> = ({ title, children, defaultOpen = false }) => {
@@ -40,6 +40,7 @@ interface LayersPanelProps {
     onUpdateBackgroundSrc: (elementId: string, src: string) => void;
     availableFonts: FontDefinition[];
     onAddFont: (font: FontDefinition) => void;
+    onOpenColorPicker: (currentColor: string, onColorChange: (color: string) => void) => void;
     palettes: {
         post?: string[];
         custom?: string[];
@@ -50,11 +51,10 @@ const LayersPanel: React.FC<LayersPanelProps> = (props) => {
     const { 
         selectedPost, selectedElementId, onSelectElement, onUpdateElement, onAddElement, onRemoveElement, 
         onDuplicateElement, onToggleVisibility, onToggleLock, onReorderElements,
-        onRegenerateBackground, onUpdateBackgroundSrc, availableFonts, onAddFont, palettes 
+        onRegenerateBackground, onUpdateBackgroundSrc, availableFonts, onAddFont, onOpenColorPicker
     } = props;
     
     const [isAddMenuOpen, setAddMenuOpen] = useState(false);
-    const [colorPickerState, setColorPickerState] = useState<{isOpen: boolean, target: null | ((color: string) => void), color: string}>({isOpen: false, target: null, color: '#FFFFFF'});
     const imageInputRef = useRef<HTMLInputElement>(null);
     const backgroundInputRef = useRef<HTMLInputElement>(null);
     const fontInputRef = useRef<HTMLInputElement>(null);
@@ -64,10 +64,6 @@ const LayersPanel: React.FC<LayersPanelProps> = (props) => {
     if (!selectedPost) return null;
 
     const selectedElement = selectedPost.elements.find(e => e.id === selectedElementId) as Exclude<AnyElement, BackgroundElement> | undefined;
-
-    const handleOpenColorPicker = (currentColor: string, onColorChange: (color: string) => void) => {
-        setColorPickerState({ isOpen: true, color: currentColor, target: onColorChange });
-    };
 
     const handleInputChange = (key: string, value: any, subKey?: string) => {
         if (!selectedElementId) return;
@@ -173,7 +169,7 @@ const LayersPanel: React.FC<LayersPanelProps> = (props) => {
     const ColorInput: React.FC<{label: string, color: string, onChange: (color: string) => void}> = ({ label, color, onChange }) => (
         <div>
             <label className="block text-xs font-medium text-gray-400">{label}</label>
-            <button onClick={() => handleOpenColorPicker(color, onChange)} className="w-full h-8 mt-1 rounded-md border border-gray-600" style={{backgroundColor: color}} />
+            <button onClick={() => onOpenColorPicker(color, onChange)} className="w-full h-8 mt-1 rounded-md border border-gray-600" style={{backgroundColor: color}} />
         </div>
     );
 
@@ -416,51 +412,41 @@ const LayersPanel: React.FC<LayersPanelProps> = (props) => {
     );
 
     return (
-        <>
-            {colorPickerState.isOpen && colorPickerState.target && (
-                <AdvancedColorPicker
-                    color={colorPickerState.color}
-                    onChange={colorPickerState.target}
-                    onClose={() => setColorPickerState({ isOpen: false, target: null, color: '#FFFFFF' })}
-                    palettes={palettes}
-                />
-            )}
-            <div className="flex flex-col flex-grow min-h-0 bg-zinc-900 border-t border-zinc-700">
-                <div className="p-4 border-b border-zinc-700">
-                    <div className="flex justify-between items-center mb-2">
-                        <h2 className="text-lg font-semibold text-gray-200">Camadas</h2>
-                        <div className="relative">
-                            <button onClick={() => setAddMenuOpen(!isAddMenuOpen)} className="p-1 hover:bg-zinc-700 rounded"><Plus className="w-5 h-5" /></button>
-                            {isAddMenuOpen && (
-                                <div className="absolute right-0 mt-2 w-48 bg-zinc-800 rounded-md shadow-lg z-10 border border-zinc-700">
-                                    <button onClick={() => { onAddElement('text'); setAddMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-zinc-700"><Type className="w-4 h-4 mr-2"/> Texto</button>
-                                    <button onClick={() => { imageInputRef.current?.click(); setAddMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-zinc-700"><ImageIcon className="w-4 h-4 mr-2"/> Imagem</button>
-                                    <button onClick={() => { onAddElement('qrcode'); setAddMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-zinc-700"><QrCode className="w-4 h-4 mr-2"/> QR Code</button>
-                                    <button onClick={() => { onAddElement('shape', {shape: 'rectangle'}); setAddMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-zinc-700"><Square className="w-4 h-4 mr-2"/> Retângulo</button>
-                                    <button onClick={() => { onAddElement('shape', {shape: 'circle'}); setAddMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-zinc-700"><Circle className="w-4 h-4 mr-2"/> Círculo</button>
-                                    <button onClick={() => { onAddElement('gradient'); setAddMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-zinc-700"><GitCommitHorizontal className="w-4 h-4 mr-2"/> Gradiente</button>
-                                </div>
-                            )}
-                             <input type="file" ref={imageInputRef} onChange={(e) => handleImageUpload(e, false)} accept="image/*" className="hidden" />
-                        </div>
+        <div className="flex flex-col flex-grow min-h-0 bg-zinc-900 border-t border-zinc-700">
+            <div className="p-4 border-b border-zinc-700">
+                <div className="flex justify-between items-center mb-2">
+                    <h2 className="text-lg font-semibold text-gray-200">Camadas</h2>
+                    <div className="relative">
+                        <button onClick={() => setAddMenuOpen(!isAddMenuOpen)} className="p-1 hover:bg-zinc-700 rounded"><Plus className="w-5 h-5" /></button>
+                        {isAddMenuOpen && (
+                            <div className="absolute right-0 mt-2 w-48 bg-zinc-800 rounded-md shadow-lg z-10 border border-zinc-700">
+                                <button onClick={() => { onAddElement('text'); setAddMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-zinc-700"><Type className="w-4 h-4 mr-2"/> Texto</button>
+                                <button onClick={() => { imageInputRef.current?.click(); setAddMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-zinc-700"><ImageIcon className="w-4 h-4 mr-2"/> Imagem</button>
+                                <button onClick={() => { onAddElement('qrcode'); setAddMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-zinc-700"><QrCode className="w-4 h-4 mr-2"/> QR Code</button>
+                                <button onClick={() => { onAddElement('shape', {shape: 'rectangle'}); setAddMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-zinc-700"><Square className="w-4 h-4 mr-2"/> Retângulo</button>
+                                <button onClick={() => { onAddElement('shape', {shape: 'circle'}); setAddMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-zinc-700"><Circle className="w-4 h-4 mr-2"/> Círculo</button>
+                                <button onClick={() => { onAddElement('gradient'); setAddMenuOpen(false); }} className="w-full text-left flex items-center px-4 py-2 text-sm text-gray-200 hover:bg-zinc-700"><GitCommitHorizontal className="w-4 h-4 mr-2"/> Gradiente</button>
+                            </div>
+                        )}
+                         <input type="file" ref={imageInputRef} onChange={(e) => handleImageUpload(e, false)} accept="image/*" className="hidden" />
                     </div>
-                    <ul className="space-y-1 max-h-36 overflow-y-auto">
-                         {selectedPost.elements.find(e => e.type === 'background') && (
-                            <li onClick={() => onSelectElement(selectedPost.elements.find(e => e.type === 'background')!.id)} className={`flex justify-between items-center p-2 rounded text-sm cursor-pointer ${selectedElementId === selectedPost.elements.find(e => e.type === 'background')!.id ? 'animated-gradient-bg text-white' : 'bg-zinc-800/50 hover:bg-zinc-800'}`}>
-                                Fundo
-                            </li>
-                         )}
-                        {[...selectedPost.elements].reverse().map(element => (
-                            element.type !== 'background' ? <LayerItem key={element.id} element={element as Exclude<AnyElement, BackgroundElement>} /> : null
-                        ))}
-                    </ul>
                 </div>
-                
-                <div className="flex-grow overflow-y-auto">
-                    {renderEditor()}
-                </div>
+                <ul className="space-y-1 max-h-36 overflow-y-auto">
+                     {selectedPost.elements.find(e => e.type === 'background') && (
+                        <li onClick={() => onSelectElement(selectedPost.elements.find(e => e.type === 'background')!.id)} className={`flex justify-between items-center p-2 rounded text-sm cursor-pointer ${selectedElementId === selectedPost.elements.find(e => e.type === 'background')!.id ? 'animated-gradient-bg text-white' : 'bg-zinc-800/50 hover:bg-zinc-800'}`}>
+                            Fundo
+                        </li>
+                     )}
+                    {[...selectedPost.elements].reverse().map(element => (
+                        element.type !== 'background' ? <LayerItem key={element.id} element={element as Exclude<AnyElement, BackgroundElement>} /> : null
+                    ))}
+                </ul>
             </div>
-        </>
+            
+            <div className="flex-grow overflow-y-auto">
+                {renderEditor()}
+            </div>
+        </div>
     );
 };
 

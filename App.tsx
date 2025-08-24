@@ -20,6 +20,7 @@ import { v4 as uuidv4 } from 'uuid';
 import * as htmlToImage from 'html-to-image';
 import JSZip from 'jszip';
 import { ZoomIn, ZoomOut, Maximize, AlignHorizontalJustifyStart, AlignHorizontalJustifyCenter, AlignHorizontalJustifyEnd, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Copy, Trash2, ChevronLeft, ChevronRight, Eye, EyeOff, Lock, Unlock, X, Sparkles, Layers, Package } from 'lucide-react';
+import AdvancedColorPicker from './components/ColorPicker';
 
 declare global {
     const google: any;
@@ -163,6 +164,21 @@ const App: React.FC = () => {
     const [isWizardOpen, setWizardOpen] = useState(false);
     const [isBrandKitPanelOpen, setBrandKitPanelOpen] = useState(false);
     const [isRightPanelOpen, setRightPanelOpen] = useState(false);
+
+    // Global Color Picker State
+    const [colorPickerState, setColorPickerState] = useState<{
+        isOpen: boolean;
+        target: null | ((color: string) => void);
+        color: string;
+    }>({ isOpen: false, target: null, color: '#FFFFFF' });
+
+    const handleOpenColorPicker = (currentColor: string, onColorChange: (color: string) => void) => {
+        setColorPickerState({ isOpen: true, color: currentColor, target: onColorChange });
+    };
+
+    const handleCloseColorPicker = () => {
+        setColorPickerState({ isOpen: false, target: null, color: '#FFFFFF' });
+    };
 
     const editorRef = useRef<HTMLDivElement>(null);
     const viewportRef = useRef<HTMLElement>(null);
@@ -1077,7 +1093,7 @@ const App: React.FC = () => {
     };
 
     const selectedPost = posts.find(p => p.id === selectedPostId);
-    const selectedElement = selectedPost?.elements.find(e => e.id === selectedElementId);
+    const selectedElement = selectedPost?.elements.find(e => e.id === selectedElementId) as Exclude<AnyElement, BackgroundElement> | undefined;
     const activeBrandKit = brandKits.find(k => k.id === activeBrandKitId);
     
     const currentCarouselSlides = selectedPost?.carouselId 
@@ -1151,6 +1167,17 @@ const App: React.FC = () => {
     return (
         <>
             <Toaster position="top-center" reverseOrder={false} />
+            {colorPickerState.isOpen && colorPickerState.target && (
+                <AdvancedColorPicker
+                    color={colorPickerState.color}
+                    onChange={colorPickerState.target}
+                    onClose={handleCloseColorPicker}
+                    palettes={{
+                        post: selectedPost?.palette,
+                        custom: customPalette,
+                    }}
+                />
+            )}
             <AccountManagerModal
                 isOpen={isAccountModalOpen}
                 onClose={() => setAccountModalOpen(false)}
@@ -1219,7 +1246,7 @@ const App: React.FC = () => {
                 setSelectedLayoutId={setSelectedLayoutId}
             />
 
-            <div className="flex flex-col h-screen font-sans bg-gray-950 text-gray-100 overflow-hidden">
+            <div className="flex flex-col h-full font-sans bg-gray-950 text-gray-100 overflow-hidden">
                 <header className="w-full bg-zinc-900 border-b border-zinc-800 px-4 sm:px-6 py-3 flex-shrink-0 flex items-center justify-end">
                     <UserProfile user={user} onLogin={() => {}} onLogout={handleLogout} onManageAccounts={handleManageAccounts} onBuyCredits={() => setBuyCreditsModalOpen(true)} />
                 </header>
@@ -1334,27 +1361,48 @@ const App: React.FC = () => {
                             )}
 
                             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center space-x-2 bg-zinc-900/70 backdrop-blur-sm p-2 rounded-lg shadow-lg">
-                                {selectedElement && selectedElement.type !== 'background' && (
-                                    <div className="flex items-center space-x-1 pr-2 border-r border-zinc-700">
-                                        <button onClick={() => handleAlignElement('h-start')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Align Left"><AlignHorizontalJustifyStart className="w-4 h-4" /></button>
-                                        <button onClick={() => handleAlignElement('h-center')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Align Center Horizontal"><AlignHorizontalJustifyCenter className="w-4 h-4" /></button>
-                                        <button onClick={() => handleAlignElement('h-end')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Align Right"><AlignHorizontalJustifyEnd className="w-4 h-4" /></button>
-                                        <button onClick={() => handleAlignElement('v-start')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Align Top"><AlignVerticalJustifyStart className="w-4 h-4" /></button>
-                                        <button onClick={() => handleAlignElement('v-center')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Align Center Vertical"><AlignVerticalJustifyCenter className="w-4 h-4" /></button>
-                                        <button onClick={() => handleAlignElement('v-end')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Align Bottom"><AlignVerticalJustifyEnd className="w-4 h-4" /></button>
-                                        <div className="w-px h-5 bg-zinc-700 mx-1"></div>
-                                        <button onClick={() => handleToggleElementVisibility(selectedElement.id)} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Toggle Visibility">
-                                            {selectedElement.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                                        </button>
-                                        <button onClick={() => handleToggleElementLock(selectedElement.id)} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Toggle Lock">
-                                            {selectedElement.locked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-                                        </button>
-                                        <button onClick={() => handleDuplicateElement(selectedElement.id)} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Duplicate Element"><Copy className="w-4 h-4"/></button>
-                                        <button onClick={() => handleRemoveElement(selectedElement.id)} className="p-2 text-red-400 hover:bg-red-500/20 rounded-md" aria-label="Remove Element"><Trash2 className="w-4 h-4"/></button>
-                                    </div>
+                                {selectedElement && selectedElementId && (
+                                    <>
+                                        <div className="flex items-center space-x-1">
+                                            <button onClick={() => handleAlignElement('h-start')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Align Left"><AlignHorizontalJustifyStart className="w-4 h-4" /></button>
+                                            <button onClick={() => handleAlignElement('h-center')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Align Center Horizontal"><AlignHorizontalJustifyCenter className="w-4 h-4" /></button>
+                                            <button onClick={() => handleAlignElement('h-end')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Align Right"><AlignHorizontalJustifyEnd className="w-4 h-4" /></button>
+                                            <button onClick={() => handleAlignElement('v-start')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Align Top"><AlignVerticalJustifyStart className="w-4 h-4" /></button>
+                                            <button onClick={() => handleAlignElement('v-center')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Align Center Vertical"><AlignVerticalJustifyCenter className="w-4 h-4" /></button>
+                                            <button onClick={() => handleAlignElement('v-end')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Align Bottom"><AlignVerticalJustifyEnd className="w-4 h-4" /></button>
+                                        </div>
+                                        <div className="w-px h-5 bg-zinc-700"></div>
+                                    </>
+                                )}
+                                {selectedElement?.type === 'text' && (
+                                     <>
+                                        <div className="flex items-center space-x-2">
+                                            <select value={selectedElement.fontFamily} onChange={e => updatePostElement(selectedElementId!, { fontFamily: e.target.value })} className="bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1 text-xs text-white focus:ring-1 focus:ring-purple-500 focus:outline-none appearance-none">
+                                                {availableFonts.map(font => <option key={font.name} value={font.name}>{font.name}</option>)}
+                                            </select>
+                                            <input type="number" value={selectedElement.fontSize} onChange={e => updatePostElement(selectedElementId!, { fontSize: parseInt(e.target.value, 10) || 24 })} className="w-16 bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1 text-xs text-white focus:ring-1 focus:ring-purple-500 focus:outline-none" />
+                                            <button onClick={() => handleOpenColorPicker(selectedElement.color, (newColor) => updatePostElement(selectedElementId!, { color: newColor }))} className="w-7 h-7 rounded-md border-2 border-zinc-700" style={{ backgroundColor: selectedElement.color }} />
+                                        </div>
+                                        <div className="w-px h-5 bg-zinc-700"></div>
+                                     </>
+                                )}
+                                {selectedElement && selectedElementId && (
+                                    <>
+                                        <div className="flex items-center space-x-2">
+                                            <span className="text-xs text-zinc-400">Opacidade</span>
+                                            <input type="range" min="0" max="1" step="0.01" value={selectedElement.opacity} onChange={e => updatePostElement(selectedElementId, { opacity: parseFloat(e.target.value) })} className="w-20" />
+                                        </div>
+                                        <div className="w-px h-5 bg-zinc-700"></div>
+                                        <div className="flex items-center space-x-1">
+                                            <button onClick={() => handleToggleElementVisibility(selectedElement.id)} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Toggle Visibility">{selectedElement.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}</button>
+                                            <button onClick={() => handleToggleElementLock(selectedElement.id)} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Toggle Lock">{selectedElement.locked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}</button>
+                                            <button onClick={() => handleDuplicateElement(selectedElement.id)} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Duplicate Element"><Copy className="w-4 h-4"/></button>
+                                            <button onClick={() => handleRemoveElement(selectedElement.id)} className="p-2 text-red-400 hover:bg-red-500/20 rounded-md" aria-label="Remove Element"><Trash2 className="w-4 h-4"/></button>
+                                        </div>
+                                    </>
                                 )}
                                  {posts.length > 0 && !isLoading && (
-                                    <div className="flex items-center space-x-2">
+                                    <div className="flex items-center space-x-2 pl-2 border-l border-zinc-700">
                                         <button onClick={handleZoomOut} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Zoom Out"><ZoomOut className="w-5 h-5"/></button>
                                         <span className="text-sm font-mono w-16 text-center">{Math.round(zoom * 100)}%</span>
                                         <button onClick={handleZoomIn} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Zoom In"><ZoomIn className="w-5 h-5"/></button>
@@ -1391,6 +1439,7 @@ const App: React.FC = () => {
                                                 onUpdateBackgroundSrc={handleUpdateBackgroundSrc}
                                                 availableFonts={availableFonts}
                                                 onAddFont={handleAddFont}
+                                                onOpenColorPicker={handleOpenColorPicker}
                                                 palettes={{
                                                     post: selectedPost?.palette,
                                                     custom: customPalette,
