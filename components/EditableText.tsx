@@ -10,39 +10,31 @@ interface EditableElementProps {
     onUpdate: (elementId: string, updates: Partial<AnyElement>) => void;
     isSelected: boolean;
     onSelect: (elementId: string | null) => void;
+    onStartEditing: (id: string, node: HTMLDivElement) => void;
+    onStopEditing: () => void;
 }
 
-interface TextParserProps {
-    content: string;
-    highlightColor?: string;
-    accentFontFamily?: string;
-}
-
-const TextParser: React.FC<TextParserProps> = ({ content, highlightColor, accentFontFamily }) => {
-    const parts = content.split(/(\*\*.*?\*\*)/g).filter(Boolean);
-    return (
-        <>
-            {parts.map((part, index) => {
-                if (part.startsWith('**') && part.endsWith('**')) {
-                    const fontFamily = accentFontFamily ? `'${accentFontFamily}', sans-serif` : 'inherit';
-                    return <span key={index} style={{ color: highlightColor || '#FBBF24', fontFamily }}>{part.slice(2, -2)}</span>;
-                }
-                return <React.Fragment key={index}>{part}</React.Fragment>;
-            })}
-        </>
-    );
-};
-
-const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSelected, onSelect }) => {
+const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSelected, onSelect, onStartEditing, onStopEditing }) => {
     const nodeRef = useRef(null);
+    const contentRef = useRef<HTMLDivElement>(null);
     const [isEditing, setIsEditing] = useState(false);
-    const [editText, setEditText] = useState(element.type === 'text' ? element.content : '');
 
     useEffect(() => {
-        if (element.type === 'text') {
-            setEditText(element.content);
+        // Sync content from state to the DOM, but only if it's different
+        // and the element is not the active editor. This prevents cursor jumps.
+        if (contentRef.current && element.type === 'text' && element.content !== contentRef.current.innerHTML) {
+            contentRef.current.innerHTML = element.content;
         }
-    }, [element.type === 'text' && element.content]);
+    }, [element.type === 'text' ? element.content : null]);
+    
+    useEffect(() => {
+        if(isEditing && contentRef.current) {
+            onStartEditing(element.id, contentRef.current);
+            contentRef.current.focus();
+        } else {
+            onStopEditing();
+        }
+    }, [isEditing, element.id, onStartEditing, onStopEditing]);
 
 
     if (!element.visible) {
@@ -86,12 +78,18 @@ const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSel
         }
     };
     
-    const handleTextBlur = () => {
-        onUpdate(element.id, { content: editText });
+     const handleBlur = () => {
+        if (contentRef.current && element.type === 'text') {
+            const newContent = contentRef.current.innerHTML;
+            if (newContent !== element.content) {
+                onUpdate(element.id, { content: newContent });
+            }
+        }
         setIsEditing(false);
     };
 
-    const styles: React.CSSProperties = {
+
+    const containerStyles: React.CSSProperties = {
         width: element.width,
         height: element.height,
         transform: `rotate(${element.rotation}deg)`,
@@ -100,92 +98,66 @@ const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSel
         display: 'flex',
         flexDirection: 'column',
         mixBlendMode: 'blendMode' in element ? element.blendMode : 'normal',
-        overflow: 'hidden', // Clip content that overflows the box
+        overflow: 'hidden',
     };
     
+    const contentStyles: React.CSSProperties = {
+        width: '100%',
+        height: '100%',
+        outline: 'none',
+        pointerEvents: isEditing ? 'all' : 'none',
+    };
+
     if (element.type === 'text') {
-        styles.color = element.color;
-        styles.fontFamily = `'${element.fontFamily}', sans-serif`;
-        styles.fontSize = `${element.fontSize}px`;
-        styles.fontWeight = element.fontWeight;
-        styles.fontStyle = element.fontStyle;
-        styles.textDecoration = element.textDecoration;
-        styles.textAlign = element.textAlign;
-        styles.letterSpacing = `${element.letterSpacing}px`;
-        styles.lineHeight = element.lineHeight;
-        styles.justifyContent =
+        containerStyles.color = element.color;
+        containerStyles.fontFamily = `'${element.fontFamily}', sans-serif`;
+        containerStyles.fontSize = `${element.fontSize}px`;
+        containerStyles.fontWeight = element.fontWeight;
+        containerStyles.fontStyle = element.fontStyle;
+        containerStyles.textDecoration = element.textDecoration;
+        containerStyles.textAlign = element.textAlign;
+        containerStyles.letterSpacing = `${element.letterSpacing}px`;
+        containerStyles.lineHeight = element.lineHeight;
+        containerStyles.justifyContent =
             element.verticalAlign === 'top' ? 'flex-start' :
             element.verticalAlign === 'bottom' ? 'flex-end' :
             'center';
        
-        styles.backgroundColor = element.backgroundColor;
-        styles.padding = `${element.padding || 0}px`;
-        styles.borderRadius = `${element.borderRadius || 0}px`;
+        containerStyles.backgroundColor = element.backgroundColor;
+        containerStyles.padding = `${element.padding || 0}px`;
+        containerStyles.borderRadius = `${element.borderRadius || 0}px`;
     }
 
     if (element.type === 'image') {
         const f = element.filters;
-        styles.filter = `brightness(${f.brightness}) contrast(${f.contrast}) saturate(${f.saturate}) blur(${f.blur}px) grayscale(${f.grayscale || 0}) sepia(${f.sepia || 0}) hue-rotate(${f.hueRotate || 0}deg) invert(${f.invert || 0})`;
+        containerStyles.filter = `brightness(${f.brightness}) contrast(${f.contrast}) saturate(${f.saturate}) blur(${f.blur}px) grayscale(${f.grayscale || 0}) sepia(${f.sepia || 0}) hue-rotate(${f.hueRotate || 0}deg) invert(${f.invert || 0})`;
     }
     
     if (element.type === 'image' || element.type === 'shape') {
-        styles.border = `${element.borderWidth || 0}px ${element.borderStyle || 'solid'} ${element.borderColor || 'transparent'}`;
+        containerStyles.border = `${element.borderWidth || 0}px ${element.borderStyle || 'solid'} ${element.borderColor || 'transparent'}`;
     }
 
     const renderContent = () => {
-        if (element.type === 'text' && isEditing) {
-            return (
-                <textarea
-                    value={editText}
-                    onChange={(e) => setEditText(e.target.value)}
-                    onBlur={handleTextBlur}
-                    autoFocus
-                    onKeyDown={(e) => e.stopPropagation()} // Prevent pan on space
-                    style={{
-                        width: '100%',
-                        height: '100%',
-                        background: 'transparent',
-                        outline: 'none',
-                        resize: 'none',
-                        border: 'none',
-                        color: 'inherit',
-                        fontFamily: 'inherit',
-                        fontSize: 'inherit',
-                        fontWeight: 'inherit',
-                        fontStyle: 'inherit',
-                        textAlign: 'inherit',
-                        letterSpacing: 'inherit',
-                        lineHeight: 'inherit',
-                        padding: 0, // Padding is on the parent
-                        margin: 0,
-                        overflowWrap: 'break-word',
-                    }}
-                />
-            );
-        }
-        
-        const baseStyle: React.CSSProperties = { width: '100%', height: '100%', pointerEvents: 'none' };
-
         switch (element.type) {
             case 'text':
-                // The text content itself should wrap and align based on its own properties
-                const textInnerStyle: React.CSSProperties = {
-                    whiteSpace: 'pre-wrap',
-                    overflowWrap: 'break-word',
-                    textAlign: element.textAlign,
-                };
                 return (
-                    <div style={textInnerStyle}>
-                        <TextParser content={element.content} highlightColor={element.highlightColor} accentFontFamily={element.accentFontFamily}/>
-                    </div>
+                    <div
+                        ref={contentRef}
+                        contentEditable={isEditing}
+                        onBlur={handleBlur}
+                        onKeyDown={(e) => e.stopPropagation()} // Prevent pan on space when editing
+                        suppressContentEditableWarning={true}
+                        style={{...contentStyles, whiteSpace: 'pre-wrap', overflowWrap: 'break-word'}}
+                        dangerouslySetInnerHTML={{ __html: element.content }}
+                    />
                 );
             case 'image':
-                return <img src={element.src} style={{ ...baseStyle, objectFit: 'cover' }} alt="user content" />;
+                return <img src={element.src} style={{ ...contentStyles, objectFit: 'cover' }} alt="user content" />;
             case 'gradient':
-                return <div style={{ ...baseStyle, background: `linear-gradient(${element.angle}deg, ${element.color1}, ${element.color2})` }} />;
+                return <div style={{ ...contentStyles, background: `linear-gradient(${element.angle}deg, ${element.color1}, ${element.color2})` }} />;
             case 'shape':
                 const shapeEl = element as ShapeElement;
-                return <div style={{...baseStyle, backgroundColor: shapeEl.fillColor, borderRadius: shapeEl.shape === 'circle' ? '50%' : '0%'}} />;
+                return <div style={{...contentStyles, backgroundColor: shapeEl.fillColor, borderRadius: shapeEl.shape === 'circle' ? '50%' : '0%'}} />;
             case 'qrcode':
                 const qrEl = element as QRCodeElement;
                 return <QRCodeDisplay url={qrEl.url} color={qrEl.color} backgroundColor={qrEl.backgroundColor} width={qrEl.width} />;
@@ -208,7 +180,7 @@ const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSel
             <div
                 ref={nodeRef}
                 className={`absolute group ${isSelected && !isLocked ? 'border-2 border-purple-500' : 'border-2 border-transparent hover:border-purple-500/30'} ${!isLocked && !isEditing ? 'handle cursor-move' : 'cursor-default'}`}
-                style={styles}
+                style={containerStyles}
                 onClick={(e) => { e.stopPropagation(); onSelect(element.id); }}
                 onDoubleClick={handleDoubleClick}
             >

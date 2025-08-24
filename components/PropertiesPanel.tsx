@@ -67,6 +67,7 @@ const Accordion: React.FC<{ title: string; children: React.ReactNode; defaultOpe
 interface PropertiesPanelProps {
     selectedElement: Exclude<AnyElement, BackgroundElement> | undefined;
     onUpdateElement: (elementId: string, updates: Partial<AnyElement>) => void;
+    onUpdateTextProperty: (prop: string, value: any) => void;
     availableFonts: FontDefinition[];
     onAddFont: (font: FontDefinition) => void;
     onOpenColorPicker: (currentColor: string, onColorChange: (color: string) => void) => void;
@@ -77,7 +78,7 @@ const blendModes: BlendMode[] = [
     'hard-light', 'soft-light', 'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity'
 ];
 
-const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedElement, onUpdateElement, availableFonts, onAddFont, onOpenColorPicker }) => {
+const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedElement, onUpdateElement, onUpdateTextProperty, availableFonts, onAddFont, onOpenColorPicker }) => {
     
     const fontInputRef = useRef<HTMLInputElement>(null);
 
@@ -100,7 +101,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedElement, onUp
                 const dataUrl = e.target?.result as string;
                 const newFont: FontDefinition = { name: fontName, dataUrl };
                 onAddFont(newFont);
-                handleInputChange('fontFamily', fontName);
+                onUpdateTextProperty('fontFamily', fontName);
                 toast.success(`Fonte "${fontName}" adicionada!`);
             };
             reader.readAsDataURL(file);
@@ -156,7 +157,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedElement, onUp
                                 <div>
                                     <label className="block text-xs font-medium text-gray-400">Conteúdo</label>
                                     <textarea 
-                                        value={(selectedElement as TextElement).content}
+                                        value={(selectedElement as TextElement).content.replace(/<[^>]*>?/gm, '')} // Show plain text for simplicity
                                         onChange={e => handleInputChange('content', e.target.value)}
                                         className="w-full mt-1 bg-black/50 border border-zinc-600 rounded-md px-2 py-1 text-white text-xs"
                                         rows={3}
@@ -165,7 +166,7 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedElement, onUp
                                  <div>
                                     <label className="block text-xs font-medium text-gray-400">Fonte</label>
                                     <div className="flex space-x-2 mt-1">
-                                        <SelectInput label="" value={(selectedElement as TextElement).fontFamily} onChange={val => handleInputChange('fontFamily', val)}>
+                                        <SelectInput label="" value={(selectedElement as TextElement).fontFamily} onChange={val => onUpdateTextProperty('fontFamily', val)}>
                                             {availableFonts.map(font => <option key={font.name} value={font.name}>{font.name}</option>)}
                                         </SelectInput>
                                         <button onClick={() => fontInputRef.current?.click()} className="p-2 bg-zinc-700 hover:bg-zinc-600 rounded-md" title="Carregar fonte">
@@ -175,13 +176,13 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedElement, onUp
                                     </div>
                                 </div>
                                  <div className="grid grid-cols-2 gap-2">
-                                    <NumberInput label="Tamanho" value={(selectedElement as TextElement).fontSize} onChange={val => handleInputChange('fontSize', parseInt(val, 10))} min={1} unit="px"/>
-                                    <ColorInput label="Cor" color={(selectedElement as TextElement).color} onChange={val => handleInputChange('color', val)} onOpenColorPicker={onOpenColorPicker} />
+                                    <NumberInput label="Tamanho" value={(selectedElement as TextElement).fontSize} onChange={val => onUpdateTextProperty('fontSize', parseInt(val, 10))} min={1} unit="px"/>
+                                    <ColorInput label="Cor" color={(selectedElement as TextElement).color} onChange={val => onUpdateTextProperty('color', val)} onOpenColorPicker={onOpenColorPicker} />
                                 </div>
                                 <div className="flex items-center space-x-1 p-1 bg-black/30 rounded-md">
-                                    <button onClick={() => handleInputChange('fontWeight', (selectedElement as TextElement).fontWeight === 700 ? 400 : 700)} className={`flex-1 text-center py-1 rounded text-xs transition-colors ${(selectedElement as TextElement).fontWeight === 700 ? 'bg-zinc-600 text-white' : 'hover:bg-zinc-700 text-gray-300'}`}><b className="font-sans">B</b></button>
-                                    <button onClick={() => handleInputChange('fontStyle', (selectedElement as TextElement).fontStyle === 'italic' ? 'normal' : 'italic')} className={`flex-1 text-center py-1 rounded text-xs transition-colors ${(selectedElement as TextElement).fontStyle === 'italic' ? 'bg-zinc-600 text-white' : 'hover:bg-zinc-700 text-gray-300'}`}><i>I</i></button>
-                                    <button onClick={() => handleInputChange('textDecoration', (selectedElement as TextElement).textDecoration === 'underline' ? 'none' : 'underline')} className={`flex-1 text-center py-1 rounded text-xs transition-colors ${(selectedElement as TextElement).textDecoration === 'underline' ? 'bg-zinc-600 text-white' : 'hover:bg-zinc-700 text-gray-300'}`}><u>U</u></button>
+                                    <button onClick={() => onUpdateTextProperty('fontWeight', (selectedElement as TextElement).fontWeight === 700 ? 400 : 700)} className={`flex-1 text-center py-1 rounded text-xs transition-colors ${(selectedElement as TextElement).fontWeight === 700 ? 'bg-zinc-600 text-white' : 'hover:bg-zinc-700 text-gray-300'}`}><b className="font-sans">B</b></button>
+                                    <button onClick={() => onUpdateTextProperty('fontStyle', (selectedElement as TextElement).fontStyle === 'italic' ? 'normal' : 'italic')} className={`flex-1 text-center py-1 rounded text-xs transition-colors ${(selectedElement as TextElement).fontStyle === 'italic' ? 'bg-zinc-600 text-white' : 'hover:bg-zinc-700 text-gray-300'}`}><i>I</i></button>
+                                    <button onClick={() => onUpdateTextProperty('textDecoration', (selectedElement as TextElement).textDecoration === 'underline' ? 'none' : 'underline')} className={`flex-1 text-center py-1 rounded text-xs transition-colors ${(selectedElement as TextElement).textDecoration === 'underline' ? 'bg-zinc-600 text-white' : 'hover:bg-zinc-700 text-gray-300'}`}><u>U</u></button>
                                 </div>
                                 <div className="grid grid-cols-2 gap-2">
                                      <SelectInput label="Alinhamento" value={(selectedElement as TextElement).textAlign} onChange={val => handleInputChange('textAlign', val)}>

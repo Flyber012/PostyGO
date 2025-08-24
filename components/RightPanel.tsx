@@ -21,6 +21,7 @@ interface RightPanelProps {
     availableFonts: FontDefinition[];
     onAddFont: (font: FontDefinition) => void;
     onOpenColorPicker: (currentColor: string, onColorChange: (color: string) => void) => void;
+    onUpdateTextProperty: (prop: string, value: any) => void;
     palettes: {
         post?: string[];
         custom?: string[];
@@ -63,7 +64,7 @@ const RightPanel: React.FC<RightPanelProps> = (props) => {
     return (
         <div ref={rightPanelRef} className="w-full bg-zinc-900 flex flex-col h-full">
             <div style={{ height: `${propertiesPanelHeight}px` }} className="flex-shrink-0 overflow-hidden">
-                <PropertiesPanel {...props} selectedElement={selectedElement} />
+                <PropertiesPanel {...props} selectedElement={selectedElement} onUpdateTextProperty={props.onUpdateTextProperty} />
             </div>
             <div
                 onMouseDown={handleMouseDown}

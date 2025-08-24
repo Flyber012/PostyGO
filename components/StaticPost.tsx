@@ -3,28 +3,6 @@ import React from 'react';
 import { Post, PostSize, AnyElement, TextElement, ImageElement, GradientElement, BackgroundElement, ShapeElement, QRCodeElement } from '../types';
 import QRCodeDisplay from './QRCodeDisplay';
 
-interface TextParserProps {
-    content: string;
-    highlightColor?: string;
-    accentFontFamily?: string;
-    baseFontFamily: string;
-}
-
-const TextParser: React.FC<TextParserProps> = ({ content, highlightColor, accentFontFamily, baseFontFamily }) => {
-    const parts = content.split(/(\*\*.*?\*\*)/g).filter(Boolean);
-    return (
-        <>
-            {parts.map((part, index) => {
-                if (part.startsWith('**') && part.endsWith('**')) {
-                    const fontFamily = accentFontFamily ? `'${accentFontFamily}', sans-serif` : 'inherit';
-                    return <span key={index} style={{ color: highlightColor || '#FBBF24', fontFamily }}>{part.slice(2, -2)}</span>;
-                }
-                return <React.Fragment key={index}>{part}</React.Fragment>;
-            })}
-        </>
-    );
-};
-
 interface StaticPostProps {
   post: Post;
   postSize: PostSize;
@@ -38,7 +16,7 @@ const renderElement = (element: AnyElement) => {
     switch(element.type) {
         case 'text':
             const textEl = element as TextElement;
-            return <div><TextParser content={textEl.content} highlightColor={textEl.highlightColor} accentFontFamily={textEl.accentFontFamily} baseFontFamily={textEl.fontFamily} /></div>;
+            return <div dangerouslySetInnerHTML={{ __html: textEl.content }} />;
         case 'image':
             return <img src={element.src} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />;
         case 'gradient':
@@ -90,6 +68,8 @@ const getElementStyles = (element: AnyElement): React.CSSProperties => {
                             element.verticalAlign === 'bottom' ? 'flex-end' :
                             'center',
             borderRadius: `${element.borderRadius || 0}px`,
+            whiteSpace: 'pre-wrap',
+            overflowWrap: 'break-word',
         };
         
         let combinedTextShadow = element.textShadow || '';

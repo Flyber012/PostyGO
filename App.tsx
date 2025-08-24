@@ -28,6 +28,22 @@ const readFileAsBase64 = (file: File): Promise<string> => {
     });
 };
 
+const convertMarkdownToHtml = (text: string, highlightColor?: string, accentFontFamily?: string): string => {
+    if (!text) return '';
+    const parts = text.split(/(\*\*.*?\*\*)/g).filter(Boolean);
+    return parts.map(part => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+            let style = 'font-weight: 700;';
+            if (highlightColor) style += `color: ${highlightColor};`;
+            if (accentFontFamily) style += `font-family: '${accentFontFamily}', sans-serif;`;
+            // Using a span with styles is more flexible for AI output and editing than a simple <strong> tag.
+            return `<span style="${style}">${part.slice(2, -2)}</span>`;
+        }
+        // Basic escaping for security, can be improved if needed
+        return part.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }).join('');
+};
+
 const convertAILayoutToElements = (aiLayout: AIGeneratedTextElement[], postSize: PostSize, postId: string): TextElement[] => {
     return aiLayout.map((aiEl, index) => {
         const { width: postWidth, height: postHeight } = postSize;
@@ -41,7 +57,7 @@ const convertAILayoutToElements = (aiLayout: AIGeneratedTextElement[], postSize:
         const element: TextElement = {
             id: `${postId}-text-${index}`,
             type: 'text',
-            content: aiEl.content,
+            content: convertMarkdownToHtml(aiEl.content, aiEl.highlightColor, aiEl.accentFontFamily),
             x: (aiEl.x / 100) * postWidth,
             y: (aiEl.y / 100) * postHeight,
             width: (aiEl.width / 100) * postWidth,
@@ -57,7 +73,8 @@ const convertAILayoutToElements = (aiLayout: AIGeneratedTextElement[], postSize:
             rotation: aiEl.rotation || 0,
             opacity: 1, locked: false, visible: true,
             letterSpacing: 0, lineHeight: aiEl.lineHeight || 1,
-            highlightColor: aiEl.highlightColor, accentFontFamily: aiEl.accentFontFamily,
+            // The following are now part of the HTML content string
+            // highlightColor: aiEl.highlightColor, accentFontFamily: aiEl.accentFontFamily,
             backgroundColor: aiEl.backgroundColor,
             padding: aiEl.fontSize === 'cta' ? fontSize * 0.5 : 0,
             borderRadius: aiEl.fontSize === 'cta' ? 8 : 0,
@@ -203,6 +220,9 @@ const App: React.FC = () => {
     const [viewState, setViewState] = useState({ zoom: 1, offset: { x: 0, y: 0 } });
     const [isPanning, setIsPanning] = useState(false);
     const panStart = useRef<{x: number, y: number, ox: number, oy: number} | null>(null);
+
+    // Rich Text Editing State
+    const activeEditorRef = useRef<{ id: string, node: HTMLDivElement } | null>(null);
 
     // Generation Settings (persist across projects for convenience)
     const [topic, setTopic] = useState('Productivity Hacks');
@@ -693,16 +713,56 @@ const App: React.FC = () => {
         updatePostElement(selectedElement.id, { x: newX, y: newY });
     };
 
-    const handleToggleTextStyle = (prop: 'fontWeight' | 'fontStyle' | 'textDecoration') => {
-        if (!selectedElement || selectedElement.type !== 'text') return;
-        let newValue: any;
-        switch(prop) {
-            case 'fontWeight': newValue = selectedElement.fontWeight === 700 ? 400 : 700; break;
-            case 'fontStyle': newValue = selectedElement.fontStyle === 'italic' ? 'normal' : 'italic'; break;
-            case 'textDecoration': newValue = selectedElement.textDecoration === 'underline' ? 'none' : 'underline'; break;
-        }
-        updatePostElement(selectedElement.id, { [prop]: newValue });
+     const handleStartEditing = (id: string, node: HTMLDivElement) => {
+        activeEditorRef.current = { id, node };
     };
+    const handleStopEditing = () => {
+        activeEditorRef.current = null;
+    };
+
+    const handleToggleTextStyle = (style: 'bold' | 'italic' | 'underline') => {
+        if (!selectedElement || selectedElement.type !== 'text') return;
+
+        if (activeEditorRef.current && activeEditorRef.current.id === selectedElement.id) {
+            document.execCommand(style);
+            const newContent = activeEditorRef.current.node.innerHTML;
+            updatePostElement(selectedElement.id, { content: newContent });
+            activeEditorRef.current.node.focus();
+        } else {
+            const propMap = { bold: 'fontWeight', italic: 'fontStyle', underline: 'textDecoration' };
+            const prop = propMap[style];
+            let newValue: any;
+            switch(prop) {
+                case 'fontWeight': newValue = selectedElement.fontWeight === 700 ? 400 : 700; break;
+                case 'fontStyle': newValue = selectedElement.fontStyle === 'italic' ? 'normal' : 'italic'; break;
+                case 'textDecoration': newValue = selectedElement.textDecoration === 'underline' ? 'none' : 'underline'; break;
+            }
+            updatePostElement(selectedElement.id, { [prop]: newValue });
+        }
+    };
+    
+    const handleUpdateTextProperty = (prop: string, value: any) => {
+        if (!selectedElement || selectedElement.type !== 'text') return;
+        
+        if (activeEditorRef.current && activeEditorRef.current.id === selectedElement.id) {
+            const commandMap: Record<string, string> = {
+                fontFamily: 'fontName',
+                color: 'foreColor'
+            };
+            const command = commandMap[prop];
+            if (command) {
+                document.execCommand(command, false, value);
+                const newContent = activeEditorRef.current.node.innerHTML;
+                updatePostElement(selectedElement.id, { content: newContent });
+                activeEditorRef.current.node.focus();
+            } else {
+                 updatePostElement(selectedElement.id, { [prop]: value });
+            }
+        } else {
+            updatePostElement(selectedElement.id, { [prop]: value });
+        }
+    };
+
 
     const handleRemoveBg = () => toast("Remoção de fundo com IA em breve!");
     const handleGenerateVariation = () => toast("Geração de variação com IA em breve!");
@@ -710,7 +770,7 @@ const App: React.FC = () => {
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.code === 'Space' && !e.repeat && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
+            if (e.code === 'Space' && !e.repeat && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName) && !(e.target as HTMLElement).isContentEditable) {
                 e.preventDefault();
                 setIsPanning(true);
                 if (viewportRef.current) viewportRef.current.style.cursor = 'grab';
@@ -834,7 +894,15 @@ const App: React.FC = () => {
                                         transform: `translate(${viewState.offset.x}px, ${viewState.offset.y}px) scale(${viewState.zoom})`,
                                         transformOrigin: 'top left'
                                     }}>
-                                        <CanvasEditor post={selectedPost} postSize={postSize} onUpdateElement={updatePostElement} selectedElementId={selectedElementId} onSelectElement={setSelectedElementId} />
+                                        <CanvasEditor 
+                                            post={selectedPost} 
+                                            postSize={postSize} 
+                                            onUpdateElement={updatePostElement} 
+                                            selectedElementId={selectedElementId} 
+                                            onSelectElement={setSelectedElementId}
+                                            onStartEditing={handleStartEditing}
+                                            onStopEditing={handleStopEditing}
+                                        />
                                     </div>
                                 ) : (
                                     <div className="text-center text-gray-400 p-4">
@@ -867,9 +935,9 @@ const App: React.FC = () => {
                               {selectedElement?.type === 'text' && (
                                 <>
                                 <div className="flex items-center space-x-1">
-                                    <button onClick={() => handleToggleTextStyle('fontWeight')} className={`p-2 hover:bg-zinc-700 rounded-md ${selectedElement.fontWeight === 700 ? 'text-purple-400' : ''}`}><Bold className="w-5 h-5"/></button>
-                                    <button onClick={() => handleToggleTextStyle('fontStyle')} className={`p-2 hover:bg-zinc-700 rounded-md ${selectedElement.fontStyle === 'italic' ? 'text-purple-400' : ''}`}><Italic className="w-5 h-5"/></button>
-                                    <button onClick={() => handleToggleTextStyle('textDecoration')} className={`p-2 hover:bg-zinc-700 rounded-md ${selectedElement.textDecoration === 'underline' ? 'text-purple-400' : ''}`}><Underline className="w-5 h-5"/></button>
+                                    <button onClick={() => handleToggleTextStyle('bold')} className={`p-2 hover:bg-zinc-700 rounded-md ${selectedElement.fontWeight === 700 ? 'text-purple-400' : ''}`}><Bold className="w-5 h-5"/></button>
+                                    <button onClick={() => handleToggleTextStyle('italic')} className={`p-2 hover:bg-zinc-700 rounded-md ${selectedElement.fontStyle === 'italic' ? 'text-purple-400' : ''}`}><Italic className="w-5 h-5"/></button>
+                                    <button onClick={() => handleToggleTextStyle('underline')} className={`p-2 hover:bg-zinc-700 rounded-md ${selectedElement.textDecoration === 'underline' ? 'text-purple-400' : ''}`}><Underline className="w-5 h-5"/></button>
                                 </div>
                                 <div className="w-px h-5 bg-zinc-700 mx-1"></div>
                                 </>
@@ -898,6 +966,7 @@ const App: React.FC = () => {
                             onAddElement={handleAddElement} onRemoveElement={removeElement} onDuplicateElement={duplicateElement} onToggleVisibility={(id) => toggleElementProperty(id, 'visible')}
                             onToggleLock={(id) => toggleElementProperty(id, 'locked')} onReorderElements={reorderElements} onRegenerateBackground={() => {}} onUpdateBackgroundSrc={() => {}}
                             availableFonts={availableFonts} onAddFont={handleAddFont} onOpenColorPicker={handleOpenColorPicker} palettes={{ post: selectedPost?.palette, custom: customPalette }}
+                            onUpdateTextProperty={handleUpdateTextProperty}
                         />
                     ) : <EmptyPanelPlaceholder text="Selecione um post para ver suas camadas e propriedades."/>}
                 </aside>

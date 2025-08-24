@@ -20,15 +20,13 @@ export type BlendMode = 'normal' | 'multiply' | 'screen' | 'overlay' | 'darken' 
 
 export interface TextElement extends BaseElement {
     type: 'text';
-    content: string;
+    content: string; // Can now contain HTML for rich text
     fontSize: number;
     fontFamily: string;
     fontWeight: number; // e.g. 400 for regular, 700 for bold
     fontStyle: 'normal' | 'italic';
     textDecoration: 'none' | 'underline' | 'line-through';
-    accentFontFamily?: string;
     color: string;
-    highlightColor?: string;
     textAlign: 'left' | 'center' | 'right';
     verticalAlign: 'top' | 'middle' | 'bottom';
     letterSpacing: number; // in px
