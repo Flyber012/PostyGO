@@ -27,7 +27,7 @@ const LayersPanel: React.FC<LayersPanelProps> = (props) => {
     const dragItem = useRef<string | null>(null);
     const dragOverItem = useRef<string | null>(null);
 
-    const handleAddClick = (type: 'text' | 'shape' | 'qrcode', options?: any) => {
+    const handleAddClick = (type: 'text' | 'image' | 'shape' | 'qrcode', options?: any) => {
         onAddElement(type, options);
         setAddMenuOpen(false);
     };
@@ -69,6 +69,7 @@ const LayersPanel: React.FC<LayersPanelProps> = (props) => {
                     {isAddMenuOpen && (
                         <div className="absolute right-0 mt-2 w-48 bg-zinc-800 rounded-md shadow-lg z-20 border border-zinc-700 p-1">
                             <button onClick={() => handleAddClick('text')} className="w-full text-left flex items-center p-2 text-sm rounded hover:bg-zinc-700"><Type className="w-4 h-4 mr-2"/> Texto</button>
+                            <button onClick={() => handleAddClick('image')} className="w-full text-left flex items-center p-2 text-sm rounded hover:bg-zinc-700"><ImageIcon className="w-4 h-4 mr-2"/> Imagem</button>
                             <button onClick={() => handleAddClick('shape', {shape: 'rectangle'})} className="w-full text-left flex items-center p-2 text-sm rounded hover:bg-zinc-700"><Square className="w-4 h-4 mr-2"/> Retângulo</button>
                             <button onClick={() => handleAddClick('shape', {shape: 'circle'})} className="w-full text-left flex items-center p-2 text-sm rounded hover:bg-zinc-700"><Circle className="w-4 h-4 mr-2"/> Círculo</button>
                             <button onClick={() => handleAddClick('qrcode')} className="w-full text-left flex items-center p-2 text-sm rounded hover:bg-zinc-700"><QrCode className="w-4 h-4 mr-2"/> QR Code</button>

@@ -15,7 +15,7 @@ import { GenerationWizard } from './components/GenerationWizard';
 import { BrandKitPanel } from './components/BrandKitPanel';
 import saveAs from 'file-saver';
 import { v4 as uuidv4 } from 'uuid';
-import { ZoomIn, ZoomOut, Maximize, Package, Image as ImageIcon, FileText, X, LayoutTemplate as LayoutTemplateIcon, Plus, Layers, AlignHorizontalJustifyCenter, AlignHorizontalJustifyStart, AlignHorizontalJustifyEnd, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize, Package, Image as ImageIcon, FileText, X, LayoutTemplate as LayoutTemplateIcon, Plus, Layers, AlignHorizontalJustifyCenter, AlignHorizontalJustifyStart, AlignHorizontalJustifyEnd, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Bold, Italic, Underline, Wand2, RefreshCcw } from 'lucide-react';
 import AdvancedColorPicker from './components/ColorPicker';
 
 // --- HELPERS ---
@@ -202,7 +202,7 @@ const App: React.FC = () => {
     // Canvas View State
     const [viewState, setViewState] = useState({ zoom: 1, offset: { x: 0, y: 0 } });
     const [isPanning, setIsPanning] = useState(false);
-    const panStart = useRef<{x: number, y: number} | null>(null);
+    const panStart = useRef<{x: number, y: number, ox: number, oy: number} | null>(null);
 
     // Generation Settings (persist across projects for convenience)
     const [topic, setTopic] = useState('Productivity Hacks');
@@ -229,6 +229,7 @@ const App: React.FC = () => {
     const viewportRef = useRef<HTMLDivElement>(null);
     const openProjectInputRef = useRef<HTMLInputElement>(null);
     const importKitRef = useRef<HTMLInputElement>(null);
+    const imageUploadRef = useRef<HTMLInputElement>(null);
 
     // --- DERIVED STATE ---
     const currentProject = projects.find(p => p.id === currentProjectId) || null;
@@ -505,6 +506,12 @@ const App: React.FC = () => {
 
     const handleAddElement = (type: 'text' | 'image' | 'gradient' | 'shape' | 'qrcode', options?: { src?: string, shape?: 'rectangle' | 'circle' }) => {
         if (!selectedPostId || !postSize) return;
+
+        if (type === 'image') {
+            imageUploadRef.current?.click();
+            return;
+        }
+
         const newId = `${selectedPostId}-${uuidv4()}`;
         const baseElement = { id: newId, x: postSize.width/2 - 150, y: postSize.height/2 - 50, width: 300, height: 100, rotation: 0, opacity: 1, locked: false, visible: true };
         let newElement: AnyElement | null = null;
@@ -517,6 +524,40 @@ const App: React.FC = () => {
              setSelectedElementId(newId);
         }
     };
+
+    const handleImageUploadForElement = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file || !selectedPostId || !postSize) return;
+
+        const toastId = toast.loading('Carregando imagem...');
+        try {
+            const src = await readFileAsBase64(file);
+            const newId = `${selectedPostId}-${uuidv4()}`;
+            const img = new Image();
+            img.onload = () => {
+                const aspectRatio = img.width / img.height;
+                let width = 300;
+                let height = width / aspectRatio;
+
+                const newElement: ImageElement = {
+                    id: newId, type: 'image', src,
+                    x: postSize.width / 2 - width / 2, y: postSize.height / 2 - height / 2,
+                    width, height, rotation: 0, opacity: 1, locked: false, visible: true,
+                    filters: { brightness: 1, contrast: 1, saturate: 1, blur: 0, grayscale: 0, sepia: 0, hueRotate: 0, invert: 0 }
+                };
+                setPosts(prev => prev.map(p => p.id === selectedPostId ? { ...p, elements: [...p.elements, newElement] } : p));
+                setSelectedElementId(newId);
+                toast.success('Imagem adicionada!', { id: toastId });
+            };
+            img.src = src;
+
+        } catch (error) {
+            toast.error('Falha ao carregar imagem.', { id: toastId });
+        } finally {
+            event.target.value = ''; // Reset input
+        }
+    };
+
 
     const removeElement = (elementId: string) => {
         if (!selectedPostId) return;
@@ -612,7 +653,7 @@ const App: React.FC = () => {
     const handleMouseDown = (e: React.MouseEvent) => {
         if (isPanning && viewportRef.current) {
             e.preventDefault();
-            panStart.current = { x: e.clientX, y: e.clientY };
+            panStart.current = { x: e.clientX, y: e.clientY, ox: viewState.offset.x, oy: viewState.offset.y };
             viewportRef.current.style.cursor = 'grabbing';
         }
     };
@@ -621,11 +662,7 @@ const App: React.FC = () => {
         if (isPanning && panStart.current && viewportRef.current) {
             const dx = e.clientX - panStart.current.x;
             const dy = e.clientY - panStart.current.y;
-            panStart.current = { x: e.clientX, y: e.clientY };
-            setViewState(prev => ({
-                ...prev,
-                offset: { x: prev.offset.x + dx, y: prev.offset.y + dy }
-            }));
+            setViewState(prev => ({ ...prev, offset: { x: panStart.current!.ox + dx, y: panStart.current!.oy + dy }}));
         }
     };
     
@@ -656,6 +693,21 @@ const App: React.FC = () => {
         updatePostElement(selectedElement.id, { x: newX, y: newY });
     };
 
+    const handleToggleTextStyle = (prop: 'fontWeight' | 'fontStyle' | 'textDecoration') => {
+        if (!selectedElement || selectedElement.type !== 'text') return;
+        let newValue: any;
+        switch(prop) {
+            case 'fontWeight': newValue = selectedElement.fontWeight === 700 ? 400 : 700; break;
+            case 'fontStyle': newValue = selectedElement.fontStyle === 'italic' ? 'normal' : 'italic'; break;
+            case 'textDecoration': newValue = selectedElement.textDecoration === 'underline' ? 'none' : 'underline'; break;
+        }
+        updatePostElement(selectedElement.id, { [prop]: newValue });
+    };
+
+    const handleRemoveBg = () => toast("Remoção de fundo com IA em breve!");
+    const handleGenerateVariation = () => toast("Geração de variação com IA em breve!");
+
+
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.code === 'Space' && !e.repeat && !['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) {
@@ -668,6 +720,7 @@ const App: React.FC = () => {
             if (e.code === 'Space') {
                 setIsPanning(false);
                 if (viewportRef.current) viewportRef.current.style.cursor = 'default';
+                panStart.current = null;
             }
         };
         window.addEventListener('keydown', handleKeyDown);
@@ -719,6 +772,7 @@ const App: React.FC = () => {
             
             <input type="file" ref={openProjectInputRef} onChange={handleOpenProjectFile} accept=".posty" className="hidden" />
             <input type="file" ref={importKitRef} onChange={() => {}} accept=".json" className="hidden" />
+            <input type="file" ref={imageUploadRef} onChange={handleImageUploadForElement} accept="image/*" className="hidden" />
 
             <div className={`app-layout font-sans bg-gray-950 text-gray-100 ${projects.length > 0 && isLeftPanelOpen ? 'left-panel-open' : ''} ${projects.length > 0 && isRightPanelOpen ? 'right-panel-open' : ''}`}>
                 <Header 
@@ -794,7 +848,7 @@ const App: React.FC = () => {
 
                     {projects.length > 0 && (
                         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center space-x-2 bg-zinc-900/70 backdrop-blur-sm p-2 rounded-lg shadow-lg z-10">
-                             {selectedElement && selectedElement.type !== 'background' && (
+                            {selectedElement && selectedElement.type !== 'background' && (
                                 <>
                                 <div className="flex items-center space-x-1">
                                     <button onClick={() => handleAlignElement('left')} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Alinhar à Esquerda"><AlignHorizontalJustifyStart className="w-5 h-5"/></button>
@@ -810,6 +864,25 @@ const App: React.FC = () => {
                                  <div className="w-px h-5 bg-zinc-700 mx-1"></div>
                                 </>
                              )}
+                              {selectedElement?.type === 'text' && (
+                                <>
+                                <div className="flex items-center space-x-1">
+                                    <button onClick={() => handleToggleTextStyle('fontWeight')} className={`p-2 hover:bg-zinc-700 rounded-md ${selectedElement.fontWeight === 700 ? 'text-purple-400' : ''}`}><Bold className="w-5 h-5"/></button>
+                                    <button onClick={() => handleToggleTextStyle('fontStyle')} className={`p-2 hover:bg-zinc-700 rounded-md ${selectedElement.fontStyle === 'italic' ? 'text-purple-400' : ''}`}><Italic className="w-5 h-5"/></button>
+                                    <button onClick={() => handleToggleTextStyle('textDecoration')} className={`p-2 hover:bg-zinc-700 rounded-md ${selectedElement.textDecoration === 'underline' ? 'text-purple-400' : ''}`}><Underline className="w-5 h-5"/></button>
+                                </div>
+                                <div className="w-px h-5 bg-zinc-700 mx-1"></div>
+                                </>
+                            )}
+                             {selectedElement?.type === 'image' && (
+                                <>
+                                <div className="flex items-center space-x-1">
+                                    <button onClick={handleRemoveBg} className="p-2 hover:bg-zinc-700 rounded-md" title="Remover Fundo (Em Breve)"><Wand2 className="w-5 h-5"/></button>
+                                    <button onClick={handleGenerateVariation} className="p-2 hover:bg-zinc-700 rounded-md" title="Gerar Variação (Em Breve)"><RefreshCcw className="w-5 h-5"/></button>
+                                </div>
+                                <div className="w-px h-5 bg-zinc-700 mx-1"></div>
+                                </>
+                            )}
                             <button onClick={() => setViewState(s => ({...s, zoom: Math.max(s.zoom / 1.25, 0.1)}))} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Zoom Out"><ZoomOut className="w-5 h-5"/></button>
                             <span className="text-sm font-mono w-16 text-center">{Math.round(viewState.zoom * 100)}%</span>
                             <button onClick={() => setViewState(s => ({...s, zoom: Math.min(s.zoom * 1.25, 5)}))} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Zoom In"><ZoomIn className="w-5 h-5"/></button>

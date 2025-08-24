@@ -35,7 +35,6 @@ const TextParser: React.FC<TextParserProps> = ({ content, highlightColor, accent
 
 const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSelected, onSelect }) => {
     const nodeRef = useRef(null);
-    const textSpanRef = useRef<HTMLSpanElement>(null);
     const [isEditing, setIsEditing] = useState(false);
     const [editText, setEditText] = useState(element.type === 'text' ? element.content : '');
 
@@ -44,28 +43,6 @@ const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSel
             setEditText(element.content);
         }
     }, [element.type === 'text' && element.content]);
-
-    useEffect(() => {
-        if (element.type === 'text' && textSpanRef.current && element.content) {
-            const span = textSpanRef.current;
-            const container = span.parentElement;
-            if (!container) return;
-
-            // Reset scale to measure natural size
-            span.style.transform = 'scale(1)';
-            span.style.whiteSpace = 'nowrap';
-            const naturalWidth = span.scrollWidth;
-            span.style.whiteSpace = 'pre-wrap'; 
-            const naturalHeight = span.scrollHeight;
-            
-            if (naturalWidth > 0 && naturalHeight > 0) {
-                const scaleX = element.width / (naturalWidth + 2); // Add a small buffer
-                const scaleY = element.height / (naturalHeight + 2);
-                const scale = Math.min(scaleX, scaleY);
-                span.style.transform = `scale(${scale})`;
-            }
-        }
-    }, [element.width, element.height, element.type === 'text' ? element.content : '', element.type === 'text' ? element.fontFamily: '', element.type === 'text' ? element.fontSize : '']);
 
 
     if (!element.visible) {
@@ -123,6 +100,7 @@ const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSel
         display: 'flex',
         flexDirection: 'column',
         mixBlendMode: 'blendMode' in element ? element.blendMode : 'normal',
+        overflow: 'hidden', // Clip content that overflows the box
     };
     
     if (element.type === 'text') {
@@ -139,15 +117,10 @@ const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSel
             element.verticalAlign === 'top' ? 'flex-start' :
             element.verticalAlign === 'bottom' ? 'flex-end' :
             'center';
-        styles.alignItems = 
-            element.textAlign === 'left' ? 'flex-start' :
-            element.textAlign === 'right' ? 'flex-end' :
-            'center';
        
         styles.backgroundColor = element.backgroundColor;
         styles.padding = `${element.padding || 0}px`;
         styles.borderRadius = `${element.borderRadius || 0}px`;
-        styles.overflow = 'hidden';
     }
 
     if (element.type === 'image') {
@@ -169,22 +142,23 @@ const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSel
                     autoFocus
                     onKeyDown={(e) => e.stopPropagation()} // Prevent pan on space
                     style={{
-                        ...styles,
                         width: '100%',
                         height: '100%',
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        margin: 0,
-                        padding: 0,
-                        border: 'none',
                         background: 'transparent',
                         outline: 'none',
                         resize: 'none',
-                        transform: 'none',
-                        zIndex: 10,
+                        border: 'none',
+                        color: 'inherit',
+                        fontFamily: 'inherit',
+                        fontSize: 'inherit',
+                        fontWeight: 'inherit',
+                        fontStyle: 'inherit',
+                        textAlign: 'inherit',
+                        letterSpacing: 'inherit',
+                        lineHeight: 'inherit',
+                        padding: 0, // Padding is on the parent
+                        margin: 0,
                         overflowWrap: 'break-word',
-                        alignItems: 'unset' // Unset flex properties for textarea
                     }}
                 />
             );
@@ -194,10 +168,16 @@ const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSel
 
         switch (element.type) {
             case 'text':
+                // The text content itself should wrap and align based on its own properties
+                const textInnerStyle: React.CSSProperties = {
+                    whiteSpace: 'pre-wrap',
+                    overflowWrap: 'break-word',
+                    textAlign: element.textAlign,
+                };
                 return (
-                    <span ref={textSpanRef} style={{ transformOrigin: 'center', display: 'inline-block', whiteSpace: 'pre-wrap' }}>
+                    <div style={textInnerStyle}>
                         <TextParser content={element.content} highlightColor={element.highlightColor} accentFontFamily={element.accentFontFamily}/>
-                    </span>
+                    </div>
                 );
             case 'image':
                 return <img src={element.src} style={{ ...baseStyle, objectFit: 'cover' }} alt="user content" />;
@@ -227,7 +207,7 @@ const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSel
         >
             <div
                 ref={nodeRef}
-                className={`absolute group ${isSelected && !isLocked ? 'border-2 border-purple-500 border-dashed' : 'border-2 border-transparent hover:border-purple-500/30'} ${!isLocked && !isEditing ? 'handle cursor-move' : 'cursor-default'}`}
+                className={`absolute group ${isSelected && !isLocked ? 'border-2 border-purple-500' : 'border-2 border-transparent hover:border-purple-500/30'} ${!isLocked && !isEditing ? 'handle cursor-move' : 'cursor-default'}`}
                 style={styles}
                 onClick={(e) => { e.stopPropagation(); onSelect(element.id); }}
                 onDoubleClick={handleDoubleClick}
