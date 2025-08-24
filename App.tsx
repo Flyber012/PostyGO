@@ -866,6 +866,11 @@ const App: React.FC = () => {
         toast.success(`Brand Kit "${kit.name}" aplicado!`);
     };
 
+    const handleApplyBrandKitAndClosePanel = (kitId: string) => {
+        handleApplyBrandKit(kitId);
+        setBrandKitPanelOpen(false);
+    };
+
     const handleExportBrandKit = (kitId: string) => {
         const kit = brandKits.find(t => t.id === kitId);
         if (!kit) { toast.error("Brand Kit não encontrado."); return; }
@@ -1242,7 +1247,7 @@ const App: React.FC = () => {
                 onImportBrandKit={handleImportBrandKit}
                 onExportBrandKit={handleExportBrandKit}
                 onDeleteBrandKit={handleDeleteBrandKit}
-                onApplyBrandKit={handleApplyBrandKit}
+                onApplyBrandKit={handleApplyBrandKitAndClosePanel}
                 onAddPostFromLayout={handleAddPostFromLayout}
                 onUpdateLayoutName={handleUpdateLayoutName}
                 onDeleteLayoutFromKit={handleDeleteLayoutFromKit}
@@ -1250,12 +1255,12 @@ const App: React.FC = () => {
                 setSelectedLayoutId={setSelectedLayoutId}
             />
 
-            <div className="flex flex-col h-full font-sans bg-gray-950 text-gray-100 overflow-hidden">
+            <div className="flex flex-col h-screen font-sans bg-gray-950 text-gray-100 overflow-hidden">
                 <header className="w-full bg-zinc-900 border-b border-zinc-800 px-4 sm:px-6 py-3 flex-shrink-0 flex items-center justify-end">
                     <UserProfile user={user} onLogin={() => {}} onLogout={handleLogout} onManageAccounts={handleManageAccounts} onBuyCredits={() => setBuyCreditsModalOpen(true)} />
                 </header>
                 <div className="flex-1 flex flex-col min-h-0">
-                    <div className="flex-1 flex flex-row min-h-0 relative">
+                    <div className="flex flex-row flex-1 min-h-0 relative">
                         {/* Painel Esquerdo (Desktop) */}
                         <div className="hidden lg:flex w-96 h-full flex-shrink-0">
                             <ControlPanel

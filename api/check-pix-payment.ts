@@ -19,9 +19,9 @@ async function getEfiToken(clientId: string, clientSecret: string, isSandbox: bo
     });
 
     if (!tokenResponse.ok) {
-        const errorData = await tokenResponse.json();
+        const errorData = await tokenResponse.json().catch(() => ({'error_description': 'Falha ao obter token.'}));
         console.error("Erro de autenticação com a Efí:", errorData);
-        throw new Error('Falha na autenticação com o provedor de pagamento.');
+        throw new Error(errorData.error_description || 'Falha na autenticação com o provedor de pagamento.');
     }
 
     const tokenData = await tokenResponse.json();
@@ -34,14 +34,13 @@ async function checkPaymentHandler(req: any, res: any) {
         return res.status(400).json({ error: 'O "txid" da transação é obrigatório.' });
     }
 
-    // ATENÇÃO: As chaves estão hardcoded para fins de desenvolvimento.
-    // Em produção, use variáveis de ambiente para segurança.
-    const clientId = "Client_Id_8c0e7adf341d9277bde8448d03ea2dfa9f2bcb8a";
-    const clientSecret = "Client_Secret_443ec3ecfcb9dc34de3f36d97771dac685f25777";
-    const isSandbox = true; // Forçando o modo sandbox para desenvolvimento local.
+    const isSandbox = process.env.EFI_SANDBOX === 'true';
+    const clientId = isSandbox ? process.env.EFI_CLIENT_ID_H : process.env.EFI_CLIENT_ID_P;
+    const clientSecret = isSandbox ? process.env.EFI_CLIENT_SECRET_H : process.env.EFI_CLIENT_SECRET_P;
 
     if (!clientId || !clientSecret) {
-        return res.status(500).json({ error: 'As credenciais da Efí não estão configuradas no servidor.' });
+        console.error("As variáveis de ambiente da Efí (EFI_CLIENT_ID_H/P, EFI_CLIENT_SECRET_H/P, EFI_SANDBOX) não estão configuradas.");
+        return res.status(500).json({ error: 'As credenciais de pagamento não estão configuradas corretamente no servidor.' });
     }
 
     try {
@@ -59,12 +58,12 @@ async function checkPaymentHandler(req: any, res: any) {
         });
         
         if (!checkResponse.ok) {
-            const errorData = await checkResponse.json();
-            console.error("Erro ao verificar cobrança na Efí:", errorData);
             // Se a cobrança não for encontrada (404), não é um erro fatal, apenas não está paga.
             if (checkResponse.status === 404) {
                  return res.status(200).json({ status: 'NAO_ENCONTRADA' });
             }
+            const errorData = await checkResponse.json().catch(() => ({ titulo: `Erro ${checkResponse.status} da API de pagamento.`}));
+            console.error("Erro ao verificar cobrança na Efí:", errorData);
             throw new Error(errorData.titulo || 'Falha ao verificar o status do pagamento.');
         }
         

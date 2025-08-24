@@ -19,9 +19,9 @@ async function getEfiToken(clientId: string, clientSecret: string, isSandbox: bo
     });
 
     if (!tokenResponse.ok) {
-        const errorData = await tokenResponse.json();
+        const errorData = await tokenResponse.json().catch(() => ({'error_description': 'Falha ao obter token.'}));
         console.error("Erro de autenticação com a Efí:", errorData);
-        throw new Error('Falha na autenticação com o provedor de pagamento.');
+        throw new Error(errorData.error_description || 'Falha na autenticação com o provedor de pagamento.');
     }
 
     const tokenData = await tokenResponse.json();
@@ -34,15 +34,16 @@ async function paymentHandler(req: any, res: any) {
         return res.status(400).json({ error: 'Os campos "amount" e "description" são obrigatórios.' });
     }
 
-    // ATENÇÃO: As chaves estão hardcoded para fins de desenvolvimento.
-    // Em produção, use variáveis de ambiente para segurança.
-    const clientId = "Client_Id_8c0e7adf341d9277bde8448d03ea2dfa9f2bcb8a";
-    const clientSecret = "Client_Secret_443ec3ecfcb9dc34de3f36d97771dac685f25777";
-    const isSandbox = true; // Forçando o modo sandbox para desenvolvimento local.
+    const isSandbox = process.env.EFI_SANDBOX === 'true';
+    const clientId = isSandbox ? process.env.EFI_CLIENT_ID_H : process.env.EFI_CLIENT_ID_P;
+    const clientSecret = isSandbox ? process.env.EFI_CLIENT_SECRET_H : process.env.EFI_CLIENT_SECRET_P;
+    const pixKey = process.env.EFI_PIX_KEY;
 
-    if (!clientId || !clientSecret) {
-        return res.status(500).json({ error: 'As credenciais da Efí não estão configuradas no servidor.' });
+    if (!clientId || !clientSecret || !pixKey) {
+        console.error("As variáveis de ambiente da Efí (EFI_CLIENT_ID_H/P, EFI_CLIENT_SECRET_H/P, EFI_PIX_KEY, EFI_SANDBOX) não estão configuradas.");
+        return res.status(500).json({ error: 'As credenciais de pagamento não estão configuradas corretamente no servidor.' });
     }
+
 
     try {
         const accessToken = await getEfiToken(clientId, clientSecret, isSandbox);
@@ -64,13 +65,13 @@ async function paymentHandler(req: any, res: any) {
             body: JSON.stringify({
                 calendario: { expiracao: 3600 }, // Expira em 1 hora
                 valor: { original: amount.toFixed(2) },
-                chave: "78895521-4d36-4b68-91e8-defb1912b18c", // Chave PIX (obrigatória em sandbox)
+                chave: pixKey,
                 solicitacaoPagador: description,
             })
         });
 
         if (!cobResponse.ok) {
-            const errorData = await cobResponse.json();
+            const errorData = await cobResponse.json().catch(() => ({ titulo: `Erro ${cobResponse.status} da API de pagamento.`}));
             console.error("Erro ao criar cobrança na Efí:", errorData);
             throw new Error(errorData.titulo || 'Falha ao criar a cobrança PIX.');
         }
@@ -87,7 +88,7 @@ async function paymentHandler(req: any, res: any) {
         });
 
         if (!qrCodeResponse.ok) {
-            const errorData = await qrCodeResponse.json();
+            const errorData = await qrCodeResponse.json().catch(() => ({ titulo: `Erro ${qrCodeResponse.status} da API de pagamento.`}));
             console.error("Erro ao gerar QR Code na Efí:", errorData);
             throw new Error(errorData.titulo || 'Falha ao gerar o QR Code.');
         }
