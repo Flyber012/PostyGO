@@ -12,18 +12,12 @@ export default async function handler(req: any, res: any) {
     }
 
     const handle = process.env.INFINITEPAY_HANDLE;
-    const clientId = process.env.INFINITEPAY_CLIENT_ID;
-    const clientSecret = process.env.INFINITEPAY_CLIENT_SECRET;
 
-    if (!handle || !clientId || !clientSecret) {
-        return res.status(500).json({ error: 'As credenciais da InfinitePay não estão configuradas corretamente no servidor.' });
+    if (!handle) {
+        return res.status(500).json({ error: 'A InfiniteTag (handle) da InfinitePay não está configurada no servidor.' });
     }
 
     try {
-        // A API de checkout/links não requer autenticação Bearer, apenas o 'handle'.
-        // No entanto, manteremos o padrão de autenticação se for necessário para outras APIs.
-        // A documentação da API de links de checkout não especifica a necessidade de token.
-        
         const checkoutResponse = await fetch('https://api.infinitepay.io/invoices/public/checkout/links', {
             method: 'POST',
             headers: {
