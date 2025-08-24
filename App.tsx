@@ -1,6 +1,7 @@
 
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { Toaster, toast } from 'react-hot-toast';
 import { Post, BrandKit, PostSize, AnyElement, TextElement, ImageElement, BackgroundElement, FontDefinition, LayoutTemplate, BrandAsset, TextStyle, Project, AIGeneratedTextElement, ShapeElement, QRCodeElement } from './types';
 import { POST_SIZES, INITIAL_FONTS, PRESET_BRAND_KITS } from './constants';
@@ -18,6 +19,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { ZoomIn, ZoomOut, Maximize, Package, Image as ImageIcon, FileText, X, LayoutTemplate as LayoutTemplateIcon, Plus, Layers, AlignHorizontalJustifyCenter, AlignHorizontalJustifyStart, AlignHorizontalJustifyEnd, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Bold, Italic, Underline, Wand2, RefreshCcw } from 'lucide-react';
 import AdvancedColorPicker from './components/ColorPicker';
 import { parseColor, rgbToHex } from './utils/color';
+import ExportModal from './components/ExportModal';
+import StaticPost from './components/StaticPost';
 
 
 // --- HELPERS ---
@@ -180,34 +183,91 @@ const ProjectTabs: React.FC<{
     onSelect: (id: string) => void;
     onClose: (id: string) => void;
     onNew: () => void;
-}> = ({ projects, currentProjectId, onSelect, onClose, onNew }) => (
-    <div className="flex-shrink-0 bg-zinc-950/50 h-10 flex items-center">
-        <nav className="flex items-center h-full overflow-x-auto pl-2">
-            {projects.map(p => (
-                 <button 
-                    key={p.id} 
-                    onClick={() => onSelect(p.id)}
-                    className={`flex items-center h-full px-4 text-sm rounded-t-md border-b-2 ${
-                        p.id === currentProjectId 
-                        ? 'bg-zinc-800 border-purple-500 text-white' 
-                        : 'bg-zinc-900 border-transparent text-gray-400 hover:bg-zinc-800/70'
-                    }`}
+    onRename: (id: string, newName: string) => void;
+}> = ({ projects, currentProjectId, onSelect, onClose, onNew, onRename }) => {
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [editingName, setEditingName] = useState('');
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (editingId && inputRef.current) {
+            inputRef.current.focus();
+            inputRef.current.select();
+        }
+    }, [editingId]);
+
+    const handleStartEditing = (project: Project) => {
+        setEditingId(project.id);
+        setEditingName(project.name);
+    };
+
+    const handleFinishEditing = () => {
+        if (editingId && editingName.trim()) {
+            onRename(editingId, editingName.trim());
+        }
+        setEditingId(null);
+        setEditingName('');
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            handleFinishEditing();
+        } else if (e.key === 'Escape') {
+            setEditingId(null);
+            setEditingName('');
+        }
+    };
+    
+    return (
+        <div className="flex-shrink-0 bg-zinc-950/50 h-10 flex items-center">
+            <nav className="flex items-center h-full overflow-x-auto pl-2">
+                {projects.map(p => (
+                     <div 
+                        key={p.id} 
+                        onClick={() => onSelect(p.id)}
+                        className={`flex items-center h-full px-4 text-sm rounded-t-md border-b-2 cursor-pointer ${
+                            p.id === currentProjectId 
+                            ? 'bg-zinc-800 border-purple-500 text-white' 
+                            : 'bg-zinc-900 border-transparent text-gray-400 hover:bg-zinc-800/70'
+                        }`}
+                    >
+                        {editingId === p.id ? (
+                            <input
+                                ref={inputRef}
+                                type="text"
+                                value={editingName}
+                                onChange={(e) => setEditingName(e.target.value)}
+                                onBlur={handleFinishEditing}
+                                onKeyDown={handleKeyDown}
+                                className="bg-transparent outline-none ring-2 ring-purple-500 rounded px-1 -mx-1"
+                                style={{ width: `${Math.max(8, editingName.length)}ch` }}
+                            />
+                        ) : (
+                             <span onDoubleClick={() => handleStartEditing(p)}>{p.name}</span>
+                        )}
+                        <X onClick={(e) => { e.stopPropagation(); onClose(p.id); }} className="w-4 h-4 ml-3 rounded-full p-0.5 hover:bg-white/20"/>
+                     </div>
+                ))}
+                 <button
+                    onClick={onNew}
+                    className="ml-1 h-8 w-8 flex-shrink-0 flex items-center justify-center rounded-md hover:bg-zinc-800/70 text-gray-400 hover:text-white transition-colors"
+                    title="Novo projeto"
                 >
-                    <span>{p.name}</span>
-                    <X onClick={(e) => { e.stopPropagation(); onClose(p.id); }} className="w-4 h-4 ml-3 rounded-full p-0.5 hover:bg-white/20"/>
-                 </button>
-            ))}
-             <button
-                onClick={onNew}
-                className="ml-1 h-8 w-8 flex-shrink-0 flex items-center justify-center rounded-md hover:bg-zinc-800/70 text-gray-400 hover:text-white transition-colors"
-                title="Novo projeto"
-            >
-                <Plus className="w-4 h-4" />
-            </button>
-        </nav>
-        <div className="flex-grow h-full"></div>
+                    <Plus className="w-4 h-4" />
+                </button>
+            </nav>
+            <div className="flex-grow h-full"></div>
+        </div>
+    );
+};
+
+
+// Hidden component used for rendering posts for export
+const StaticPostRenderer: React.FC<{ post: Post; postSize: PostSize; ref: React.Ref<HTMLDivElement> }> = React.forwardRef(({ post, postSize }, ref) => (
+    <div ref={ref} className="absolute -left-[9999px] -top-[9999px]">
+      <StaticPost post={post} postSize={postSize} />
     </div>
-);
+));
 
 
 const App: React.FC = () => {
@@ -222,6 +282,7 @@ const App: React.FC = () => {
     const [isRightPanelOpen, setRightPanelOpen] = useState(true);
     const [isWizardOpen, setWizardOpen] = useState(false);
     const [isBrandKitPanelOpen, setBrandKitPanelOpen] = useState(false);
+    const [isExportModalOpen, setExportModalOpen] = useState(false);
     const [isMobileView, setIsMobileView] = useState(window.innerWidth <= 1024);
     const [colorPickerState, setColorPickerState] = useState<{ isOpen: boolean, color: string, onChange: (color: string) => void }>({ isOpen: false, color: '#FFFFFF', onChange: () => {} });
     
@@ -261,6 +322,7 @@ const App: React.FC = () => {
     const openProjectInputRef = useRef<HTMLInputElement>(null);
     const importKitRef = useRef<HTMLInputElement>(null);
     const imageUploadRef = useRef<HTMLInputElement>(null);
+    const staticPostRef = useRef<HTMLDivElement>(null);
 
     // --- DERIVED STATE ---
     const currentProject = projects.find(p => p.id === currentProjectId) || null;
@@ -322,14 +384,34 @@ const App: React.FC = () => {
             setRightPanelOpen(false);
         }
     };
+    
+    const saveProjectToLocalStorage = (project: Project) => {
+        localStorage.setItem(`posty_project_${project.id}`, JSON.stringify(project));
+        const recentIds = JSON.parse(localStorage.getItem('posty_recent_project_ids') || '[]');
+        const updatedRecents = [project.id, ...recentIds.filter((id: string) => id !== project.id)].slice(0, 8);
+        localStorage.setItem('posty_recent_project_ids', JSON.stringify(updatedRecents));
+        toast.success(`Projeto "${project.name}" salvo!`);
+    };
 
     const handleSaveProject = () => {
         if (!currentProject) { toast.error("Nenhum projeto ativo para salvar."); return; }
-        localStorage.setItem(`posty_project_${currentProject.id}`, JSON.stringify(currentProject));
-        const recentIds = JSON.parse(localStorage.getItem('posty_recent_project_ids') || '[]');
-        const updatedRecents = [currentProject.id, ...recentIds.filter((id: string) => id !== currentProject.id)].slice(0, 8);
-        localStorage.setItem('posty_recent_project_ids', JSON.stringify(updatedRecents));
-        toast.success(`Projeto "${currentProject.name}" salvo!`);
+        
+        const saveAction = (projectToSave: Project) => {
+             // Update state first to reflect name change immediately in the UI
+            setProjects(projects.map(p => p.id === projectToSave.id ? projectToSave : p));
+            saveProjectToLocalStorage(projectToSave);
+        };
+
+        if (currentProject.name.startsWith('Untitled Project')) {
+            const newName = prompt('Dê um nome ao seu projeto:', currentProject.name);
+            if (newName && newName.trim() !== '') {
+                saveAction({ ...currentProject, name: newName.trim() });
+            } else {
+                toast('Salvamento cancelado.');
+            }
+        } else {
+            saveAction(currentProject);
+        }
     };
     
     const handleSaveAsProject = () => {
@@ -385,6 +467,12 @@ const App: React.FC = () => {
             } 
             else { setCurrentProjectId(newProjects[Math.max(0, projectIndex - 1)].id); }
         }
+    };
+    
+    const handleRenameProject = (projectId: string, newName: string) => {
+        if (!newName.trim()) return;
+        setProjects(projs => projs.map(p => (p.id === projectId ? { ...p, name: newName.trim() } : p)));
+        toast.success("Projeto renomeado!");
     };
 
     // --- CORE APP LOGIC ---
@@ -865,13 +953,27 @@ const App: React.FC = () => {
             <input type="file" ref={openProjectInputRef} onChange={handleOpenProjectFile} accept=".posty" className="hidden" />
             <input type="file" ref={importKitRef} onChange={() => {}} accept=".json" className="hidden" />
             <input type="file" ref={imageUploadRef} onChange={handleImageUploadForElement} accept="image/*" className="hidden" />
+            
+            {/* Hidden renderer for exports */}
+            {selectedPost && <StaticPostRenderer ref={staticPostRef} post={selectedPost} postSize={postSize} />}
+
 
             <div className={`app-layout font-sans bg-gray-950 text-gray-100 ${projects.length > 0 && isLeftPanelOpen ? 'left-panel-open' : ''} ${projects.length > 0 && isRightPanelOpen ? 'right-panel-open' : ''}`}>
+                 <ExportModal 
+                    isOpen={isExportModalOpen}
+                    onClose={() => setExportModalOpen(false)}
+                    posts={posts}
+                    postSize={postSize}
+                    selectedPost={selectedPost}
+                    project={currentProject}
+                    staticPostRendererRef={staticPostRef}
+                 />
                 <Header 
                     onNewProject={handleNewProject} 
                     onSaveProject={handleSaveProject} 
                     onSaveAsProject={handleSaveAsProject} 
                     onOpenProject={handleOpenProjectClick} 
+                    onExport={() => setExportModalOpen(true)}
                     hasProject={projects.length > 0} 
                     isMobileView={isMobileView}
                     onToggleLeftPanel={() => setLeftPanelOpen(!isLeftPanelOpen)}
@@ -910,7 +1012,7 @@ const App: React.FC = () => {
                         <WelcomeScreen onNewProject={handleNewProject} onOpenProject={handleOpenProjectClick} onOpenRecent={handleOpenProject} />
                     ) : (
                          <div className="flex flex-col h-full w-full bg-zinc-800">
-                             <ProjectTabs projects={projects} currentProjectId={currentProjectId} onSelect={setCurrentProjectId} onClose={handleCloseProject} onNew={() => handleNewProject(postSize)} />
+                             <ProjectTabs projects={projects} currentProjectId={currentProjectId} onSelect={setCurrentProjectId} onClose={handleCloseProject} onNew={() => handleNewProject(postSize)} onRename={handleRenameProject} />
                             <div className="flex-grow relative overflow-hidden">
                                 {isLoading ? (
                                     <div className="flex flex-col items-center justify-center text-center h-full">

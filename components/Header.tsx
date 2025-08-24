@@ -6,6 +6,7 @@ interface HeaderProps {
     onSaveProject: () => void;
     onSaveAsProject: () => void;
     onOpenProject: () => void;
+    onExport: () => void;
     hasProject: boolean;
     isMobileView: boolean;
     onToggleLeftPanel: () => void;
@@ -14,7 +15,7 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = (props) => {
     const { 
-        onNewProject, onSaveProject, onSaveAsProject, onOpenProject, hasProject, 
+        onNewProject, onSaveProject, onSaveAsProject, onOpenProject, onExport, hasProject, 
         isMobileView, onToggleLeftPanel, onToggleRightPanel 
     } = props;
 
@@ -70,7 +71,7 @@ const Header: React.FC<HeaderProps> = (props) => {
                 </div>
                 
                 <div className="flex items-center space-x-1">
-                    <button onClick={() => { /* Implement export logic */ }} disabled={!hasProject} className="p-2 text-zinc-300 hover:bg-zinc-700 rounded-md disabled:opacity-50" aria-label="Export posts">
+                    <button onClick={onExport} disabled={!hasProject} className="p-2 text-zinc-300 hover:bg-zinc-700 rounded-md disabled:opacity-50" aria-label="Export posts">
                         <Download className="w-5 h-5"/>
                     </button>
                     <button onClick={onToggleRightPanel} className="p-2 text-zinc-300 hover:bg-zinc-700 rounded-md" aria-label="Open layers panel">
@@ -99,7 +100,7 @@ const Header: React.FC<HeaderProps> = (props) => {
             </div>
             
             <div className="flex items-center space-x-2 md:space-x-4">
-                 <button onClick={() => { /* Implement export logic */ }} disabled={!hasProject} className="flex items-center space-x-2 text-sm font-medium px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed">
+                 <button onClick={onExport} disabled={!hasProject} className="flex items-center space-x-2 text-sm font-medium px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed">
                     <Download className="w-4 h-4"/>
                     <span className="hidden md:inline">Exportar Posts</span>
                 </button>

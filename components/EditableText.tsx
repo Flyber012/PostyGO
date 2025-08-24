@@ -1,4 +1,5 @@
 
+
 import React, { useRef, useState, useEffect } from 'react';
 import Draggable from 'react-draggable';
 import { AnyElement, TextElement, ImageElement, GradientElement, ShapeElement, QRCodeElement, ForegroundElement } from '../types';
@@ -37,18 +38,24 @@ const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSel
         }
     }, [element, onUpdate]);
 
+    // This effect syncs the state (element.content) to the contentEditable div's innerHTML.
+    // It's crucial that it ONLY runs when not in editing mode to prevent React from
+    // overwriting the DOM and breaking user selection or cursor position.
     useEffect(() => {
-        // Sync content from state to the DOM, but only if it's different
-        // and the element is not being edited. This prevents cursor jumps and selection issues.
-        if (contentRef.current && element.type === 'text' && element.content !== contentRef.current.innerHTML && !isEditing) {
-            contentRef.current.innerHTML = element.content;
+        if (contentRef.current && element.type === 'text') {
+            if (!isEditing && element.content !== contentRef.current.innerHTML) {
+                contentRef.current.innerHTML = element.content;
+            }
         }
     }, [element.type === 'text' ? element.content : null, isEditing]);
     
     useEffect(() => {
         if(isEditing && contentRef.current) {
             onStartEditing(element.id, contentRef.current);
+            // Focus and select all text when editing starts
             contentRef.current.focus();
+            document.execCommand('selectAll', false);
+
         } else {
             onStopEditing();
         }
@@ -158,6 +165,7 @@ const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSel
     const renderContent = () => {
         switch (element.type) {
             case 'text':
+                // We no longer use dangerouslySetInnerHTML here. The useEffect handles content synchronization.
                 return (
                     <div
                         ref={contentRef}
@@ -166,7 +174,6 @@ const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSel
                         onKeyDown={(e) => e.stopPropagation()} // Prevent pan on space when editing
                         suppressContentEditableWarning={true}
                         style={{...contentStyles, whiteSpace: 'pre-wrap', overflowWrap: 'break-word'}}
-                        dangerouslySetInnerHTML={{ __html: element.content }}
                     />
                 );
             case 'image':
