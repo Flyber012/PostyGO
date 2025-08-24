@@ -13,11 +13,13 @@ import StaticPost from './components/StaticPost';
 import UserProfile from './components/UserProfile';
 import AccountManagerModal from './components/AccountManagerModal';
 import BuyCreditsModal from './components/BuyCreditsModal';
+import { GenerationWizard } from './components/GenerationWizard';
+import { BrandKitPanel } from './components/BrandKitPanel';
 import saveAs from 'file-saver';
 import { v4 as uuidv4 } from 'uuid';
 import * as htmlToImage from 'html-to-image';
 import JSZip from 'jszip';
-import { ZoomIn, ZoomOut, Maximize, AlignHorizontalJustifyStart, AlignHorizontalJustifyCenter, AlignHorizontalJustifyEnd, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Copy, Trash2, ChevronLeft, ChevronRight, Eye, EyeOff, Lock, Unlock, X, Sparkles, Layers } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize, AlignHorizontalJustifyStart, AlignHorizontalJustifyCenter, AlignHorizontalJustifyEnd, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Copy, Trash2, ChevronLeft, ChevronRight, Eye, EyeOff, Lock, Unlock, X, Sparkles, Layers, Package } from 'lucide-react';
 
 declare global {
     const google: any;
@@ -135,6 +137,14 @@ const App: React.FC = () => {
     const [loadingMessage, setLoadingMessage] = useState('');
     const [postSize, setPostSize] = useState<PostSize>(POST_SIZES[0]);
     
+    // States lifted for Wizard and ControlPanel
+    const [topic, setTopic] = useState('Productivity Hacks');
+    const [contentLevel, setContentLevel] = useState<'mínimo' | 'médio' | 'detalhado'>('médio');
+    const [generationType, setGenerationType] = useState<'post' | 'carousel'>('post');
+    const [backgroundSource, setBackgroundSource] = useState<'upload' | 'ai'>('upload');
+    const [aiProvider, setAiProvider] = useState<'gemini' | 'freepik'>('gemini');
+    const [aiPostCount, setAiPostCount] = useState(4);
+    
     const [customBackgrounds, setCustomBackgrounds] = useState<string[]>([]);
     const [styleImages, setStyleImages] = useState<string[]>([]);
     const [styleGuide, setStyleGuide] = useState<string | null>(null);
@@ -148,7 +158,10 @@ const App: React.FC = () => {
 
     const [zoom, setZoom] = useState(1);
     const [isAddLayoutModalOpen, setAddLayoutModalOpen] = useState(false);
-    const [isLeftPanelOpen, setLeftPanelOpen] = useState(false);
+    
+    // Mobile Panel States
+    const [isWizardOpen, setWizardOpen] = useState(false);
+    const [isBrandKitPanelOpen, setBrandKitPanelOpen] = useState(false);
     const [isRightPanelOpen, setRightPanelOpen] = useState(false);
 
     const editorRef = useRef<HTMLDivElement>(null);
@@ -341,12 +354,12 @@ const App: React.FC = () => {
     };
 
     const handleGeneratePosts = async (
-        topic: string, 
+        genTopic: string, 
         count: number, 
-        type: 'post' | 'carousel', 
-        contentLevel: 'mínimo' | 'médio' | 'detalhado',
-        backgroundSource: 'upload' | 'ai',
-        aiProvider: 'gemini' | 'freepik'
+        genType: 'post' | 'carousel', 
+        genContentLevel: 'mínimo' | 'médio' | 'detalhado',
+        genBackgroundSource: 'upload' | 'ai',
+        genAiProvider: 'gemini' | 'freepik'
     ) => {
         if (!user) {
             toast.error("Por favor, faça login para gerar conteúdo.");
@@ -370,7 +383,7 @@ const App: React.FC = () => {
         }
         
         // Verificação de créditos para geração de imagens AI
-        if (backgroundSource === 'ai') {
+        if (genBackgroundSource === 'ai') {
             if ((user.credits || 0) < count) {
                 toast.error(`Créditos insuficientes. Você precisa de ${count} créditos, mas tem apenas ${user.credits || 0}.`);
                 setBuyCreditsModalOpen(true);
@@ -418,7 +431,7 @@ const App: React.FC = () => {
                     let newContentMap: Record<string, string> = {};
                     if (textElementsToFill.length > 0) {
                         setLoadingMessage(`Gerando texto para o post ${i + 1}/${backgroundSources.length}...`);
-                        newContentMap = await geminiService.generateTextForLayout(textElementsToFill, topic, contentLevel, activeStyleGuide, userApiKey);
+                        newContentMap = await geminiService.generateTextForLayout(textElementsToFill, genTopic, genContentLevel, activeStyleGuide, userApiKey);
                     }
                     
                     const newPostId = uuidv4();
@@ -443,17 +456,17 @@ const App: React.FC = () => {
             } else { 
                 let backgroundSources: { src: string; prompt?: string; provider?: 'gemini' | 'freepik' }[] = [];
 
-                if (backgroundSource === 'ai') {
+                if (genBackgroundSource === 'ai') {
                     setLoadingMessage('Gerando ideias para imagens...');
                     toast.loading('Gerando ideias para imagens...', { id: toastId });
-                    const imagePrompts = await geminiService.generateImagePrompts(topic, count, activeStyleGuide, userApiKey);
+                    const imagePrompts = await geminiService.generateImagePrompts(genTopic, count, activeStyleGuide, userApiKey);
                     
                     let generatedBase64Images: string[] = [];
-                    if (aiProvider === 'gemini') {
+                    if (genAiProvider === 'gemini') {
                         setLoadingMessage(`Criando imagens de fundo com Gemini...`);
                         toast.loading(`Criando imagens de fundo com Gemini...`, { id: toastId });
                         generatedBase64Images = await geminiService.generateBackgroundImages(imagePrompts, postSize, userApiKey);
-                    } else if (aiProvider === 'freepik') {
+                    } else if (genAiProvider === 'freepik') {
                         setLoadingMessage(`Criando imagens de fundo com Freepik...`);
                         toast.loading(`Criando imagens de fundo com Freepik...`, { id: toastId });
                         generatedBase64Images = await freepikService.generateBackgroundImages(imagePrompts, postSize, user.linkedAccounts?.freepik?.apiKey);
@@ -462,7 +475,7 @@ const App: React.FC = () => {
                     backgroundSources = generatedBase64Images.map((b64, index) => ({
                         src: `data:image/png;base64,${b64}`,
                         prompt: imagePrompts[index],
-                        provider: aiProvider
+                        provider: genAiProvider
                     }));
 
                     // Deduzir créditos
@@ -477,11 +490,11 @@ const App: React.FC = () => {
                 setLoadingMessage('Criando layouts inteligentes...');
                 toast.loading('Criando layouts inteligentes...', { id: toastId });
 
-                const layoutPromises = backgroundSources.map(bg => geminiService.generateLayoutAndContentForImage(bg.src, topic, contentLevel, activeKit, userApiKey));
+                const layoutPromises = backgroundSources.map(bg => geminiService.generateLayoutAndContentForImage(bg.src, genTopic, genContentLevel, activeKit, userApiKey));
                 const allLayouts = await Promise.all(layoutPromises);
 
                 const newPosts: Post[] = [];
-                const carouselId = type === 'carousel' ? uuidv4() : undefined;
+                const carouselId = genType === 'carousel' ? uuidv4() : undefined;
 
                 for (let i = 0; i < backgroundSources.length; i++) {
                     const bgData = backgroundSources[i];
@@ -529,7 +542,7 @@ const App: React.FC = () => {
                 if (newPosts.length > 0) setSelectedPostId(newPosts[0].id);
                 toast.success('Posts criados com sucesso!', { id: toastId });
             }
-             if (isFreeTierUser && backgroundSource !== 'ai') { // Créditos são para imagens de IA, não para texto
+             if (isFreeTierUser && genBackgroundSource !== 'ai') { // Créditos são para imagens de IA, não para texto
                 const generationsToday = user.generationsToday || 0;
                 updateUser({
                     ...user,
@@ -1158,62 +1171,111 @@ const App: React.FC = () => {
                 postToPreview={selectedPost}
                 postSize={postSize}
             />
+            <GenerationWizard
+                isOpen={isWizardOpen}
+                onClose={() => setWizardOpen(false)}
+                onGenerate={handleGeneratePosts}
+                isLoading={isLoading}
+                topic={topic} setTopic={setTopic}
+                contentLevel={contentLevel} setContentLevel={setContentLevel}
+                generationType={generationType} setGenerationType={setGenerationType}
+                postSize={postSize} setPostSize={setPostSize}
+                backgroundSource={backgroundSource} setBackgroundSource={setBackgroundSource}
+                aiPostCount={aiPostCount} setAiPostCount={setAiPostCount}
+                aiProvider={aiProvider} setAiProvider={setAiProvider}
+                customBackgrounds={customBackgrounds}
+                styleImages={styleImages}
+                onFileChange={handleFileChange}
+                onRemoveImage={handleRemoveImage}
+                styleGuide={styleGuide}
+                useStyleGuide={useStyleGuide}
+                setUseStyleGuide={setUseStyleGuide}
+                onAnalyzeStyle={handleAnalyzeStyle}
+                selectedLayoutId={selectedLayoutId}
+                setSelectedLayoutId={setSelectedLayoutId}
+                useLayoutToFill={useLayoutToFill}
+                setUseLayoutToFill={setUseLayoutToFill}
+                user={user}
+                activeBrandKit={activeBrandKit}
+                onBuyCredits={() => setBuyCreditsModalOpen(true)}
+            />
+            <BrandKitPanel 
+                isOpen={isBrandKitPanelOpen}
+                onClose={() => setBrandKitPanelOpen(false)}
+                user={user}
+                hasPosts={posts.length > 0}
+                brandKits={brandKits}
+                activeBrandKit={activeBrandKit}
+                onSaveBrandKit={handleSaveBrandKit}
+                onAddLayoutToActiveKit={handleOpenAddLayoutModal}
+                onImportBrandKit={handleImportBrandKit}
+                onExportBrandKit={handleExportBrandKit}
+                onDeleteBrandKit={handleDeleteBrandKit}
+                onApplyBrandKit={handleApplyBrandKit}
+                onAddPostFromLayout={handleAddPostFromLayout}
+                onUpdateLayoutName={handleUpdateLayoutName}
+                onDeleteLayoutFromKit={handleDeleteLayoutFromKit}
+                selectedLayoutId={selectedLayoutId}
+                setSelectedLayoutId={setSelectedLayoutId}
+            />
+
             <div className="flex flex-col h-screen font-sans bg-gray-950 text-gray-100 overflow-hidden">
                 <header className="w-full bg-zinc-900 border-b border-zinc-800 px-4 sm:px-6 py-3 flex-shrink-0 flex items-center justify-end">
                     <UserProfile user={user} onLogin={() => {}} onLogout={handleLogout} onManageAccounts={handleManageAccounts} onBuyCredits={() => setBuyCreditsModalOpen(true)} />
                 </header>
                 <div className="flex-1 flex flex-col min-h-0">
                     <div className="flex-1 flex flex-row min-h-0 relative">
-                        {/* Painel Esquerdo */}
-                        <div className={`fixed lg:relative top-0 left-0 h-full z-40 transform transition-transform duration-300 ease-in-out ${isLeftPanelOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0`}>
-                            <div className="w-screen sm:w-96 h-full relative">
-                                <ControlPanel
-                                    isLoading={isLoading}
-                                    onGenerate={handleGeneratePosts}
-                                    onExport={handleExport}
-                                    onSaveBrandKit={handleSaveBrandKit}
-                                    onAddLayoutToActiveKit={handleOpenAddLayoutModal}
-                                    onImportBrandKit={handleImportBrandKit}
-                                    onExportBrandKit={handleExportBrandKit}
-                                    onDeleteBrandKit={handleDeleteBrandKit}
-                                    onApplyBrandKit={handleApplyBrandKit}
-                                    onAddPostFromLayout={handleAddPostFromLayout}
-                                    onUpdateLayoutName={handleUpdateLayoutName}
-                                    onDeleteLayoutFromKit={handleDeleteLayoutFromKit}
-                                    brandKits={brandKits}
-                                    activeBrandKit={activeBrandKit}
-                                    postSize={postSize}
-                                    setPostSize={setPostSize}
-                                    hasPosts={posts.length > 0}
-                                    customBackgrounds={customBackgrounds}
-                                    styleImages={styleImages}
-                                    onFileChange={handleFileChange}
-                                    onRemoveImage={handleRemoveImage}
-                                    colorMode={colorMode}
-                                    setColorMode={setColorMode}
-                                    customPalette={customPalette}
-                                    setCustomPalette={setCustomPalette}
-                                    styleGuide={styleGuide}
-                                    useStyleGuide={useStyleGuide}
-                                    setUseStyleGuide={setUseStyleGuide}
-                                    onAnalyzeStyle={handleAnalyzeStyle}
-                                    selectedLayoutId={selectedLayoutId}
-                                    setSelectedLayoutId={setSelectedLayoutId}
-                                    useLayoutToFill={useLayoutToFill}
-                                    setUseLayoutToFill={setUseLayoutToFill}
-                                    user={user}
-                                    generationsToday={user?.generationsToday || 0}
-                                    dailyLimit={DAILY_GENERATION_LIMIT}
-                                    onBuyCredits={() => setBuyCreditsModalOpen(true)}
-                                />
-                                <button onClick={() => setLeftPanelOpen(false)} className="lg:hidden absolute top-4 right-4 p-2 bg-zinc-800/80 rounded-full backdrop-blur-sm text-white">
-                                    <X className="w-5 h-5" />
-                                </button>
-                            </div>
+                        {/* Painel Esquerdo (Desktop) */}
+                        <div className="hidden lg:flex w-96 h-full flex-shrink-0">
+                            <ControlPanel
+                                isLoading={isLoading}
+                                onGenerate={handleGeneratePosts}
+                                onExport={handleExport}
+                                brandKits={brandKits}
+                                activeBrandKit={activeBrandKit}
+                                postSize={postSize}
+                                setPostSize={setPostSize}
+                                hasPosts={posts.length > 0}
+                                customBackgrounds={customBackgrounds}
+                                styleImages={styleImages}
+                                onFileChange={handleFileChange}
+                                onRemoveImage={handleRemoveImage}
+                                colorMode={colorMode}
+                                setColorMode={setColorMode}
+                                customPalette={customPalette}
+                                setCustomPalette={setCustomPalette}
+                                styleGuide={styleGuide}
+                                useStyleGuide={useStyleGuide}
+                                setUseStyleGuide={setUseStyleGuide}
+                                onAnalyzeStyle={handleAnalyzeStyle}
+                                useLayoutToFill={useLayoutToFill}
+                                setUseLayoutToFill={setUseLayoutToFill}
+                                user={user}
+                                onBuyCredits={() => setBuyCreditsModalOpen(true)}
+                                // Pass state down
+                                topic={topic} setTopic={setTopic}
+                                contentLevel={contentLevel} setContentLevel={setContentLevel}
+                                generationType={generationType} setGenerationType={setGenerationType}
+                                backgroundSource={backgroundSource} setBackgroundSource={setBackgroundSource}
+                                aiPostCount={aiPostCount} setAiPostCount={setAiPostCount}
+                                aiProvider={aiProvider} setAiProvider={setAiProvider}
+                                // Brand Kit specific props
+                                onSaveBrandKit={handleSaveBrandKit}
+                                onAddLayoutToActiveKit={handleOpenAddLayoutModal}
+                                onImportBrandKit={handleImportBrandKit}
+                                onExportBrandKit={handleExportBrandKit}
+                                onDeleteBrandKit={handleDeleteBrandKit}
+                                onApplyBrandKit={handleApplyBrandKit}
+                                onAddPostFromLayout={handleAddPostFromLayout}
+                                onUpdateLayoutName={handleUpdateLayoutName}
+                                onDeleteLayoutFromKit={handleDeleteLayoutFromKit}
+                                selectedLayoutId={selectedLayoutId}
+                                setSelectedLayoutId={setSelectedLayoutId}
+                            />
                         </div>
 
                         {/* Overlay para fechar painéis em mobile */}
-                        {(isLeftPanelOpen || isRightPanelOpen) && <div onClick={() => { setLeftPanelOpen(false); setRightPanelOpen(false); }} className="fixed inset-0 bg-black/60 z-30 lg:hidden" />}
+                        {(isRightPanelOpen) && <div onClick={() => { setRightPanelOpen(false); }} className="fixed inset-0 bg-black/60 z-30 lg:hidden" />}
 
                         <main 
                             className="flex-1 flex flex-col items-center justify-center bg-black/30 overflow-hidden relative"
@@ -1233,7 +1295,7 @@ const App: React.FC = () => {
                             {!isLoading && posts.length === 0 && (
                                  <div className="text-center text-gray-400">
                                      <h2 className="text-2xl font-bold mb-2">Tudo pronto!</h2>
-                                     <p>Selecione um Brand Kit ou preencha os detalhes para gerar conteúdo.</p>
+                                     <p>Use o botão ✨ Gerar ✨ para começar a criar.</p>
                                  </div>
                             )}
                             {selectedPost && (
@@ -1349,14 +1411,22 @@ const App: React.FC = () => {
                         </div>
                     </div>
                     {/* Navegação Inferior para Mobile */}
-                    <div className="lg:hidden flex items-center justify-around bg-zinc-900 border-t border-zinc-800 p-1 flex-shrink-0">
-                        <button onClick={() => { setLeftPanelOpen(true); setRightPanelOpen(false); }} className="flex flex-col items-center space-y-1 text-xs p-2 rounded-lg text-zinc-300 hover:bg-zinc-800 hover:text-white w-24">
-                            <Sparkles className="w-5 h-5"/>
-                            <span>Gerar</span>
+                    <div className="lg:hidden grid grid-cols-3 items-center bg-zinc-900 border-t border-zinc-800 px-2 pt-1 flex-shrink-0">
+                        <button onClick={() => setBrandKitPanelOpen(true)} className="flex flex-col items-center space-y-1 text-xs p-2 rounded-lg text-zinc-300 hover:bg-zinc-800 hover:text-white">
+                            <Package className="w-5 h-5"/>
+                            <span>Kits</span>
                         </button>
+                        <div className="flex justify-center">
+                            <button 
+                                onClick={() => setWizardOpen(true)}
+                                className="flex items-center justify-center h-14 w-14 rounded-full text-white transform -translate-y-5 animated-gradient-bg shadow-lg shadow-purple-500/30 ring-4 ring-zinc-900"
+                            >
+                                <Sparkles className="w-7 h-7"/>
+                            </button>
+                        </div>
                         <button 
-                            onClick={() => { setRightPanelOpen(true); setLeftPanelOpen(false); }} 
-                            className={`flex flex-col items-center space-y-1 text-xs p-2 rounded-lg w-24 ${posts.length > 0 ? 'text-zinc-300 hover:bg-zinc-800 hover:text-white' : 'text-zinc-600 cursor-not-allowed'}`} 
+                            onClick={() => setRightPanelOpen(true)} 
+                            className={`flex flex-col items-center space-y-1 text-xs p-2 rounded-lg ${posts.length > 0 ? 'text-zinc-300 hover:bg-zinc-800 hover:text-white' : 'text-zinc-600 cursor-not-allowed'}`} 
                             disabled={posts.length === 0}
                         >
                             <Layers className="w-5 h-5"/>
