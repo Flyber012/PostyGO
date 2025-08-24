@@ -1,5 +1,4 @@
 
-
 import React, { useRef, useState, useEffect } from 'react';
 import Draggable from 'react-draggable';
 import { AnyElement, TextElement, ImageElement, GradientElement, ShapeElement, QRCodeElement, ForegroundElement } from '../types';
@@ -40,11 +39,11 @@ const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSel
 
     useEffect(() => {
         // Sync content from state to the DOM, but only if it's different
-        // and the element is not the active editor. This prevents cursor jumps.
-        if (contentRef.current && element.type === 'text' && element.content !== contentRef.current.innerHTML) {
+        // and the element is not being edited. This prevents cursor jumps and selection issues.
+        if (contentRef.current && element.type === 'text' && element.content !== contentRef.current.innerHTML && !isEditing) {
             contentRef.current.innerHTML = element.content;
         }
-    }, [element.type === 'text' ? element.content : null]);
+    }, [element.type === 'text' ? element.content : null, isEditing]);
     
     useEffect(() => {
         if(isEditing && contentRef.current) {
