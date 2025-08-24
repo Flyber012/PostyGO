@@ -1,8 +1,5 @@
 
-
-
-
-export type ToneOfVoice = 'padrão' | 'profissional' | 'amigável' | 'inspirador' | 'divertido';
+export type TextStyle = 'padrão' | 'profissional' | 'amigável' | 'inspirador' | 'divertido';
 
 export interface BaseElement {
     id: string;

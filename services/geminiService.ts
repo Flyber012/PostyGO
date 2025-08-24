@@ -1,5 +1,6 @@
+
 import { GoogleGenAI, Type, Part } from "@google/genai";
-import { AIGeneratedTextElement, PaletteExtractionResult, AIGeneratedCarouselScriptSlide, TextElement, BrandKit, PostSize, ToneOfVoice } from '../types';
+import { AIGeneratedTextElement, PaletteExtractionResult, AIGeneratedCarouselScriptSlide, TextElement, BrandKit, PostSize, TextStyle } from '../types';
 
 // Conforme solicitado, esta chave será usada como padrão.
 // A geração de imagens pode falhar se não estiver vinculada a uma conta com faturamento.
@@ -174,7 +175,7 @@ export async function generateImagePrompts(topic: string, count: number, styleGu
 }
 
 
-export async function generateLayoutAndContentForImage(base64Image: string, topic: string, contentLevel: 'mínimo' | 'médio' | 'detalhado', brandKit: BrandKit | null, userApiKey?: string, toneOfVoice: ToneOfVoice = 'padrão'): Promise<AIGeneratedTextElement[]> {
+export async function generateLayoutAndContentForImage(base64Image: string, topic: string, contentLevel: 'mínimo' | 'médio' | 'detalhado', brandKit: BrandKit | null, userApiKey?: string, textStyle: TextStyle = 'padrão'): Promise<AIGeneratedTextElement[]> {
     const ai = getAIClient(userApiKey);
     const [header, data] = base64Image.split(',');
     if (!header || !data) throw new Error("Formato de imagem base64 inválido.");
@@ -188,7 +189,7 @@ export async function generateLayoutAndContentForImage(base64Image: string, topi
         detalhado: 'Gere um texto mais completo. Pode incluir um título, um subtítulo e um parágrafo mais elaborado ou uma lista de pontos. Forneça mais valor e contexto.'
     };
 
-    const toneOfVoiceInstructions = {
+    const textStyleInstructions = {
         padrão: 'Mantenha um tom de voz neutro e informativo, adequado para um público geral.',
         profissional: 'Adote um tom de voz profissional, corporativo e direto. Use uma linguagem formal e evite gírias ou excesso de emojis.',
         amigável: 'Escreva como se estivesse conversando com um amigo. Use uma linguagem informal e acolhedora, faça perguntas e use emojis relevantes de forma moderada.',
@@ -201,8 +202,8 @@ export async function generateLayoutAndContentForImage(base64Image: string, topi
     **Nível de Conteúdo Solicitado: ${contentLevel.toUpperCase()}**
     - ${contentLevelInstructions[contentLevel]}
 
-    **Tom de Voz Solicitado: ${toneOfVoice.toUpperCase()}**
-    - ${toneOfVoiceInstructions[toneOfVoice]}
+    **Estilo do Texto Solicitado: ${textStyle.toUpperCase()}**
+    - ${textStyleInstructions[textStyle]}
 
     **Seu Processo Criativo (Regras Inquebráveis):**
     1.  **Conteúdo Criativo com Personalidade:** Primeiro, crie o texto. Seja envolvente, use markdown (\`**destaque**\`) para ênfase e emojis relevantes.
@@ -231,8 +232,8 @@ export async function generateLayoutAndContentForImage(base64Image: string, topi
         **Nível de Conteúdo Solicitado: ${contentLevel.toUpperCase()}**
         - ${contentLevelInstructions[contentLevel]}
 
-        **Tom de Voz Solicitado: ${toneOfVoice.toUpperCase()}**
-        - ${toneOfVoiceInstructions[toneOfVoice]}
+        **Estilo do Texto Solicitado: ${textStyle.toUpperCase()}**
+        - ${textStyleInstructions[textStyle]}
 
         **Seu Processo (Seguindo as Regras):**
         1.  **Conteúdo no Tom Certo:** Crie o texto alinhado com o tópico e a "vibe" do Guia de Estilo.
@@ -463,7 +464,7 @@ export async function generateTextForLayout(
     contentLevel: 'mínimo' | 'médio' | 'detalhado', 
     styleGuide: string | null,
     userApiKey?: string,
-    toneOfVoice: ToneOfVoice = 'padrão'
+    textStyle: TextStyle = 'padrão'
 ): Promise<Record<string, string>> {
     const ai = getAIClient(userApiKey);
     
@@ -473,7 +474,7 @@ export async function generateTextForLayout(
         detalhado: 'Gere um texto mais completo. Pode incluir um título, um subtítulo e um parágrafo mais elaborado.'
     };
 
-    const toneOfVoiceInstructions = {
+    const textStyleInstructions = {
         padrão: 'Mantenha um tom de voz neutro e informativo, adequado para um público geral.',
         profissional: 'Adote um tom de voz profissional, corporativo e direto. Use uma linguagem formal e evite gírias ou excesso de emojis.',
         amigável: 'Escreva como se estivesse conversando com um amigo. Use uma linguagem informal e acolhedora, faça perguntas e use emojis relevantes de forma moderada.',
@@ -490,8 +491,8 @@ export async function generateTextForLayout(
     **Nível de Conteúdo Solicitado: ${contentLevel.toUpperCase()}**
     - ${contentLevelInstructions[contentLevel]}
 
-    **Tom de Voz Solicitado: ${toneOfVoice.toUpperCase()}**
-    - ${toneOfVoiceInstructions[toneOfVoice]}
+    **Estilo do Texto Solicitado: ${textStyle.toUpperCase()}**
+    - ${textStyleInstructions[textStyle]}
 
     **Estrutura do Layout e Contexto:**
     ${contextString}
@@ -514,8 +515,8 @@ export async function generateTextForLayout(
         **Nível de Conteúdo Solicitado: ${contentLevel.toUpperCase()}**
         - ${contentLevelInstructions[contentLevel]}
 
-        **Tom de Voz Solicitado: ${toneOfVoice.toUpperCase()}**
-        - ${toneOfVoiceInstructions[toneOfVoice]}
+        **Estilo do Texto Solicitado: ${textStyle.toUpperCase()}**
+        - ${textStyleInstructions[textStyle]}
 
         **Estrutura do Layout e Contexto:**
         ${contextString}
