@@ -1,10 +1,9 @@
 import React, { useState, useRef } from 'react';
-import { BrandKit, LayoutTemplate, User } from '../types';
-import { Save, Download, Upload, Trash2, Plus, Check, LayoutTemplate as LayoutIcon, Copy, AlertCircle, Package } from 'lucide-react';
+import { BrandKit, LayoutTemplate } from '../types';
+import { Save, Download, Upload, Trash2, Plus, Check, LayoutTemplate as LayoutIcon, Copy, Package } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 interface BrandKitManagementProps {
-    user: User | null;
     hasPosts: boolean;
     brandKits: BrandKit[];
     activeBrandKit: BrandKit | undefined;
@@ -23,7 +22,7 @@ interface BrandKitManagementProps {
 
 export const BrandKitManagement: React.FC<BrandKitManagementProps> = (props) => {
     const {
-        user, hasPosts, brandKits, activeBrandKit, onSaveBrandKit, onAddLayoutToActiveKit,
+        hasPosts, brandKits, activeBrandKit, onSaveBrandKit, onAddLayoutToActiveKit,
         onImportBrandKit, onExportBrandKit, onDeleteBrandKit, onApplyBrandKit,
         onAddPostFromLayout, onUpdateLayoutName, onDeleteLayoutFromKit,
         selectedLayoutId, setSelectedLayoutId
@@ -35,10 +34,6 @@ export const BrandKitManagement: React.FC<BrandKitManagementProps> = (props) => 
     const [tempLayoutName, setTempLayoutName] = useState('');
 
     const handleSaveKitClick = () => {
-        if (!user) {
-            toast.error("Você precisa estar logado para criar um Brand Kit.");
-            return;
-        }
         if(newKitName.trim()) {
             onSaveBrandKit(newKitName);
             setNewKitName('');
@@ -92,7 +87,7 @@ export const BrandKitManagement: React.FC<BrandKitManagementProps> = (props) => 
                 })}
             </div>
 
-            {hasPosts && user && <div>
+            {hasPosts && <div>
                 <label htmlFor="kit-name" className="block text-sm font-medium text-gray-300 mb-1">Nome do Novo Kit</label>
                 <div className="flex space-x-2">
                     <input type="text" id="kit-name" value={newKitName} onChange={e => setNewKitName(e.target.value)} className="flex-grow w-full bg-black/50 border border-zinc-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-purple-500 focus:outline-none" placeholder="ex: 'Minha Marca Incrível'"/>
@@ -165,17 +160,11 @@ export const BrandKitManagement: React.FC<BrandKitManagementProps> = (props) => 
                             <p className="text-xs text-zinc-400">Nenhum layout salvo neste kit.</p>
                         </div>
                     )}
-                    {hasPosts && user && (
+                    {hasPosts && (
                         <button onClick={onAddLayoutToActiveKit} className="mt-3 w-full flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">
                            <Plus className="mr-2 h-4 w-4"/> Adicionar Layout do Post Atual
                         </button>
                     )}
-                </div>
-            )}
-             {!user && (
-                <div className="flex items-center justify-center text-center p-2 bg-yellow-900/30 rounded-lg mt-4">
-                    <AlertCircle className="w-4 h-4 mr-2 text-yellow-400 shrink-0" />
-                    <p className="text-xs text-yellow-300">Faça login para salvar Brand Kits.</p>
                 </div>
             )}
         </div>

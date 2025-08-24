@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import { User, PostSize, BrandKit, TextStyle } from '../types';
+import { PostSize, BrandKit, TextStyle } from '../types';
 import { POST_SIZES } from '../constants';
-import { Sparkles, BrainCircuit, Upload, ChevronLeft, X, File, Files, AlertCircle, Coins, LayoutTemplate as LayoutIcon } from 'lucide-react';
+import { Sparkles, BrainCircuit, Upload, ChevronLeft, X, File, Files, LayoutTemplate as LayoutIcon } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 // Re-usable component from ControlPanel
@@ -79,15 +78,13 @@ interface GenerationWizardProps {
     setSelectedLayoutId: (id: string | null) => void;
     useLayoutToFill: boolean;
     setUseLayoutToFill: (use: boolean) => void;
-    user: User | null;
     activeBrandKit: BrandKit | undefined;
-    onBuyCredits: () => void;
 }
 
 const steps = ["Estilo", "Conteúdo", "Fundos", "Formato"];
 
 export const GenerationWizard: React.FC<GenerationWizardProps> = (props) => {
-    const { isOpen, onClose, onGenerate, isLoading, user, activeBrandKit, onBuyCredits } = props;
+    const { isOpen, onClose, onGenerate, isLoading, activeBrandKit } = props;
     const [currentStep, setCurrentStep] = useState(0);
 
     useEffect(() => {
@@ -127,19 +124,6 @@ export const GenerationWizard: React.FC<GenerationWizardProps> = (props) => {
         
         onGenerate(props.topic, finalCount, props.generationType, props.contentLevel, props.backgroundSource, props.aiProvider, props.textStyle);
     };
-
-    let canGenerate = !isLoading;
-    let generateButtonTooltip = '';
-    if (!user) {
-        canGenerate = false;
-        generateButtonTooltip = 'Faça login para gerar conteúdo.';
-    } else if (props.backgroundSource === 'ai') {
-        const creditsNeeded = props.aiPostCount;
-        if ((user.credits || 0) < creditsNeeded) {
-            generateButtonTooltip = `Créditos insuficientes. Você precisa de ${creditsNeeded}.`;
-            canGenerate = false;
-        }
-    }
 
     const renderStepContent = () => {
         switch (currentStep) {
@@ -237,7 +221,7 @@ export const GenerationWizard: React.FC<GenerationWizardProps> = (props) => {
                             <button onClick={() => props.setBackgroundSource('upload')} className={`flex-1 flex items-center justify-center text-center py-1.5 rounded-md transition-all duration-300 ${props.backgroundSource === 'upload' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:bg-zinc-700'}`}>
                                 <Upload className="w-4 h-4 mr-2"/> Meus Fundos
                             </button>
-                            <button onClick={() => props.setBackgroundSource('ai')} className={`flex-1 flex items-center justify-center text-center py-1.5 rounded-md transition-all duration-300 ${props.backgroundSource === 'ai' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:bg-zinc-700'}`} disabled={!user}>
+                            <button onClick={() => props.setBackgroundSource('ai')} className={`flex-1 flex items-center justify-center text-center py-1.5 rounded-md transition-all duration-300 ${props.backgroundSource === 'ai' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:bg-zinc-700'}`}>
                                 <Sparkles className="w-4 h-4 mr-2"/> Gerar com IA
                             </button>
                         </div>
@@ -268,20 +252,6 @@ export const GenerationWizard: React.FC<GenerationWizardProps> = (props) => {
             case 3: // Formato
                 return (
                     <div className="space-y-4">
-                        {user && (
-                            <div className="space-y-2 p-3 bg-black/20 rounded-lg">
-                                <div className="flex justify-between items-center text-sm">
-                                    <div className="flex items-center font-medium text-gray-300">
-                                        <Coins className="w-4 h-4 mr-2 text-yellow-400"/>
-                                        <span>Créditos de Imagem</span>
-                                    </div>
-                                    <span className="font-semibold text-gray-200">{user.credits || 0}</span>
-                                </div>
-                                <button onClick={onBuyCredits} className="w-full text-center text-xs bg-green-600/20 text-green-300 hover:bg-green-600/40 font-semibold py-1 rounded-md">
-                                    Comprar mais créditos
-                                </button>
-                            </div>
-                        )}
                         <div className="grid grid-cols-2 gap-2">
                             <button onClick={() => props.setGenerationType('post')} className={`flex items-center justify-center p-2 rounded-md transition-colors ${props.generationType === 'post' ? 'bg-purple-600 text-white' : 'bg-zinc-700 hover:bg-zinc-600'}`}>
                                 <File className="w-4 h-4 mr-2"/> Post Único
@@ -296,12 +266,6 @@ export const GenerationWizard: React.FC<GenerationWizardProps> = (props) => {
                                 {POST_SIZES.map(s => <option key={s.name}>{s.name}</option>)}
                             </select>
                         </div>
-                        {!user && (
-                            <div className="flex items-center justify-center text-center p-2 bg-yellow-900/30 rounded-lg">
-                               <AlertCircle className="w-4 h-4 mr-2 text-yellow-400 shrink-0" />
-                               <p className="text-xs text-yellow-300">Por favor, faça login para gerar conteúdo.</p>
-                            </div>
-                        )}
                     </div>
                 );
             default: return null;
@@ -333,16 +297,14 @@ export const GenerationWizard: React.FC<GenerationWizardProps> = (props) => {
                             Próximo
                         </button>
                     ) : (
-                        <div title={generateButtonTooltip}>
-                            <button 
-                                onClick={handleGenerateClick}
-                                disabled={!canGenerate}
-                                className="w-full flex items-center justify-center animated-gradient-bg text-white font-bold py-3 rounded-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <Sparkles className="w-5 h-5 mr-2"/>
-                                {isLoading ? 'Gerando...' : 'Gerar Conteúdo'}
-                            </button>
-                        </div>
+                        <button 
+                            onClick={handleGenerateClick}
+                            disabled={isLoading}
+                            className="w-full flex items-center justify-center animated-gradient-bg text-white font-bold py-3 rounded-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <Sparkles className="w-5 h-5 mr-2"/>
+                            {isLoading ? 'Gerando...' : 'Gerar Conteúdo'}
+                        </button>
                     )}
                 </div>
 

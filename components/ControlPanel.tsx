@@ -1,8 +1,7 @@
-
 import React, { useState, useRef, useEffect } from 'react';
-import { PostSize, BrandKit, User, TextStyle } from '../types';
+import { PostSize, BrandKit, TextStyle } from '../types';
 import { POST_SIZES } from '../constants';
-import { Upload, X, Sparkles, BrainCircuit, Coins, AlertCircle, Package, ChevronDown, File as FileIcon, Files } from 'lucide-react';
+import { Upload, X, Sparkles, BrainCircuit, Package, ChevronDown, File as FileIcon, Files } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { BrandKitManagement } from './BrandKitManagement';
 
@@ -95,8 +94,6 @@ interface CreationPanelProps {
     onAnalyzeStyle: () => void;
     useLayoutToFill: boolean;
     setUseLayoutToFill: (use: boolean) => void;
-    user: User | null;
-    onBuyCredits: () => void;
     topic: string; setTopic: (s: string) => void;
     contentLevel: 'mínimo' | 'médio' | 'detalhado'; setContentLevel: (s: 'mínimo' | 'médio' | 'detalhado') => void;
     generationType: 'post' | 'carousel'; setGenerationType: (s: 'post' | 'carousel') => void;
@@ -122,7 +119,7 @@ const CreationPanel: React.FC<CreationPanelProps> = (props) => {
         isLoading, onGenerate, brandKits, activeBrandKit,
         postSize, setPostSize, customBackgrounds, styleImages,
         onFileChange, onRemoveImage, styleGuide, useStyleGuide, setUseStyleGuide, onAnalyzeStyle,
-        useLayoutToFill, setUseLayoutToFill, user, onBuyCredits,
+        useLayoutToFill, setUseLayoutToFill,
         topic, setTopic, contentLevel, setContentLevel, generationType, setGenerationType,
         textStyle, setTextStyle, backgroundSource, setBackgroundSource, aiPostCount, setAiPostCount, 
         aiProvider, setAiProvider, onSaveBrandKit, onAddLayoutToActiveKit, onImportBrandKit, 
@@ -154,19 +151,6 @@ const CreationPanel: React.FC<CreationPanelProps> = (props) => {
         onGenerate(topic, finalCount, generationType, contentLevel, backgroundSource, aiProvider, textStyle);
     };
     
-    let canGenerate = !isLoading;
-    let generateButtonTooltip = '';
-    if (!user) {
-        canGenerate = false;
-        generateButtonTooltip = 'Faça login para gerar conteúdo.';
-    } else if (backgroundSource === 'ai') {
-        const creditsNeeded = aiPostCount;
-        if ((user.credits || 0) < creditsNeeded) {
-            generateButtonTooltip = `Créditos insuficientes. Você precisa de ${creditsNeeded}.`;
-            canGenerate = false;
-        }
-    }
-
     return (
         <div className="w-full bg-zinc-900 p-4 flex flex-col h-full overflow-y-auto">
             <div className="flex-grow space-y-4">
@@ -263,7 +247,7 @@ const CreationPanel: React.FC<CreationPanelProps> = (props) => {
                             <button onClick={() => setBackgroundSource('upload')} className={`flex-1 flex items-center justify-center text-center py-1.5 rounded-md transition-all duration-300 ${backgroundSource === 'upload' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:bg-zinc-700'}`}>
                                 <Upload className="w-4 h-4 mr-2"/> Meus Fundos
                             </button>
-                            <button onClick={() => setBackgroundSource('ai')} className={`flex-1 flex items-center justify-center text-center py-1.5 rounded-md transition-all duration-300 ${backgroundSource === 'ai' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:bg-zinc-700'}`} disabled={!user}>
+                            <button onClick={() => setBackgroundSource('ai')} className={`flex-1 flex items-center justify-center text-center py-1.5 rounded-md transition-all duration-300 ${backgroundSource === 'ai' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:bg-zinc-700'}`}>
                                 <Sparkles className="w-4 h-4 mr-2"/> Gerar com IA
                             </button>
                         </div>
@@ -308,7 +292,6 @@ const CreationPanel: React.FC<CreationPanelProps> = (props) => {
 
                 <Accordion title={<><Package className="mr-2 h-5 w-5 text-purple-400"/> Brand Kits</>}>
                     <BrandKitManagement 
-                        user={user}
                         hasPosts={props.hasPosts}
                         brandKits={brandKits}
                         activeBrandKit={activeBrandKit}
@@ -328,18 +311,10 @@ const CreationPanel: React.FC<CreationPanelProps> = (props) => {
             </div>
             
             <div className="mt-4 pt-4 border-t border-zinc-700">
-                <div title={generateButtonTooltip}>
-                    <button onClick={handleGenerateClick} disabled={!canGenerate} className="w-full flex items-center justify-center animated-gradient-bg text-white font-bold py-3 px-4 rounded-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
-                        <Sparkles className="w-5 h-5 mr-2"/>
-                        {isLoading ? 'Gerando...' : 'Gerar Conteúdo'}
-                    </button>
-                </div>
-                 {!user && (
-                    <div className="flex items-center justify-center text-center p-2 bg-yellow-900/30 rounded-lg mt-2">
-                       <AlertCircle className="w-4 h-4 mr-2 text-yellow-400 shrink-0" />
-                       <p className="text-xs text-yellow-300">Faça login para gerar conteúdo.</p>
-                    </div>
-                )}
+                <button onClick={handleGenerateClick} disabled={isLoading} className="w-full flex items-center justify-center animated-gradient-bg text-white font-bold py-3 px-4 rounded-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <Sparkles className="w-5 h-5 mr-2"/>
+                    {isLoading ? 'Gerando...' : 'Gerar Conteúdo'}
+                </button>
             </div>
         </div>
     );

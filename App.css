@@ -11,7 +11,7 @@
     transition: grid-template-columns 0.3s ease-in-out;
 }
 
-/* Panel visibility states */
+/* Panel visibility states for desktop */
 .app-layout.left-panel-open {
     grid-template-columns: 384px 1fr 0; /* 384px = w-96 */
 }
@@ -23,7 +23,7 @@
 }
 
 /* Grid area assignments */
-.header { grid-area: header; }
+.header { grid-area: header; z-index: 20; }
 .left-panel { grid-area: left-panel; overflow: hidden; }
 .main-content { grid-area: main-content; position: relative; display: flex; align-items: center; justify-content: center; background-color: #18181b; overflow: hidden; }
 .right-panel { grid-area: right-panel; overflow: hidden; }
@@ -61,9 +61,67 @@
     border: 1px solid #3f3f46;
 }
 
-/* Hide scrollbars when panels are collapsed */
+/* Hide scrollbars when panels are collapsed on desktop */
 .app-layout:not(.left-panel-open) .left-panel,
 .app-layout:not(.right-panel-open) .right-panel {
     border-left: none;
     border-right: none;
+}
+
+.mobile-backdrop {
+    display: none;
+}
+
+
+/* --- Responsive Styles for Mobile & Tablet --- */
+@media (max-width: 1024px) {
+    .app-layout {
+        /* Change to a single column layout, panels will be overlaid */
+        grid-template-columns: 1fr;
+        grid-template-areas:
+            "header"
+            "main-content"
+            "footer-gallery";
+    }
+
+    /* Panels become fixed, off-screen drawers */
+    .left-panel, .right-panel {
+        position: fixed;
+        top: 0;
+        height: 100vh;
+        z-index: 100;
+        width: 85vw;
+        max-width: 384px;
+        box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        border: none;
+        overflow-y: auto;
+    }
+
+    .left-panel {
+        left: 0;
+        transform: translateX(-100%);
+    }
+
+    .right-panel {
+        right: 0;
+        transform: translateX(100%);
+    }
+
+    /* Class to slide panels into view */
+    .left-panel.mobile-panel-open {
+        transform: translateX(0);
+    }
+     .right-panel.mobile-panel-open {
+        transform: translateX(0);
+    }
+
+    /* Mobile Backdrop for closing panels */
+    .mobile-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        background-color: rgba(0, 0, 0, 0.6);
+        z-index: 99;
+        backdrop-filter: blur(2px);
+    }
 }

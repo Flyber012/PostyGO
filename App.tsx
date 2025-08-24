@@ -1,7 +1,6 @@
-
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Toaster, toast } from 'react-hot-toast';
-import { Post, BrandKit, PostSize, AnyElement, TextElement, ImageElement, BackgroundElement, FontDefinition, LayoutTemplate, BrandAsset, User, TextStyle, Project } from './types';
+import { Post, BrandKit, PostSize, AnyElement, TextElement, ImageElement, BackgroundElement, FontDefinition, LayoutTemplate, BrandAsset, TextStyle, Project } from './types';
 import { POST_SIZES, INITIAL_FONTS, PRESET_BRAND_KITS } from './constants';
 import * as geminiService from './services/geminiService';
 import * as freepikService from './services/freepikService';
@@ -10,25 +9,17 @@ import CanvasEditor from './components/CanvasEditor';
 import TimelineGallery from './components/PostGallery';
 import RightPanel from './components/RightPanel';
 import Header from './components/Header';
-import AccountManagerModal from './components/AccountManagerModal';
-import BuyCreditsModal from './components/BuyCreditsModal';
 import { GenerationWizard } from './components/GenerationWizard';
 import { BrandKitPanel } from './components/BrandKitPanel';
 import saveAs from 'file-saver';
 import { v4 as uuidv4 } from 'uuid';
-import { ZoomIn, ZoomOut, Maximize, PanelLeft, PanelRight } from 'lucide-react';
-
-declare global {
-    const google: any;
-}
-
-const DAILY_GENERATION_LIMIT = 10;
+import { ZoomIn, ZoomOut, Maximize, PanelLeft, PanelRight, Package } from 'lucide-react';
 
 const WelcomeScreen: React.FC<{ onNewProject: () => void; onOpenProject: () => void; }> = ({ onNewProject, onOpenProject }) => (
-    <div className="flex flex-col items-center justify-center h-full text-center text-gray-300 bg-black/30">
-        <h1 className="text-4xl font-bold mb-2 animated-gradient-text">Bem-vindo(a) ao Posty</h1>
-        <p className="text-lg text-gray-400 mb-8">Sua ferramenta de IA para criar posts incríveis.</p>
-        <div className="flex space-x-4">
+    <div className="flex flex-col items-center justify-center h-full text-center text-gray-300 bg-black/30 p-4">
+        <h1 className="text-3xl md:text-4xl font-bold mb-2 animated-gradient-text">Bem-vindo(a) ao Posty</h1>
+        <p className="text-base md:text-lg text-gray-400 mb-8">Sua ferramenta de IA para criar posts incríveis.</p>
+        <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
             <button
                 onClick={onNewProject}
                 className="bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors"
@@ -45,13 +36,15 @@ const WelcomeScreen: React.FC<{ onNewProject: () => void; onOpenProject: () => v
     </div>
 );
 
+const EmptyPanelPlaceholder: React.FC<{text: string}> = ({ text }) => (
+    <div className="flex flex-col items-center justify-center h-full text-center p-4 text-zinc-500">
+        <Package className="w-12 h-12 mb-4"/>
+        <p className="text-sm font-medium">{text}</p>
+    </div>
+);
+
 
 const App: React.FC = () => {
-    // Auth & Modals
-    const [user, setUser] = useState<User | null>(null);
-    const [isAccountModalOpen, setAccountModalOpen] = useState(false);
-    const [isBuyCreditsModalOpen, setBuyCreditsModalOpen] = useState(false);
-
     // Project State
     const [currentProject, setCurrentProject] = useState<Project | null>(null);
     const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
@@ -65,6 +58,7 @@ const App: React.FC = () => {
     const [zoom, setZoom] = useState(1);
     const [isWizardOpen, setWizardOpen] = useState(false);
     const [isBrandKitPanelOpen, setBrandKitPanelOpen] = useState(false);
+    const [isMobileView, setIsMobileView] = useState(window.innerWidth <= 1024);
 
     // Generation Settings (persist across projects for convenience)
     const [topic, setTopic] = useState('Productivity Hacks');
@@ -99,26 +93,24 @@ const App: React.FC = () => {
     const selectedPost = posts.find(p => p.id === selectedPostId);
     const activeBrandKit = brandKits.find(k => k.id === activeBrandKitId);
 
-    // --- USER AUTH & DATA ---
-    const updateUser = (updatedUser: User | null) => {
-        setUser(updatedUser);
-        if (updatedUser) {
-            localStorage.setItem('user', JSON.stringify(updatedUser));
-        } else {
-            localStorage.removeItem('user');
-        }
-    };
-    const handleLogin = useCallback((response: any) => { /* ... ( unchanged ) ... */ }, []);
-    const handleLogout = () => { /* ... ( unchanged ) ... */ };
-
-    // Restore user from localStorage
-    useEffect(() => {
-        const savedUserJson = localStorage.getItem('user');
-        if (savedUserJson) { /* ... ( unchanged logic ) ... */ }
+    // --- RESPONSIVE & UI LOGIC ---
+     useEffect(() => {
+        const handleResize = () => {
+            const mobile = window.innerWidth <= 1024;
+            setIsMobileView(mobile);
+            // On desktop, default panels to open, on mobile to closed
+            if (!mobile) {
+                setLeftPanelOpen(true);
+                setRightPanelOpen(true);
+            } else {
+                setLeftPanelOpen(false);
+                setRightPanelOpen(false);
+            }
+        };
+        handleResize(); // Initial check
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
     }, []);
-
-    // Google Identity Services
-    useEffect(() => { /* ... ( unchanged logic ) ... */ }, [user, handleLogin]);
 
     // --- PROJECT MANAGEMENT ---
     const createNewProject = (name: string, size: PostSize): Project => ({
@@ -205,16 +197,10 @@ const App: React.FC = () => {
         genTopic: string, count: number, genType: 'post' | 'carousel', genContentLevel: 'mínimo' | 'médio' | 'detalhado',
         genBackgroundSource: 'upload' | 'ai', genAiProvider: 'gemini' | 'freepik', genTextStyle: TextStyle
     ) => {
-        if (!user) { /* ... (user check unchanged) ... */ }
         if (!currentProject) {
             toast.error("Por favor, crie ou abra um projeto primeiro.");
             return;
         }
-        
-        const userApiKey = user.linkedAccounts?.google?.apiKey;
-        const isFreeTierUser = !userApiKey;
-
-        // ... (generation limit and credits checks unchanged) ...
         
         setIsLoading(true);
         setPosts([]); // Clear posts within the current project
@@ -260,7 +246,7 @@ const App: React.FC = () => {
                     let newContentMap: Record<string, string> = {};
                     if (textElementsToFill.length > 0) {
                         setLoadingMessage(`Gerando texto para o post ${i + 1}/${backgroundSources.length}...`);
-                        newContentMap = await geminiService.generateTextForLayout(textElementsToFill, genTopic, genContentLevel, activeStyleGuide, userApiKey, genTextStyle);
+                        newContentMap = await geminiService.generateTextForLayout(textElementsToFill, genTopic, genContentLevel, activeStyleGuide, undefined, genTextStyle);
                     }
                     
                     const newPostId = uuidv4();
@@ -295,7 +281,7 @@ const App: React.FC = () => {
                 setLoadingMessage('Criando layouts inteligentes...');
                 toast.loading('Criando layouts inteligentes...', { id: toastId });
 
-                const layoutPromises = backgroundSources.map(bg => geminiService.generateLayoutAndContentForImage(bg.src, genTopic, genContentLevel, activeKit, userApiKey, genTextStyle));
+                const layoutPromises = backgroundSources.map(bg => geminiService.generateLayoutAndContentForImage(bg.src, genTopic, genContentLevel, activeKit, undefined, genTextStyle));
                 const allLayouts = await Promise.all(layoutPromises);
 
                 const newPosts: Post[] = [];
@@ -309,7 +295,6 @@ const App: React.FC = () => {
                 if (newPosts.length > 0) setSelectedPostId(newPosts[0].id);
                 toast.success('Posts criados com sucesso!', { id: toastId });
             }
-             if (isFreeTierUser && genBackgroundSource !== 'ai') { /* ... (unchanged) ... */ }
         } catch (error) {
             console.error(error);
             toast.error(error instanceof Error ? error.message : 'Falha ao gerar conteúdo.', { id: toastId, duration: 6000 });
@@ -363,16 +348,20 @@ const App: React.FC = () => {
     return (
         <>
             <Toaster position="top-center" reverseOrder={false} />
-            {/* ... (Modals are unchanged) ... */}
+            {(isLeftPanelOpen || isRightPanelOpen) && isMobileView && (
+                <div 
+                    className="mobile-backdrop"
+                    onClick={() => {
+                        setLeftPanelOpen(false);
+                        setRightPanelOpen(false);
+                    }}
+                />
+            )}
             
             <input type="file" ref={openProjectInputRef} onChange={handleOpenProjectFile} accept=".posty" className="hidden" />
 
             <div className={`app-layout font-sans bg-gray-950 text-gray-100 ${isLeftPanelOpen ? 'left-panel-open' : ''} ${isRightPanelOpen ? 'right-panel-open' : ''}`}>
                 <Header 
-                    user={user}
-                    onLogout={handleLogout}
-                    onManageAccounts={() => setAccountModalOpen(true)}
-                    onBuyCredits={() => setBuyCreditsModalOpen(true)}
                     onNewProject={handleNewProject}
                     onSaveProject={handleSaveProject}
                     onSaveAsProject={handleSaveAsProject}
@@ -380,8 +369,8 @@ const App: React.FC = () => {
                     hasProject={!!currentProject}
                 />
 
-                <aside className="left-panel">
-                    {currentProject && (
+                <aside className={`left-panel ${isMobileView && isLeftPanelOpen ? 'mobile-panel-open' : ''}`}>
+                    {currentProject ? (
                         <CreationPanel
                             isLoading={isLoading}
                             onGenerate={handleGeneratePosts}
@@ -404,8 +393,6 @@ const App: React.FC = () => {
                             onAnalyzeStyle={() => { /* unchanged */ }}
                             useLayoutToFill={useLayoutToFill}
                             setUseLayoutToFill={setUseLayoutToFill}
-                            user={user}
-                            onBuyCredits={() => setBuyCreditsModalOpen(true)}
                             topic={topic} setTopic={setTopic}
                             contentLevel={contentLevel} setContentLevel={setContentLevel}
                             generationType={generationType} setGenerationType={setGenerationType}
@@ -425,6 +412,8 @@ const App: React.FC = () => {
                             selectedLayoutId={selectedLayoutId}
                             setSelectedLayoutId={setSelectedLayoutId}
                         />
+                    ) : (
+                         <EmptyPanelPlaceholder text="Crie ou abra um projeto para começar."/>
                     )}
                 </aside>
 
@@ -454,33 +443,35 @@ const App: React.FC = () => {
                             </div>
                         </div>
                     ) : (
-                        <div className="text-center text-gray-400">
+                        <div className="text-center text-gray-400 p-4">
                             <h2 className="text-2xl font-bold mb-2">Projeto Vazio</h2>
                             <p>Use o painel à esquerda para gerar seu primeiro conteúdo.</p>
                         </div>
                     )}
 
-                    <div className="absolute top-4 left-4 flex flex-col space-y-2">
+                    <div className="absolute top-4 left-4 flex flex-col space-y-2 z-10">
                         <button onClick={() => setLeftPanelOpen(!isLeftPanelOpen)} className="p-2 bg-zinc-900/70 backdrop-blur-sm rounded-lg shadow-lg hover:bg-zinc-800 transition-colors">
                             <PanelLeft className="w-5 h-5"/>
                         </button>
                     </div>
-                     <div className="absolute top-4 right-4 flex flex-col space-y-2">
+                     <div className="absolute top-4 right-4 flex flex-col space-y-2 z-10">
                         <button onClick={() => setRightPanelOpen(!isRightPanelOpen)} className="p-2 bg-zinc-900/70 backdrop-blur-sm rounded-lg shadow-lg hover:bg-zinc-800 transition-colors">
                             <PanelRight className="w-5 h-5"/>
                         </button>
                     </div>
                     
-                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center space-x-2 bg-zinc-900/70 backdrop-blur-sm p-2 rounded-lg shadow-lg">
-                        <button onClick={() => setZoom(z => Math.max(z / 1.25, 0.1))} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Zoom Out"><ZoomOut className="w-5 h-5"/></button>
-                        <span className="text-sm font-mono w-16 text-center">{Math.round(zoom * 100)}%</span>
-                        <button onClick={() => setZoom(z => Math.min(z * 1.25, 5))} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Zoom In"><ZoomIn className="w-5 h-5"/></button>
-                        <button onClick={handleFitToScreen} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Fit to Screen"><Maximize className="w-5 h-5"/></button>
-                    </div>
+                    {currentProject && (
+                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center space-x-2 bg-zinc-900/70 backdrop-blur-sm p-2 rounded-lg shadow-lg z-10">
+                            <button onClick={() => setZoom(z => Math.max(z / 1.25, 0.1))} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Zoom Out"><ZoomOut className="w-5 h-5"/></button>
+                            <span className="text-sm font-mono w-16 text-center">{Math.round(zoom * 100)}%</span>
+                            <button onClick={() => setZoom(z => Math.min(z * 1.25, 5))} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Zoom In"><ZoomIn className="w-5 h-5"/></button>
+                            <button onClick={handleFitToScreen} className="p-2 hover:bg-zinc-700 rounded-md" aria-label="Fit to Screen"><Maximize className="w-5 h-5"/></button>
+                        </div>
+                    )}
                 </main>
 
-                <aside className="right-panel">
-                    {currentProject && (
+                <aside className={`right-panel ${isMobileView && isRightPanelOpen ? 'mobile-panel-open' : ''}`}>
+                    {currentProject ? (
                        <RightPanel
                             selectedPost={selectedPost}
                             selectedElementId={selectedElementId}
@@ -499,6 +490,8 @@ const App: React.FC = () => {
                             onOpenColorPicker={() => {}}
                             palettes={{ post: selectedPost?.palette, custom: customPalette }}
                         />
+                    ) : (
+                        <EmptyPanelPlaceholder text="Selecione um post para ver suas camadas e propriedades."/>
                     )}
                 </aside>
 
