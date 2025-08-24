@@ -76,7 +76,7 @@ const LayersPanel: React.FC<LayersPanelProps> = (props) => {
                     )}
                 </div>
             </div>
-            <ul className="space-y-1 flex-grow overflow-y-auto">
+            <ul className="space-y-1 flex-grow overflow-y-auto layers-scrollbar pr-2">
                  {selectedPost.elements.find(e => e.type === 'background') && (
                     <li onClick={() => onSelectElement(selectedPost.elements.find(e => e.type === 'background')!.id)} className={`flex justify-between items-center p-2 rounded text-sm cursor-pointer ${selectedElementId === selectedPost.elements.find(e => e.type === 'background')!.id ? 'animated-gradient-bg text-white' : 'bg-zinc-800/50 hover:bg-zinc-800'}`}>
                         Fundo

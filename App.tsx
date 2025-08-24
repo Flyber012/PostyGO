@@ -590,20 +590,20 @@ const App: React.FC = () => {
     const handleWheel = (e: React.WheelEvent) => {
         if (!viewportRef.current) return;
         e.preventDefault();
-        const rect = viewportRef.current.getBoundingClientRect();
-        const mousePos = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-        
+        const rect = viewportRef.current.getBoundingClientRect();        
+        const viewportCenter = { x: rect.width / 2, y: rect.height / 2 };
+
         const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
         const newZoom = Math.max(0.1, Math.min(viewState.zoom * zoomFactor, 5));
         
-        const mouseBeforeZoom = {
-            x: (mousePos.x - viewState.offset.x) / viewState.zoom,
-            y: (mousePos.y - viewState.offset.y) / viewState.zoom
+        const centerBeforeZoom = {
+            x: (viewportCenter.x - viewState.offset.x) / viewState.zoom,
+            y: (viewportCenter.y - viewState.offset.y) / viewState.zoom
         };
         
         const newOffset = {
-            x: mousePos.x - mouseBeforeZoom.x * newZoom,
-            y: mousePos.y - mouseBeforeZoom.y * newZoom
+            x: viewportCenter.x - centerBeforeZoom.x * newZoom,
+            y: viewportCenter.y - centerBeforeZoom.y * newZoom
         };
         
         setViewState({ zoom: newZoom, offset: newOffset });
@@ -752,7 +752,7 @@ const App: React.FC = () => {
                     ) : (
                          <div className="flex flex-col h-full w-full bg-zinc-800">
                              <ProjectTabs projects={projects} currentProjectId={currentProjectId} onSelect={setCurrentProjectId} onClose={handleCloseProject} onNew={() => handleNewProject(postSize)} />
-                            <div className="flex-grow relative flex items-center justify-center p-4 overflow-hidden">
+                            <div className="flex-grow relative overflow-hidden">
                                 {isLoading ? (
                                     <div className="flex flex-col items-center justify-center text-center h-full">
                                         <svg className="animate-spin -ml-1 mr-3 h-10 w-10 text-purple-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
