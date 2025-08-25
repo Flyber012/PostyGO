@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { PostSize, BrandKit, TextStyle } from '../types';
 import { POST_SIZES } from '../constants';
-import { Upload, X, Sparkles, BrainCircuit, Package, ChevronDown, File as FileIcon, Files } from 'lucide-react';
+import { Upload, X, Sparkles, BrainCircuit, Package, ChevronDown, File as FileIcon, Files, Palette } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { BrandKitManagement } from './BrandKitManagement';
 
@@ -20,7 +20,7 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ title, images, onFileChan
     return (
         <div className="space-y-2">
             <h3 className="text-sm font-semibold text-gray-300">{title} ({images.length}/{limit})</h3>
-            <div className="grid grid-cols-4 gap-2 bg-black/30 p-2 rounded-md min-h-[6rem]">
+            <div className="grid grid-cols-4 lg:grid-cols-5 gap-2 bg-black/30 p-2 rounded-md min-h-[6rem]">
                 {images.map((img, index) => (
                     <div key={`${idPrefix}-${index}`} className="relative group aspect-square">
                         <img src={img} alt={`upload preview ${index + 1}`} className="w-full h-full object-cover rounded" />
@@ -74,16 +74,17 @@ const Accordion: React.FC<{ title: React.ReactNode; children: React.ReactNode; d
 
 interface CreationPanelProps {
     isLoading: boolean;
-    onGenerate: (topic: string, count: number, type: 'post' | 'carousel', contentLevel: 'mínimo' | 'médio' | 'detalhado', backgroundSource: 'upload' | 'ai', aiProvider: 'gemini' | 'freepik', textStyle: TextStyle) => void;
+    onGenerate: (topic: string, count: number, type: 'post' | 'carousel', contentLevel: 'mínimo' | 'médio' | 'detalhado', backgroundSource: 'upload' | 'ai' | 'solid', aiProvider: 'gemini' | 'freepik', textStyle: TextStyle) => void;
     brandKits: BrandKit[];
     activeBrandKit: BrandKit | undefined;
     postSize: PostSize;
     setPostSize: (size: PostSize) => void;
     hasPosts: boolean;
     customBackgrounds: string[];
-    styleImages: string[];
-    onFileChange: (event: React.ChangeEvent<HTMLInputElement>, type: 'background' | 'style') => void;
-    onRemoveImage: (index: number, type: 'background' | 'style') => void;
+    styleInspirationImages: string[];
+    generationInspirationImages: string[];
+    onFileChange: (event: React.ChangeEvent<HTMLInputElement>, type: 'background' | 'style' | 'gen-inspiration') => void;
+    onRemoveImage: (index: number, type: 'background' | 'style' | 'gen-inspiration') => void;
     colorMode: 'default' | 'custom' | 'extract';
     setColorMode: (mode: 'default' | 'custom' | 'extract') => void;
     customPalette: string[];
@@ -98,7 +99,7 @@ interface CreationPanelProps {
     contentLevel: 'mínimo' | 'médio' | 'detalhado'; setContentLevel: (s: 'mínimo' | 'médio' | 'detalhado') => void;
     generationType: 'post' | 'carousel'; setGenerationType: (s: 'post' | 'carousel') => void;
     textStyle: TextStyle; setTextStyle: (t: TextStyle) => void;
-    backgroundSource: 'upload' | 'ai'; setBackgroundSource: (s: 'upload' | 'ai') => void;
+    backgroundSource: 'upload' | 'ai' | 'solid'; setBackgroundSource: (s: 'upload' | 'ai' | 'solid') => void;
     aiPostCount: number; setAiPostCount: (n: number) => void;
     aiProvider: 'gemini' | 'freepik'; setAiProvider: (s: 'gemini' | 'freepik') => void;
     onSaveBrandKit: (name: string) => void;
@@ -112,19 +113,22 @@ interface CreationPanelProps {
     onDeleteLayoutFromKit: (layoutId: string) => void;
     selectedLayoutId: string | null;
     setSelectedLayoutId: (id: string | null) => void;
+    solidColorForGeneration: string;
+    onOpenSolidColorPicker: () => void;
 }
 
 const CreationPanel: React.FC<CreationPanelProps> = (props) => {
     const { 
         isLoading, onGenerate, brandKits, activeBrandKit,
-        postSize, setPostSize, customBackgrounds, styleImages,
+        postSize, setPostSize, customBackgrounds, styleInspirationImages, generationInspirationImages,
         onFileChange, onRemoveImage, styleGuide, useStyleGuide, setUseStyleGuide, onAnalyzeStyle,
         useLayoutToFill, setUseLayoutToFill,
         topic, setTopic, contentLevel, setContentLevel, generationType, setGenerationType,
         textStyle, setTextStyle, backgroundSource, setBackgroundSource, aiPostCount, setAiPostCount, 
         aiProvider, setAiProvider, onSaveBrandKit, onAddLayoutToActiveKit, onImportBrandKit, 
         onExportBrandKit, onDeleteBrandKit, onApplyBrandKit, onAddPostFromLayout, 
-        onUpdateLayoutName, onDeleteLayoutFromKit, selectedLayoutId, setSelectedLayoutId
+        onUpdateLayoutName, onDeleteLayoutFromKit, selectedLayoutId, setSelectedLayoutId,
+        solidColorForGeneration, onOpenSolidColorPicker
      } = props;
     
     useEffect(() => {
@@ -144,7 +148,7 @@ const CreationPanel: React.FC<CreationPanelProps> = (props) => {
             toast.error("Por favor, suba suas imagens de fundo antes de gerar.");
             return;
         }
-        if (finalCount <= 0) {
+        if ((backgroundSource === 'ai' || backgroundSource === 'solid') && finalCount <= 0) {
             toast.error("Por favor, defina um número de posts maior que zero.");
             return;
         }
@@ -159,13 +163,13 @@ const CreationPanel: React.FC<CreationPanelProps> = (props) => {
                         <p className="text-sm text-gray-400">Envie seus designs para a IA aprender sua identidade visual, ou use um Brand Kit.</p>
                         <ImageUploader 
                             title="Seus Designs de Exemplo"
-                            images={styleImages}
+                            images={styleInspirationImages}
                             onFileChange={(e) => onFileChange(e, 'style')}
                             onRemove={(index) => onRemoveImage(index, 'style')}
                             limit={10}
                             idPrefix="cp-style"
                         />
-                        <button onClick={onAnalyzeStyle} disabled={isLoading || styleImages.length === 0} className="w-full flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
+                        <button onClick={onAnalyzeStyle} disabled={isLoading || styleInspirationImages.length === 0} className="w-full flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed">
                             <BrainCircuit className="mr-2 h-4 w-4"/> {isLoading ? 'Analisando...' : 'Analisar Estilo'}
                         </button>
                         {styleGuide && (
@@ -243,12 +247,15 @@ const CreationPanel: React.FC<CreationPanelProps> = (props) => {
                 
                 <Accordion title={<>3. Fundos e Formato</>} defaultOpen>
                     <div className="space-y-4">
-                        <div className="flex bg-zinc-900/70 p-1 rounded-lg text-sm">
+                        <div className="grid grid-cols-3 bg-zinc-900/70 p-1 rounded-lg text-sm">
                             <button onClick={() => setBackgroundSource('upload')} className={`flex-1 flex items-center justify-center text-center py-1.5 rounded-md transition-all duration-300 ${backgroundSource === 'upload' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:bg-zinc-700'}`}>
-                                <Upload className="w-4 h-4 mr-2"/> Meus Fundos
+                                <Upload className="w-4 h-4 mr-2"/> Upload
                             </button>
                             <button onClick={() => setBackgroundSource('ai')} className={`flex-1 flex items-center justify-center text-center py-1.5 rounded-md transition-all duration-300 ${backgroundSource === 'ai' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:bg-zinc-700'}`}>
-                                <Sparkles className="w-4 h-4 mr-2"/> Gerar com IA
+                                <Sparkles className="w-4 h-4 mr-2"/> IA
+                            </button>
+                             <button onClick={() => setBackgroundSource('solid')} className={`flex-1 flex items-center justify-center text-center py-1.5 rounded-md transition-all duration-300 ${backgroundSource === 'solid' ? 'bg-purple-600 text-white shadow' : 'text-gray-300 hover:bg-zinc-700'}`}>
+                                <Palette className="w-4 h-4 mr-2"/> Cor Sólida
                             </button>
                         </div>
                         {backgroundSource === 'upload' ? (
@@ -260,8 +267,16 @@ const CreationPanel: React.FC<CreationPanelProps> = (props) => {
                                 limit={10}
                                 idPrefix="cp-bg"
                             />
-                        ) : (
+                        ) : backgroundSource === 'ai' ? (
                             <div className="space-y-4">
+                                <ImageUploader
+                                    title="Imagens de Inspiração (Opcional)"
+                                    images={generationInspirationImages}
+                                    onFileChange={(e) => onFileChange(e, 'gen-inspiration')}
+                                    onRemove={(index) => onRemoveImage(index, 'gen-inspiration')}
+                                    limit={5}
+                                    idPrefix="cp-gen-insp"
+                                />
                                 <div>
                                     <label className="block text-sm font-medium text-gray-300 mb-1">Provedor de IA</label>
                                     <div className="flex bg-zinc-900/70 p-1 rounded-lg text-sm">
@@ -272,6 +287,18 @@ const CreationPanel: React.FC<CreationPanelProps> = (props) => {
                                 <label htmlFor="cp-post-count-ai" className="block text-sm font-medium text-gray-300 mb-1">Número de Posts</label>
                                 <input type="number" id="cp-post-count-ai" value={aiPostCount} onChange={e => setAiPostCount(Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))} min="1" max="10" className="w-full bg-black/50 border border-zinc-600 rounded-md px-3 py-2 text-white" />
                             </div>
+                        ) : ( // solid color
+                             <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-300 mb-1">Cor de Fundo</label>
+                                    <div className="flex items-center space-x-2">
+                                        <button onClick={onOpenSolidColorPicker} className="w-10 h-10 rounded-md border border-zinc-600" style={{ backgroundColor: solidColorForGeneration }} />
+                                        <button onClick={onOpenSolidColorPicker} className="flex-1 text-center py-2 bg-zinc-700 hover:bg-zinc-600 rounded-md text-sm">Escolher Cor Personalizada</button>
+                                    </div>
+                                </div>
+                                <label htmlFor="cp-post-count-solid" className="block text-sm font-medium text-gray-300 mb-1">Número de Posts</label>
+                                <input type="number" id="cp-post-count-solid" value={aiPostCount} onChange={e => setAiPostCount(Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))} min="1" max="10" className="w-full bg-black/50 border border-zinc-600 rounded-md px-3 py-2 text-white" />
+                             </div>
                         )}
                          <div className="grid grid-cols-2 gap-2">
                             <button onClick={() => setGenerationType('post')} className={`flex items-center justify-center p-2 rounded-md transition-colors ${generationType === 'post' ? 'bg-purple-600 text-white' : 'bg-zinc-700 hover:bg-zinc-600'}`}>

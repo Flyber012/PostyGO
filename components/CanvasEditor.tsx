@@ -28,14 +28,15 @@ const CanvasEditor: React.FC<CanvasEditorProps> = ({ post, postSize, onUpdateEle
 
     return (
         <div 
-            className="shadow-lg rounded-lg overflow-hidden relative bg-gray-700"
+            className="shadow-lg rounded-lg overflow-hidden relative"
             style={{
                 width: postSize.width,
                 height: postSize.height,
+                backgroundColor: backgroundElement?.backgroundColor || '#18181b',
             }}
             onClick={deselectElement}
         >
-            {backgroundElement && (
+            {backgroundElement?.src && (
                 <img
                     src={backgroundElement.src}
                     alt="Post background"

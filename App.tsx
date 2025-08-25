@@ -16,7 +16,7 @@ import { GenerationWizard } from './components/GenerationWizard';
 import { BrandKitPanel } from './components/BrandKitPanel';
 import saveAs from 'file-saver';
 import { v4 as uuidv4 } from 'uuid';
-import { ZoomIn, ZoomOut, Maximize, Package, Image as ImageIcon, FileText, X, LayoutTemplate as LayoutTemplateIcon, Plus, Layers, AlignHorizontalJustifyCenter, AlignHorizontalJustifyStart, AlignHorizontalJustifyEnd, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Bold, Italic, Underline, Wand2, RefreshCcw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize, Package, Image as ImageIcon, FileText, X, LayoutTemplate as LayoutTemplateIcon, Plus, Layers, AlignHorizontalJustifyCenter, AlignHorizontalJustifyStart, AlignHorizontalJustifyEnd, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Bold, Italic, Underline, Wand2, RefreshCcw, ChevronLeft, ChevronRight, Upload } from 'lucide-react';
 import AdvancedColorPicker from './components/ColorPicker';
 import { parseColor, rgbToHex } from './utils/color';
 import ExportModal from './components/ExportModal';
@@ -269,6 +269,92 @@ const StaticPostRenderer: React.FC<{ post: Post; postSize: PostSize; ref: React.
     </div>
 ));
 
+// --- MODAL COMPONENTS ---
+
+const RegenerateBackgroundModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    onSubmit: (data: { prompt: string, inspirationImages: string[] }) => void;
+    isLoading: boolean;
+}> = ({ isOpen, onClose, onSubmit, isLoading }) => {
+    const [prompt, setPrompt] = useState('');
+    const [inspirationImages, setInspirationImages] = useState<string[]>([]);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (!isOpen) {
+            setPrompt('');
+            setInspirationImages([]);
+        }
+    }, [isOpen]);
+
+    if (!isOpen) return null;
+
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(event.target.files || []);
+        if (files.length === 0) return;
+        if (inspirationImages.length + files.length > 5) {
+            toast.error(`Você só pode enviar até 5 imagens de inspiração.`);
+            return;
+        }
+        const toastId = toast.loading('Carregando imagens de inspiração...');
+        try {
+            const base64Results = await Promise.all(files.map(file => readFileAsBase64(file)));
+            setInspirationImages(prev => [...prev, ...base64Results]);
+            toast.success('Imagens carregadas!', { id: toastId });
+        } catch (error) {
+            toast.error('Falha ao carregar uma ou mais imagens.', { id: toastId });
+        } finally {
+            event.target.value = '';
+        }
+    };
+    
+    const handleRemove = (index: number) => setInspirationImages(prev => prev.filter((_, i) => i !== index));
+    const handleSubmit = () => onSubmit({ prompt, inspirationImages });
+
+    return (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center backdrop-blur-sm" onClick={onClose}>
+            <div className="bg-zinc-900 rounded-lg shadow-2xl border border-zinc-700 w-full max-w-lg p-6 animate-fade-in" onClick={e => e.stopPropagation()}>
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold text-white flex items-center">
+                        <Wand2 className="w-5 h-5 mr-2 text-purple-400"/> Regenerar Fundo
+                    </h2>
+                    <button onClick={onClose} className="p-1 text-zinc-400 hover:text-white rounded-full"><X className="w-5 h-5"/></button>
+                </div>
+                <div className="space-y-4">
+                    <div>
+                        <label htmlFor="regen-prompt" className="block text-sm font-medium text-gray-300 mb-1">Novo Prompt</label>
+                        <textarea id="regen-prompt" value={prompt} onChange={e => setPrompt(e.target.value)} rows={3} className="w-full bg-black/50 border border-zinc-600 rounded-md px-3 py-2 text-white focus:ring-2 focus:ring-purple-500 focus:outline-none" placeholder="Ex: Um astronauta surfando em um anel de saturno, estilo synthwave"/>
+                    </div>
+                    <div className="space-y-2">
+                        <h3 className="text-sm font-semibold text-gray-300">Imagens de Inspiração (Opcional) ({inspirationImages.length}/5)</h3>
+                        <div className="grid grid-cols-5 gap-2 bg-black/30 p-2 rounded-md min-h-[6rem]">
+                            {inspirationImages.map((img, index) => (
+                                <div key={`regen-insp-${index}`} className="relative group aspect-square">
+                                    <img src={img} alt={`inspiration ${index + 1}`} className="w-full h-full object-cover rounded"/>
+                                    <button onClick={() => handleRemove(index)} className="absolute top-0 right-0 m-1 bg-red-600/80 hover:bg-red-500 rounded-full p-0.5 opacity-0 group-hover:opacity-100"><X className="h-3 w-3 text-white"/></button>
+                                </div>
+                            ))}
+                            {inspirationImages.length < 5 && (
+                                <button onClick={() => inputRef.current?.click()} className="flex items-center justify-center w-full h-full border-2 border-dashed border-gray-600 hover:border-gray-500 rounded text-gray-400 hover:text-white transition-colors aspect-square">
+                                    <Upload className="h-6 w-6"/>
+                                </button>
+                            )}
+                        </div>
+                        <input type="file" multiple accept="image/*" ref={inputRef} onChange={handleFileChange} className="hidden"/>
+                    </div>
+                    <div className="pt-4 border-t border-zinc-700 flex justify-end">
+                        <button onClick={handleSubmit} disabled={isLoading || !prompt.trim()} className="w-full flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-md transition-all disabled:opacity-50">
+                            {isLoading ? <RefreshCcw className="w-5 h-5 animate-spin mr-2"/> : <Wand2 className="w-5 h-5 mr-2"/>}
+                            {isLoading ? 'Gerando...' : 'Gerar Nova Imagem'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 const App: React.FC = () => {
     // Project State
@@ -283,6 +369,7 @@ const App: React.FC = () => {
     const [isWizardOpen, setWizardOpen] = useState(false);
     const [isBrandKitPanelOpen, setBrandKitPanelOpen] = useState(false);
     const [isExportModalOpen, setExportModalOpen] = useState(false);
+    const [isRegenModalOpen, setIsRegenModalOpen] = useState(false);
     const [isMobileView, setIsMobileView] = useState(window.innerWidth <= 1024);
     const [colorPickerState, setColorPickerState] = useState<{ isOpen: boolean, color: string, onChange: (color: string) => void }>({ isOpen: false, color: '#FFFFFF', onChange: () => {} });
     
@@ -301,11 +388,13 @@ const App: React.FC = () => {
     const [contentLevel, setContentLevel] = useState<'mínimo' | 'médio' | 'detalhado'>('médio');
     const [generationType, setGenerationType] = useState<'post' | 'carousel'>('post');
     const [textStyle, setTextStyle] = useState<TextStyle>('padrão');
-    const [backgroundSource, setBackgroundSource] = useState<'upload' | 'ai'>('upload');
+    const [backgroundSource, setBackgroundSource] = useState<'upload' | 'ai' | 'solid'>('upload');
     const [aiProvider, setAiProvider] = useState<'gemini' | 'freepik'>('gemini');
     const [aiPostCount, setAiPostCount] = useState(4);
     const [customBackgrounds, setCustomBackgrounds] = useState<string[]>([]);
-    const [styleImages, setStyleImages] = useState<string[]>([]);
+    const [styleInspirationImages, setStyleInspirationImages] = useState<string[]>([]);
+    const [generationInspirationImages, setGenerationInspirationImages] = useState<string[]>([]);
+    const [solidColorForGeneration, setSolidColorForGeneration] = useState<string>('#FFFFFF');
     
     // BrandKit & Style State
     const [brandKits, setBrandKits] = useState<BrandKit[]>(PRESET_BRAND_KITS);
@@ -321,6 +410,7 @@ const App: React.FC = () => {
     const viewportRef = useRef<HTMLDivElement>(null);
     const openProjectInputRef = useRef<HTMLInputElement>(null);
     const imageUploadRef = useRef<HTMLInputElement>(null);
+    const backgroundUploadRef = useRef<HTMLInputElement>(null);
     const staticPostRef = useRef<HTMLDivElement>(null);
 
     // --- DERIVED STATE ---
@@ -495,19 +585,27 @@ const App: React.FC = () => {
         }));
     };
 
-    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>, type: 'background' | 'style') => {
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>, type: 'background' | 'style' | 'gen-inspiration') => {
         const files = Array.from(event.target.files || []);
         if (files.length === 0) return;
-        const targetStateUpdater = type === 'background' ? setCustomBackgrounds : setStyleImages;
-        const currentState = type === 'background' ? customBackgrounds : styleImages;
-        if (currentState.length + files.length > 10) {
-            toast.error(`Você só pode enviar até 10 imagens.`);
+    
+        const stateMap = {
+            'background': { setter: setCustomBackgrounds, current: customBackgrounds, limit: 10 },
+            'style': { setter: setStyleInspirationImages, current: styleInspirationImages, limit: 10 },
+            'gen-inspiration': { setter: setGenerationInspirationImages, current: generationInspirationImages, limit: 5 },
+        };
+    
+        const { setter, current, limit } = stateMap[type];
+    
+        if (current.length + files.length > limit) {
+            toast.error(`Você só pode enviar até ${limit} imagens.`);
             return;
         }
+    
         const toastId = toast.loading('Carregando imagens...');
         try {
             const base64Results = await Promise.all(files.map(file => readFileAsBase64(file)));
-            targetStateUpdater(prev => [...prev, ...base64Results]);
+            setter(prev => [...prev, ...base64Results]);
             toast.success('Imagens carregadas!', { id: toastId });
         } catch (error) {
             toast.error('Falha ao carregar uma ou mais imagens.', { id: toastId });
@@ -516,19 +614,23 @@ const App: React.FC = () => {
         }
     };
 
-    const handleRemoveImage = (index: number, type: 'background' | 'style') => {
-        const updater = type === 'background' ? setCustomBackgrounds : setStyleImages;
-        updater(prev => prev.filter((_, i) => i !== index));
+    const handleRemoveImage = (index: number, type: 'background' | 'style' | 'gen-inspiration') => {
+         const stateMap = {
+            'background': setCustomBackgrounds,
+            'style': setStyleInspirationImages,
+            'gen-inspiration': setGenerationInspirationImages,
+        };
+        stateMap[type](prev => prev.filter((_, i) => i !== index));
     };
 
     const handleAnalyzeStyle = async () => {
-        if (styleImages.length === 0) {
+        if (styleInspirationImages.length === 0) {
             toast.error("Por favor, envie suas imagens de exemplo primeiro.");
             return;
         }
         const toastId = toast.loading('Analisando seu estilo...');
         try {
-            const analysis = await geminiService.analyzeStyleFromImages(styleImages);
+            const analysis = await geminiService.analyzeStyleFromImages(styleInspirationImages);
             setStyleGuide(analysis);
             setUseStyleGuide(true);
             toast.success('Guia de Estilo criado com sucesso!', { id: toastId });
@@ -539,7 +641,7 @@ const App: React.FC = () => {
 
     const handleGeneratePosts = async (
         genTopic: string, count: number, genType: 'post' | 'carousel', genContentLevel: 'mínimo' | 'médio' | 'detalhado',
-        genBackgroundSource: 'upload' | 'ai', genAiProvider: 'gemini' | 'freepik', genTextStyle: TextStyle
+        genBackgroundSource: 'upload' | 'ai' | 'solid', genAiProvider: 'gemini' | 'freepik', genTextStyle: TextStyle
     ) => {
         if (!currentProject || !postSize) { toast.error("Por favor, crie ou abra um projeto primeiro."); return; }
         
@@ -582,20 +684,23 @@ const App: React.FC = () => {
                 if (newPosts.length > 0) setSelectedPostId(newPosts[0].id);
                 toast.success(`${newPosts.length} posts criados com seu layout!`, { id: toastId });
             } else { 
-                let backgroundSources: { src: string; prompt?: string; provider?: 'gemini' | 'freepik' }[] = [];
-                if (genBackgroundSource === 'ai') {
+                let backgroundSources: { src?: string; backgroundColor?: string; prompt?: string; provider?: 'gemini' | 'freepik' }[] = [];
+                 if (genBackgroundSource === 'ai') {
                     setLoadingMessage('Gerando prompts de imagem...'); toast.loading('Gerando prompts de imagem...', { id: toastId });
-                    const imagePrompts = await geminiService.generateImagePrompts(genTopic, count, activeStyleGuide);
+                    const imagePrompts = await geminiService.generateImagePrompts(genTopic, count, activeStyleGuide, generationInspirationImages);
                     setLoadingMessage(`Gerando ${imagePrompts.length} imagens...`); toast.loading(`Gerando ${imagePrompts.length} imagens...`, { id: toastId });
                     const imageGenerator = genAiProvider === 'freepik' ? freepikService.generateBackgroundImages : geminiService.generateBackgroundImages;
                     const generatedImages = await imageGenerator(imagePrompts, postSize);
                     backgroundSources = generatedImages.map((src, i) => ({ src: `data:image/png;base64,${src}`, prompt: imagePrompts[i], provider: genAiProvider }));
-                } else {
+                } else if (genBackgroundSource === 'upload') {
                     if (customBackgrounds.length === 0) throw new Error("Nenhuma imagem de fundo foi enviada.");
                     backgroundSources = customBackgrounds.map(src => ({ src }));
+                } else { // 'solid'
+                    backgroundSources = Array(count).fill({ backgroundColor: solidColorForGeneration });
                 }
+
                 setLoadingMessage('Criando layouts inteligentes...'); toast.loading('Criando layouts inteligentes...', { id: toastId });
-                const layoutPromises = backgroundSources.map(bg => geminiService.generateLayoutAndContentForImage(bg.src, genTopic, genContentLevel, activeKit, undefined, genTextStyle));
+                const layoutPromises = backgroundSources.map(bg => geminiService.generateLayoutAndContentForImage(bg.src || bg.backgroundColor!, genTopic, genContentLevel, activeKit, undefined, genTextStyle));
                 const allLayouts = await Promise.all(layoutPromises);
                 const newPosts: Post[] = [];
                 const carouselId = genType === 'carousel' ? uuidv4() : undefined;
@@ -604,7 +709,10 @@ const App: React.FC = () => {
                     const layout = allLayouts[i];
                     const newPostId = uuidv4();
                     setLoadingMessage(`Montando post ${i + 1}/${backgroundSources.length}...`);
-                    const backgroundElement: BackgroundElement = { id: `${newPostId}-background`, type: 'background', src: bgData.src, prompt: bgData.prompt, provider: bgData.provider };
+                    const backgroundElement: BackgroundElement = { 
+                        id: `${newPostId}-background`, type: 'background', src: bgData.src, 
+                        backgroundColor: bgData.backgroundColor, prompt: bgData.prompt, provider: bgData.provider 
+                    };
                     const textElements = convertAILayoutToElements(layout, postSize, newPostId);
                     newPosts.push({ id: newPostId, elements: [backgroundElement, ...textElements], carouselId: carouselId, slideIndex: carouselId ? i : undefined });
                 }
@@ -1100,14 +1208,76 @@ const App: React.FC = () => {
         toast.success("Layout deletado do kit.");
     };
 
+    // --- BACKGROUND MANIPULATION ---
+
+    const handleTriggerBackgroundUpload = () => backgroundUploadRef.current?.click();
+
+    const handleBackgroundFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file || !selectedPost) return;
+        const bgElement = selectedPost.elements.find(e => e.type === 'background');
+        if (!bgElement) return;
+
+        const toastId = toast.loading('Atualizando fundo...');
+        try {
+            const src = await readFileAsBase64(file);
+            updatePostElement(bgElement.id, { src, backgroundColor: undefined });
+            toast.success('Fundo atualizado!', { id: toastId });
+        } catch (error) {
+            toast.error('Falha ao carregar imagem de fundo.', { id: toastId });
+        } finally {
+            event.target.value = '';
+        }
+    };
+    
+    const handleSetSolidBackground = () => {
+        const bgElement = selectedPost?.elements.find(e => e.type === 'background') as BackgroundElement | undefined;
+        if (!bgElement) return;
+        
+        handleOpenColorPicker(
+            bgElement.backgroundColor || '#18181b',
+            (newColor) => {
+                updatePostElement(bgElement.id, { backgroundColor: newColor, src: undefined });
+            }
+        );
+    };
+
+    const handleRegenerateBackground = async ({ prompt, inspirationImages }: { prompt: string, inspirationImages: string[] }) => {
+        if (!selectedPost || !postSize) return;
+        const bgElement = selectedPost.elements.find(e => e.type === 'background');
+        if (!bgElement) return;
+
+        setIsLoading(true);
+        const toastId = toast.loading('Gerando novo fundo com IA...');
+        try {
+            const newSrc = await geminiService.generateSingleBackgroundImage(prompt, postSize, undefined, inspirationImages);
+            updatePostElement(bgElement.id, { src: newSrc, backgroundColor: undefined });
+            toast.success('Fundo regenerado com sucesso!', { id: toastId });
+        } catch(error) {
+            toast.error(error instanceof Error ? error.message : 'Falha ao regenerar fundo.', { id: toastId });
+        } finally {
+            setIsLoading(false);
+            setIsRegenModalOpen(false);
+        }
+    };
+
+    const handleOpenSolidColorPickerForGeneration = () => {
+        handleOpenColorPicker(
+            solidColorForGeneration,
+            (newColor) => setSolidColorForGeneration(newColor)
+        );
+    };
+
     return (
         <>
             <Toaster position="top-center" reverseOrder={false} />
             {colorPickerState.isOpen && <AdvancedColorPicker color={colorPickerState.color} onChange={colorPickerState.onChange} onClose={() => setColorPickerState(s => ({...s, isOpen: false}))} palettes={{post: selectedPost?.palette, custom: customPalette}}/>}
             {(isLeftPanelOpen || isRightPanelOpen) && isMobileView && <div className="mobile-backdrop" onClick={() => { setLeftPanelOpen(false); setRightPanelOpen(false); }} />}
+            <RegenerateBackgroundModal isOpen={isRegenModalOpen} onClose={() => setIsRegenModalOpen(false)} onSubmit={handleRegenerateBackground} isLoading={isLoading} />
             
             <input type="file" ref={openProjectInputRef} onChange={handleOpenProjectFile} accept=".posty" className="hidden" />
             <input type="file" ref={imageUploadRef} onChange={handleImageUploadForElement} accept="image/*" className="hidden" />
+            <input type="file" ref={backgroundUploadRef} onChange={handleBackgroundFileChange} accept="image/*" className="hidden" />
             
             {/* Hidden renderer for exports */}
             <div ref={staticPostRef} className="absolute -left-[9999px] -top-[9999px]"/>
@@ -1139,7 +1309,8 @@ const App: React.FC = () => {
                     {projects.length > 0 ? (
                         <CreationPanel
                             isLoading={isLoading} onGenerate={handleGeneratePosts} brandKits={brandKits} activeBrandKit={activeBrandKit} postSize={postSize}
-                            setPostSize={setPostSizeForCurrentProject} hasPosts={posts.length > 0} customBackgrounds={customBackgrounds} styleImages={styleImages}
+                            setPostSize={setPostSizeForCurrentProject} hasPosts={posts.length > 0} 
+                            customBackgrounds={customBackgrounds} styleInspirationImages={styleInspirationImages} generationInspirationImages={generationInspirationImages}
                             onFileChange={handleFileChange} onRemoveImage={handleRemoveImage} colorMode={colorMode} setColorMode={setColorMode}
                             customPalette={customPalette} setCustomPalette={setCustomPalette} styleGuide={styleGuide} useStyleGuide={useStyleGuide}
                             setUseStyleGuide={setUseStyleGuide} onAnalyzeStyle={handleAnalyzeStyle} useLayoutToFill={useLayoutToFill} setUseLayoutToFill={setUseLayoutToFill}
@@ -1150,6 +1321,7 @@ const App: React.FC = () => {
                             onImportBrandKit={handleImportBrandKit} onExportBrandKit={handleExportBrandKit} onDeleteBrandKit={(kitId) => setBrandKits(prev => prev.filter(k => k.id !== kitId))}
                             onApplyBrandKit={(kitId) => updateCurrentProject({ activeBrandKitId: kitId })} onAddPostFromLayout={handleAddPostFromLayout} onUpdateLayoutName={handleUpdateLayoutName}
                             onDeleteLayoutFromKit={handleDeleteLayoutFromKit} selectedLayoutId={selectedLayoutId} setSelectedLayoutId={setSelectedLayoutId}
+                            solidColorForGeneration={solidColorForGeneration} onOpenSolidColorPicker={handleOpenSolidColorPickerForGeneration}
                         />
                     ) : <EmptyPanelPlaceholder text="Crie ou abra um projeto para começar."/>}
                 </aside>
@@ -1199,14 +1371,14 @@ const App: React.FC = () => {
                                             <>
                                                 <button
                                                     onClick={() => handleCarouselNav('prev')}
-                                                    className="absolute left-4 top-1/2 -translate-y-1/2 z-10 bg-black/40 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/60"
+                                                    className="absolute left-4 top-1/2 -translate-y-1/2 z-10 bg-black/40 text-white p-2 rounded-full transition-opacity hover:bg-black/60"
                                                     aria-label="Slide anterior"
                                                 >
                                                     <ChevronLeft className="w-6 h-6" />
                                                 </button>
                                                 <button
                                                     onClick={() => handleCarouselNav('next')}
-                                                    className="absolute right-4 top-1/2 -translate-y-1/2 z-10 bg-black/40 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/60"
+                                                    className="absolute right-4 top-1/2 -translate-y-1/2 z-10 bg-black/40 text-white p-2 rounded-full transition-opacity hover:bg-black/60"
                                                     aria-label="Próximo slide"
                                                 >
                                                     <ChevronRight className="w-6 h-6" />
@@ -1303,7 +1475,8 @@ const App: React.FC = () => {
                        <RightPanel
                             selectedPost={selectedPost} selectedElementId={selectedElementId} onSelectElement={setSelectedElementId} onUpdateElement={updatePostElement}
                             onAddElement={handleAddElement} onRemoveElement={removeElement} onDuplicateElement={duplicateElement} onToggleVisibility={(id) => toggleElementProperty(id, 'visible')}
-                            onToggleLock={(id) => toggleElementProperty(id, 'locked')} onReorderElements={handleReorderElements} onRegenerateBackground={() => {}} onUpdateBackgroundSrc={() => {}}
+                            onToggleLock={(id) => toggleElementProperty(id, 'locked')} onReorderElements={handleReorderElements} onOpenRegenModal={() => setIsRegenModalOpen(true)} 
+                            onTriggerBackgroundUpload={handleTriggerBackgroundUpload} onSetSolidBackground={handleSetSolidBackground}
                             availableFonts={availableFonts} onAddFont={handleAddFont} onOpenColorPicker={handleOpenColorPicker} palettes={{ post: selectedPost?.palette, custom: customPalette }}
                             onUpdateTextProperty={handleUpdateTextProperty}
                             onToggleTextStyle={handleToggleTextStyle}

@@ -18,8 +18,9 @@ interface RightPanelProps {
     onToggleVisibility: (elementId: string) => void;
     onToggleLock: (elementId: string) => void;
     onReorderElements: (sourceId: string, destinationId: string, position: 'before' | 'after') => void;
-    onRegenerateBackground: (elementId: string, prompt: string) => void;
-    onUpdateBackgroundSrc: (elementId: string, src: string) => void;
+    onOpenRegenModal: () => void;
+    onTriggerBackgroundUpload: () => void;
+    onSetSolidBackground: () => void;
     availableFonts: FontDefinition[];
     onAddFont: (font: FontDefinition) => void;
     onOpenColorPicker: (currentColor: string, onColorChange: (color: string) => void) => void;

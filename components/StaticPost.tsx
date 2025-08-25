@@ -123,7 +123,8 @@ const StaticPost: React.FC<StaticPostProps> = ({ post, postSize }) => {
       style={{
         width: postSize.width,
         height: postSize.height,
-        backgroundImage: backgroundElement ? `url(${backgroundElement.src})` : 'none',
+        backgroundColor: backgroundElement?.backgroundColor,
+        backgroundImage: backgroundElement?.src ? `url(${backgroundElement.src})` : 'none',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
       }}

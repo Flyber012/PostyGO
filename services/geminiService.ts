@@ -1,5 +1,6 @@
 
 
+
 import { GoogleGenAI, Type, Part } from "@google/genai";
 import { AIGeneratedTextElement, PaletteExtractionResult, AIGeneratedCarouselScriptSlide, TextElement, BrandKit, PostSize, TextStyle } from '../types';
 
@@ -72,13 +73,40 @@ export async function generateBackgroundImages(prompts: string[], postSize: Post
     return base64Images;
 }
 
-export async function generateSingleBackgroundImage(prompt: string, postSize: PostSize, userApiKey?: string): Promise<string> {
+async function generateEnhancedImagePrompt(basePrompt: string, inspirationImages: string[], userApiKey?: string): Promise<string> {
+    const ai = getAIClient(userApiKey);
+    const parts: Part[] = [];
+
+    const systemPrompt = `Você é um diretor de arte especialista em engenharia de prompt para IA generativa de imagens. Sua tarefa é analisar as imagens de inspiração fornecidas para entender seu estilo, cor, composição e "vibe" geral. Em seguida, você deve criar um prompt novo, detalhado e artístico para o tópico "${basePrompt}", incorporando o estilo analisado. O prompt resultante deve ser rico em detalhes visuais e pronto para ser usado por um modelo de texto para imagem como Imagen.`;
+    parts.push({ text: systemPrompt });
+
+    inspirationImages.forEach(base64Image => {
+        const [header, data] = base64Image.split(',');
+        if (!header || !data) return;
+        const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
+        parts.push({ inlineData: { mimeType, data } });
+    });
+
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: { parts }
+    });
+    
+    return response.text.trim();
+}
+
+export async function generateSingleBackgroundImage(prompt: string, postSize: PostSize, userApiKey?: string, inspirationImages?: string[]): Promise<string> {
     const ai = getAIClient(userApiKey);
     const aspectRatio = getAspectRatio(postSize);
 
+    let finalPrompt = prompt;
+    if (inspirationImages && inspirationImages.length > 0) {
+        finalPrompt = await generateEnhancedImagePrompt(prompt, inspirationImages, userApiKey);
+    }
+
     const response = await ai.models.generateImages({
         model: 'imagen-3.0-generate-002',
-        prompt: prompt,
+        prompt: finalPrompt,
         config: {
             numberOfImages: 1,
             outputMimeType: 'image/png',
@@ -128,8 +156,10 @@ export async function analyzeStyleFromImages(base64Images: string[], userApiKey?
     return response.text.trim();
 }
 
-export async function generateImagePrompts(topic: string, count: number, styleGuide: string | null, userApiKey?: string): Promise<string[]> {
+export async function generateImagePrompts(topic: string, count: number, styleGuide: string | null, inspirationImages: string[] = [], userApiKey?: string): Promise<string[]> {
     const ai = getAIClient(userApiKey);
+    const parts: Part[] = [];
+    
     let prompt = `Você é um diretor de arte criativo. Sua tarefa é gerar ${count} prompts de imagem distintos, visualmente interessantes e artísticos para um gerador de imagens de IA, todos baseados no tópico principal: "${topic}".
 
     **Instruções:**
@@ -137,20 +167,30 @@ export async function generateImagePrompts(topic: string, count: number, styleGu
     2.  **Espaço Negativo CRÍTICO:** A imagem DEVE incluir uma quantidade significativa de espaço negativo (como uma parede lisa, céu claro, fundo desfocado ou superfície texturizada simples). Este espaço é onde o texto será colocado, por isso não deve conter elementos que distraiam.
     3.  **Evitar Desordem:** Evite cenas excessivamente cheias ou ocupadas.
     4.  **Diversidade Temática:** Cada prompt deve explorar um ângulo ou subtema diferente relacionado ao tópico principal. Evite repetições.
-    5.  **Riqueza Visual:** Descreva a cena, os objetos, as cores, a iluminação e a composição. Use adjetivos evocativos.
-    6.  **Consistência de Estilo:** Todos os prompts devem seguir um estilo visual coeso.`;
+    5.  **Riqueza Visual:** Descreva a cena, os objetos, as cores, a iluminação e a composição. Use adjetivos evocativos.`;
 
-    if (styleGuide) {
+    if (inspirationImages.length > 0) {
+         prompt += `\n\n**DIRETRIZES DE ESTILO VISUAL OBRIGATÓRIAS (das imagens de inspiração):**\nAnalise o estilo, as cores e a "vibe" das imagens fornecidas. Todos os prompts que você criar DEVEM seguir esta estética visual de perto.`;
+    } else if (styleGuide) {
         prompt += `\n\n**DIRETRIZES DE ESTILO OBRIGATÓRIAS (do Brand Kit):**\n${styleGuide}\n\nAdapte o estilo dos prompts (ex: 'fotografia cinematográfica', 'ilustração 3D minimalista', 'arte abstrata com gradientes') para corresponder a essas diretrizes.`;
     } else {
         prompt += `\n\n**Estilo Padrão:** Vise um estilo de fotografia limpo, moderno e profissional com iluminação suave e natural.`;
     }
 
     prompt += `\n\nRetorne um array JSON contendo exatamente ${count} strings, onde cada string é um prompt de imagem completo.`;
+    parts.push({ text: prompt });
+
+    inspirationImages.forEach(base64Image => {
+        const [header, data] = base64Image.split(',');
+        if (!header || !data) return;
+        const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
+        parts.push({ inlineData: { mimeType, data } });
+    });
+
 
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: { parts: [{ text: prompt }] },
+        contents: { parts },
         config: {
             responseMimeType: "application/json",
             responseSchema: {
@@ -176,13 +216,18 @@ export async function generateImagePrompts(topic: string, count: number, styleGu
 }
 
 
-export async function generateLayoutAndContentForImage(base64Image: string, topic: string, contentLevel: 'mínimo' | 'médio' | 'detalhado', brandKit: BrandKit | null, userApiKey?: string, textStyle: TextStyle = 'padrão'): Promise<AIGeneratedTextElement[]> {
+export async function generateLayoutAndContentForImage(background: string, topic: string, contentLevel: 'mínimo' | 'médio' | 'detalhado', brandKit: BrandKit | null, userApiKey?: string, textStyle: TextStyle = 'padrão'): Promise<AIGeneratedTextElement[]> {
     const ai = getAIClient(userApiKey);
-    const [header, data] = base64Image.split(',');
-    if (!header || !data) throw new Error("Formato de imagem base64 inválido.");
-    const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
+    const parts: Part[] = [];
 
-    const imagePart = { inlineData: { mimeType, data } };
+    const isBase64Image = background.startsWith('data:image');
+    
+    if (isBase64Image) {
+        const [header, data] = background.split(',');
+        if (!header || !data) throw new Error("Formato de imagem base64 inválido.");
+        const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
+        parts.push({ inlineData: { mimeType, data } });
+    }
     
     const contentLevelInstructions = {
         mínimo: 'Gere um texto muito conciso. Uma frase curta ou um título de impacto. O objetivo é ser rápido e direto.',
@@ -198,8 +243,13 @@ export async function generateLayoutAndContentForImage(base64Image: string, topi
         divertido: 'Adote um tom bem-humorado, espirituoso e descontraído. O objetivo é entreter e engajar através da diversão.'
     };
 
-    let prompt = `Você é um diretor de arte e designer gráfico de IA com um olho impecável para composição e tipografia. Sua missão é criar um layout de texto visualmente deslumbrante e, acima de tudo, legível, para o tópico "${topic}", posicionando-o sobre a imagem de fundo.
+    let prompt = `Você é um diretor de arte e designer gráfico de IA com um olho impecável para composição e tipografia. Sua missão é criar um layout de texto visualmente deslumbrante e, acima de tudo, legível, para o tópico "${topic}", posicionando-o sobre o fundo fornecido.`;
+    
+    if (!isBase64Image) {
+         prompt += ` O fundo é uma cor sólida: ${background}.`;
+    }
 
+    prompt += `
     **Nível de Conteúdo Solicitado: ${contentLevel.toUpperCase()}**
     - ${contentLevelInstructions[contentLevel]}
 
@@ -208,13 +258,13 @@ export async function generateLayoutAndContentForImage(base64Image: string, topi
 
     **Seu Processo Criativo (Regras Inquebráveis):**
     1.  **Conteúdo Criativo com Personalidade:** Primeiro, crie o texto. Seja envolvente, use markdown (\`**destaque**\`) para ênfase e emojis relevantes. Use 'Poppins' como a fontFamily padrão se nenhuma outra for especificada.
-    2.  **ANÁLISE VISUAL CRÍTICA:** Depois de ter o texto, analise a imagem. Identifique as "zonas seguras" com espaço negativo (céu, paredes, áreas desfocadas).
-    3.  **NUNCA OBSTRUA O ESSENCIAL:** É PROIBIDO posicionar texto sobre rostos, produtos, ou o ponto focal principal da imagem. A legibilidade e o respeito pela imagem são fundamentais.
+    2.  **ANÁLISE VISUAL CRÍTICA:** Depois de ter o texto, analise o fundo. Se for uma imagem, identifique as "zonas seguras" com espaço negativo (céu, paredes, áreas desfocadas). Se for uma cor, a análise é mais simples.
+    3.  **NUNCA OBSTRUA O ESSENCIAL:** Se o fundo for uma imagem, é PROIBIDO posicionar texto sobre rostos, produtos, ou o ponto focal principal. A legibilidade e o respeito pela imagem são fundamentais.
     4.  **HIERARQUIA E POSICIONAMENTO:** Decomponha seu texto em elementos lógicos (título, corpo, etc.) e distribua-os harmonicamente. O título (use fontSize: 'large') deve ser o mais proeminente. A descrição (use fontSize: 'medium') deve ser claramente secundária e legível. Texto de rodapé ou detalhes (use fontSize: 'small') deve ser discreto.
-    5.  **CONTRASTE É REI:** Analise o tom da imagem (\`backgroundTone\`) *exatamente* onde você vai colocar cada bloco de texto. Use branco ('#FFFFFF') para fundos escuros e um cinza muito escuro/preto ('#0F172A') para fundos claros.
+    5.  **CONTRASTE É REI:** Analise o tom do fundo (\`backgroundTone\`) *exatamente* onde você vai colocar cada bloco de texto. Use branco ('#FFFFFF') para fundos escuros e um cinza muito escuro/preto ('#0F172A') para fundos claros.
     6.  **DESIGN INTELIGENTE:**
-        -   Para textos com markdown, sugira uma \`highlightColor\` vibrante da imagem e uma \`accentFontFamily\` de contraste.
-        -   Se criar uma CTA, use o \`fontSize\` 'cta' e sugira uma \`backgroundColor\` sólida da paleta da imagem.
+        -   Para textos com markdown, sugira uma \`highlightColor\` vibrante do fundo (se for imagem) e uma \`accentFontFamily\` de contraste.
+        -   Se criar uma CTA, use o \`fontSize\` 'cta' e sugira uma \`backgroundColor\` sólida e contrastante.
         -   Para CTAs, a altura (\`height\`) DEVE ser justa ao conteúdo para que pareçam botões.`;
     
     if (brandKit) {
@@ -228,8 +278,13 @@ export async function generateLayoutAndContentForImage(base64Image: string, topi
         - **Fontes Permitidas:** Você DEVE usar uma das seguintes fontes: ${fontNames}. Defina a fonte principal no campo 'fontFamily'.
         - **Paleta de Cores Obrigatória:** Você DEVE usar cores desta paleta para textos, fundos de botão e destaques: ${palette}. Defina a cor do texto no campo 'color'.
         ---
-        Você é um diretor de arte IA que deve aplicar o Brand Kit acima. Sua missão é criar um layout de texto para o tópico "${topic}" sobre a imagem fornecida.
+        Você é um diretor de arte IA que deve aplicar o Brand Kit acima. Sua missão é criar um layout de texto para o tópico "${topic}" sobre o fundo fornecido.`;
+        
+        if (!isBase64Image) {
+            prompt += ` O fundo é uma cor sólida: ${background}.`;
+        }
 
+        prompt += `
         **Nível de Conteúdo Solicitado: ${contentLevel.toUpperCase()}**
         - ${contentLevelInstructions[contentLevel]}
 
@@ -238,14 +293,16 @@ export async function generateLayoutAndContentForImage(base64Image: string, topi
 
         **Seu Processo (Seguindo as Regras):**
         1.  **Conteúdo no Tom Certo:** Crie o texto alinhado com o tópico e a "vibe" do Guia de Estilo.
-        2.  **Análise e Posicionamento:** Analise a imagem para encontrar "zonas seguras". Posicione os elementos de texto seguindo o Guia de Estilo e criando uma hierarquia visual clara. O título (fontSize: 'large') deve ser proeminente, e a descrição (fontSize: 'medium') secundária. **NUNCA** coloque texto sobre rostos ou pontos focais.
+        2.  **Análise e Posicionamento:** Analise o fundo para encontrar "zonas seguras" (se for imagem). Posicione os elementos de texto seguindo o Guia de Estilo e criando uma hierarquia visual clara. O título (fontSize: 'large') deve ser proeminente, e a descrição (fontSize: 'medium') secundária. **NUNCA** coloque texto sobre rostos ou pontos focais.
         3.  **Tipografia e Cores:** Aplique as fontes e cores OBRIGATÓRIAS do Brand Kit.
         4.  **Contraste:** Use branco ('#FFFFFF') para fundos escuros e preto/cinza escuro ('#0F172A') para fundos claros, a menos que a paleta do Brand Kit forneça outras opções.`;
     }
 
+    parts.push({ text: prompt });
+
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: { parts: [imagePart, { text: prompt }] },
+        contents: { parts },
         config: {
             responseMimeType: "application/json",
             responseSchema: {

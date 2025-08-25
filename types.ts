@@ -96,7 +96,8 @@ export interface QRCodeElement extends BaseElement {
 export interface BackgroundElement {
     id: string;
     type: 'background';
-    src: string; // base64
+    src?: string; // base64, agora opcional
+    backgroundColor?: string; // para fundos de cor sólida
     prompt?: string; // The prompt used to generate it, for regeneration
     provider?: 'gemini' | 'freepik';
 }

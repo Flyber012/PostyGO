@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Post, AnyElement, TextElement, BackgroundElement, ShapeElement, ForegroundElement } from '../types';
-import { Plus, Trash2, Type, Image as ImageIcon, GitCommitHorizontal, Square, Circle, QrCode, Copy, Eye, EyeOff, Lock, Unlock, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Trash2, Type, Image as ImageIcon, GitCommitHorizontal, Square, Circle, QrCode, Copy, Eye, EyeOff, Lock, Unlock, ArrowUp, ArrowDown, Wand2, FileUp, Palette } from 'lucide-react';
 
 interface LayersPanelProps {
     selectedPost: Post | undefined;
@@ -17,6 +17,9 @@ interface LayersPanelProps {
     onReorderElements: (sourceId: string, destinationId: string, position: 'before' | 'after') => void;
     onMoveElement: (elementId: string, direction: 'up' | 'down') => void;
     onRenameElement: (elementId: string, newName: string) => void;
+    onOpenRegenModal: () => void;
+    onTriggerBackgroundUpload: () => void;
+    onSetSolidBackground: () => void;
 }
 
 const getElementDisplayName = (element: ForegroundElement): string => {
@@ -47,7 +50,8 @@ const getElementDisplayName = (element: ForegroundElement): string => {
 const LayersPanel: React.FC<LayersPanelProps> = (props) => {
     const { 
         selectedPost, selectedElementId, onSelectElement, onAddElement, onRemoveElement, 
-        onDuplicateElement, onToggleVisibility, onToggleLock, onReorderElements, onMoveElement, onRenameElement
+        onDuplicateElement, onToggleVisibility, onToggleLock, onReorderElements, onMoveElement, onRenameElement,
+        onOpenRegenModal, onTriggerBackgroundUpload, onSetSolidBackground
     } = props;
     
     const [isAddMenuOpen, setAddMenuOpen] = useState(false);
@@ -134,6 +138,7 @@ const LayersPanel: React.FC<LayersPanelProps> = (props) => {
 
     if (!selectedPost) return <div className="p-4 text-sm text-zinc-500">Selecione um post para ver suas camadas.</div>;
     
+    const backgroundElement = selectedPost.elements.find(e => e.type === 'background') as BackgroundElement | undefined;
     const foregroundElements = selectedPost.elements.filter((e): e is ForegroundElement => e.type !== 'background');
     // Render layers in reverse z-index order (item at index 0 is bottom-most, rendered last in the list)
     // This is the standard for layer panels (Photoshop, Figma, etc.)
@@ -179,7 +184,7 @@ const LayersPanel: React.FC<LayersPanelProps> = (props) => {
                             onDoubleClick={() => handleStartEditing(element)}
                             className={`relative flex items-center p-2 rounded text-sm transition-all duration-150 group 
                                 ${!element.locked && !editingElementId ? 'cursor-grab' : 'cursor-default'} 
-                                ${selectedElementId === element.id ? 'animated-gradient-bg text-white' : 'bg-zinc-800/50 hover:bg-zinc-800'} 
+                                ${selectedElementId === element.id ? 'bg-purple-600/50 text-white' : 'bg-zinc-800/50 hover:bg-zinc-800'} 
                                 ${!element.visible ? 'opacity-50' : ''}
                                 ${isDragged ? 'opacity-40' : ''}
                             `}
@@ -215,10 +220,17 @@ const LayersPanel: React.FC<LayersPanelProps> = (props) => {
                 })}
 
                 {/* Background Layer */}
-                {selectedPost.elements.find(e => e.type === 'background') && (
-                    <li onClick={() => onSelectElement(selectedPost.elements.find(e => e.type === 'background')!.id)} className={`flex justify-between items-center p-2 rounded text-sm cursor-pointer ${selectedElementId === selectedPost.elements.find(e => e.type === 'background')!.id ? 'animated-gradient-bg text-white' : 'bg-zinc-800/50 hover:bg-zinc-800'}`}>
-                        Fundo
-                        <Lock className="w-3 h-3 text-zinc-400" />
+                {backgroundElement && (
+                    <li 
+                        onClick={() => onSelectElement(backgroundElement.id)} 
+                        className={`flex justify-between items-center p-2 rounded text-sm cursor-pointer group ${selectedElementId === backgroundElement.id ? 'bg-purple-600/50 text-white' : 'bg-zinc-800/50 hover:bg-zinc-800'}`}
+                    >
+                        <span className="font-semibold">Fundo</span>
+                        <div className="flex items-center space-x-1 ml-2">
+                             <button onClick={(e) => { e.stopPropagation(); onOpenRegenModal(); }} className="p-1 hover:bg-white/20 rounded" title="Regenerar com IA"><Wand2 className="w-3 h-3"/></button>
+                             <button onClick={(e) => { e.stopPropagation(); onTriggerBackgroundUpload(); }} className="p-1 hover:bg-white/20 rounded" title="Fazer Upload de Fundo"><FileUp className="w-3 h-3"/></button>
+                             <button onClick={(e) => { e.stopPropagation(); onSetSolidBackground(); }} className="p-1 hover:bg-white/20 rounded" title="Definir Cor Sólida"><Palette className="w-3 h-3"/></button>
+                        </div>
                     </li>
                  )}
             </ul>
