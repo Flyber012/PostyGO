@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createRoot, Root } from 'react-dom/client';
 import { X, Download, FileImage, Archive, RotateCw } from 'lucide-react';
 import { toast } from 'react-hot-toast';
@@ -31,9 +31,6 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, posts, postS
     const [exportFormat, setExportFormat] = useState<ExportFormat>('png');
     const [isExporting, setIsExporting] = useState(false);
     const [exportMessage, setExportMessage] = useState('');
-    
-    const rendererRef = useRef<HTMLDivElement | null>(null);
-    const rendererRootRef = useRef<Root | null>(null);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -53,67 +50,101 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, posts, postS
         } else {
             if (exportFormat === 'zip') setExportFormat('png');
         }
-    }, [exportScope]);
+    }, [exportScope, exportFormat]);
     
-    const cleanupRenderer = () => {
-        if (rendererRootRef.current) {
-            rendererRootRef.current.unmount();
-            rendererRootRef.current = null;
-        }
-        if (rendererRef.current) {
-            document.body.removeChild(rendererRef.current);
-            rendererRef.current = null;
-        }
-    };
+    const generateImageInIframe = (post: Post, postSize: PostSize, fontEmbedCss: string): Promise<string> => {
+        return new Promise(async (resolve, reject) => {
+            const iframe = document.createElement('iframe');
+            iframe.style.position = 'absolute';
+            iframe.style.left = '-9999px';
+            iframe.style.top = '-9999px';
+            iframe.style.border = 'none';
+            iframe.width = `${postSize.width}px`;
+            iframe.height = `${postSize.height}px`;
 
-    const generateImageForPost = async (post: Post, postSize: PostSize, fontEmbedCss: string): Promise<string> => {
-        if (!rendererRef.current) {
-            const div = document.createElement('div');
-            div.style.position = 'absolute';
-            div.style.left = '-9999px';
-            div.style.top = '-9999px';
-            document.body.appendChild(div);
-            rendererRef.current = div;
-            rendererRootRef.current = createRoot(div);
-        }
-        
-        rendererRootRef.current.render(<StaticPost post={post} postSize={postSize} />);
-        
-        // Wait for next tick to ensure DOM is updated
-        await new Promise(resolve => setTimeout(resolve, 50));
+            document.body.appendChild(iframe);
 
-        const imageTargetNode = rendererRef.current.firstChild as HTMLElement;
-        if (!imageTargetNode) throw new Error("Componente renderizado não encontrado para exportação.");
-        
-        // Wait for all images inside the node to load to prevent layout shifts
-        const images = Array.from(imageTargetNode.getElementsByTagName('img'));
-        const imagePromises = images.map(img => {
-            if (img.complete && img.naturalHeight !== 0) return Promise.resolve(); // Already loaded and valid
-            return new Promise<void>((resolve) => {
-                img.onload = () => resolve();
-                img.onerror = () => {
-                    console.warn(`Could not load image during export: ${img.src}.`);
-                    resolve(); // Resolve instead of reject to not fail the whole export
+            const cleanup = (root: Root | null) => {
+                if (root) root.unmount();
+                if (iframe.parentElement) {
+                    document.body.removeChild(iframe);
+                }
+            };
+            
+            let reactRoot: Root | null = null;
+
+            try {
+                const doc = iframe.contentWindow?.document;
+                if (!doc) {
+                    throw new Error("Não foi possível acessar o documento do iframe.");
+                }
+
+                doc.open();
+                doc.write(`
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <style>
+                            body, html { margin: 0; padding: 0; font-family: sans-serif; }
+                            ${fontEmbedCss}
+                        </style>
+                    </head>
+                    <body>
+                        <div id="render-root" style="width:${postSize.width}px; height:${postSize.height}px;"></div>
+                    </body>
+                    </html>
+                `);
+                doc.close();
+
+                const renderRootEl = doc.getElementById('render-root');
+                if (!renderRootEl) {
+                    throw new Error("Não foi possível encontrar o elemento raiz para renderização no iframe.");
+                }
+
+                reactRoot = createRoot(renderRootEl);
+                reactRoot.render(<StaticPost post={post} postSize={postSize} />);
+
+                // Wait for render and images to load
+                await new Promise(r => setTimeout(r, 100));
+
+                const images = Array.from(doc.getElementsByTagName('img'));
+                const imagePromises = images.map(img => {
+                    if (img.complete && img.naturalHeight !== 0) return Promise.resolve();
+                    return new Promise<void>((resolveImg, rejectImg) => {
+                        img.onload = () => resolveImg();
+                        img.onerror = () => {
+                            console.warn(`Could not load image during export: ${img.src}.`);
+                            resolveImg(); // Don't fail the whole export
+                        };
+                    });
+                });
+                await Promise.all(imagePromises);
+                
+                await new Promise(r => setTimeout(r, 300));
+
+                const options = {
+                    quality: 0.98,
+                    pixelRatio: 2,
+                    imagePlaceholder: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
                 };
-            });
+                
+                const targetNode = doc.getElementById('render-root') as HTMLElement;
+                let dataUrl: string;
+
+                if (exportFormat === 'jpeg') {
+                    dataUrl = await htmlToImage.toJpeg(targetNode, options);
+                } else {
+                    dataUrl = await htmlToImage.toPng(targetNode, options);
+                }
+                
+                cleanup(reactRoot);
+                resolve(dataUrl);
+
+            } catch (error) {
+                cleanup(reactRoot);
+                reject(error);
+            }
         });
-        await Promise.all(imagePromises);
-        
-        // Add a final delay for layout settlement, especially for complex text elements (titles, CTAs).
-        await new Promise(resolve => setTimeout(resolve, 300));
-
-        const options = {
-            quality: 0.98,
-            pixelRatio: 2,
-            fontEmbedCss: fontEmbedCss,
-            imagePlaceholder: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
-        };
-
-        if (exportFormat === 'jpeg') {
-            return await htmlToImage.toJpeg(imageTargetNode, options);
-        } else {
-            return await htmlToImage.toPng(imageTargetNode, options);
-        }
     };
 
     const handleExport = async () => {
@@ -172,7 +203,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, posts, postS
                 setExportMessage(`Renderizando post...`);
                 toast.loading(`Renderizando post como ${exportFormat.toUpperCase()}...`, { id: toastId });
 
-                const dataUrl = await generateImageForPost(selectedPost, postSize, fontEmbedCss);
+                const dataUrl = await generateImageInIframe(selectedPost, postSize, fontEmbedCss);
                 saveAs(dataUrl, `${projectName}_post.${exportFormat}`);
                 toast.success('Exportação concluída!', { id: toastId });
 
@@ -184,7 +215,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, posts, postS
                     setExportMessage(`Renderizando post ${i + 1}/${posts.length}...`);
                     toast.loading(`Renderizando post ${i + 1}/${posts.length}...`, { id: toastId });
                     
-                    const pngDataUrl = await generateImageForPost(post, postSize, fontEmbedCss);
+                    const pngDataUrl = await generateImageInIframe(post, postSize, fontEmbedCss);
                     const base64Data = pngDataUrl.split(',')[1];
                     zip.file(`post_${String(i + 1).padStart(2, '0')}.png`, base64Data, { base64: true });
                 }
@@ -199,7 +230,6 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, posts, postS
             console.error("Export failed:", error);
             toast.error(error instanceof Error ? error.message : "Ocorreu um erro durante a exportação.", { id: toastId });
         } finally {
-            cleanupRenderer();
             setIsExporting(false);
             setExportMessage('');
             onClose();

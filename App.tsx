@@ -263,13 +263,6 @@ const ProjectTabs: React.FC<{
 };
 
 
-// Hidden container used for rendering posts for export
-const StaticPostRenderer: React.FC<{ post: Post; postSize: PostSize; ref: React.Ref<HTMLDivElement> }> = React.forwardRef(({ post, postSize }, ref) => (
-    <div ref={ref} className="absolute -left-[9999px] -top-[9999px]">
-      <StaticPost post={post} postSize={postSize} />
-    </div>
-));
-
 // --- MODAL COMPONENTS ---
 
 const RegenerateBackgroundModal: React.FC<{
