@@ -2,11 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createRoot, Root } from 'react-dom/client';
 import { X, Download, FileImage, FileText, Archive, RotateCw } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import { Post, PostSize, Project } from '../types';
+import { Post, PostSize, Project, TextElement } from '../types';
 import * as htmlToImage from 'html-to-image';
 import saveAs from 'file-saver';
 import JSZip from 'jszip';
 import StaticPost from './StaticPost';
+import { loadGoogleFont } from '../utils/fontManager';
 
 interface ExportModalProps {
     isOpen: boolean;
@@ -68,18 +69,45 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, posts, postS
             return;
         }
 
-        // Create the root if it doesn't exist
         if (!rendererRootRef.current) {
             rendererRootRef.current = createRoot(rendererContainer);
         }
         const root = rendererRootRef.current;
     
         try {
+            const postsToExport = exportScope === 'current' && selectedPost ? [selectedPost] : posts;
+            const toastId = toast.loading('Carregando fontes para exportação...');
+
+            // 1. Collect all fonts from elements and their rich-text content
+            const allFonts = new Set<string>();
+            const fontRegex = /font-family:\s*['"]([^'"]+)['"]/g;
+            postsToExport.forEach(post => {
+                post.elements.forEach(element => {
+                    if (element.type === 'text') {
+                        const textEl = element as TextElement;
+                        allFonts.add(textEl.fontFamily);
+                        let match;
+                        while ((match = fontRegex.exec(textEl.content)) !== null) {
+                            allFonts.add(match[1]);
+                        }
+                    }
+                });
+            });
+
+            // 2. Load all collected fonts and wait for them
+            try {
+                await Promise.all(Array.from(allFonts).map(fontName => loadGoogleFont(fontName)));
+            } catch (error) {
+                console.error("Font loading failed during export:", error);
+                toast.error("Algumas fontes não puderam ser carregadas. A exportação pode não ficar perfeita.", { id: toastId });
+            }
+
+
             if (exportScope === 'current' && selectedPost) {
-                const toastId = toast.loading(`Exportando post como ${exportFormat.toUpperCase()}...`);
+                toast.loading(`Exportando post como ${exportFormat.toUpperCase()}...`, { id: toastId });
                 
                 root.render(<StaticPost post={selectedPost} postSize={postSize} />);
-                await new Promise(resolve => setTimeout(resolve, 500)); // Give React and fonts time to render
+                await new Promise(resolve => setTimeout(resolve, 750)); // Give React and fonts time to render
 
                 const imageTargetNode = rendererContainer.firstChild as HTMLElement;
                 if (!imageTargetNode) throw new Error("Componente renderizado não encontrado para exportação.");
@@ -95,7 +123,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, posts, postS
                 toast.success('Exportação concluída!', { id: toastId });
 
             } else if (exportScope === 'all') {
-                const toastId = toast.loading('Preparando para exportar todos os posts...');
+                toast.loading('Preparando para exportar todos os posts...', { id: toastId });
                 const zip = new JSZip();
     
                 for (let i = 0; i < posts.length; i++) {
@@ -103,7 +131,7 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, posts, postS
                     toast.loading(`Processando post ${i + 1} de ${posts.length}...`, { id: toastId });
                     
                     root.render(<StaticPost post={post} postSize={postSize} />);
-                    await new Promise(resolve => setTimeout(resolve, 500)); // Allow render time
+                    await new Promise(resolve => setTimeout(resolve, 750)); // Allow render time
 
                     const imageTargetNode = rendererContainer.firstChild as HTMLElement;
                     if (!imageTargetNode) throw new Error(`Componente renderizado não encontrado para o post ${i + 1}.`);
@@ -122,7 +150,6 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, posts, postS
             console.error("Export failed:", error);
             toast.error(error instanceof Error ? error.message : "Ocorreu um erro durante a exportação.");
         } finally {
-            // Unmount the component from the portal
             if (rendererRootRef.current) {
                 rendererRootRef.current.unmount();
                 rendererRootRef.current = null;

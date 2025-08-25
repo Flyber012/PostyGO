@@ -1,9 +1,8 @@
-
-
 import React, { useState } from 'react';
 import { AnyElement, TextElement, ImageElement, ShapeElement, QRCodeElement, FontDefinition, BlendMode, BackgroundElement } from '../types';
 import { ChevronDown, FileUp } from 'lucide-react';
 import FontSelector from './FontSelector';
+import { toast } from 'react-hot-toast';
 
 // Reusable input components
 const NumberInput: React.FC<{label: string, value: number, onChange: (val: string) => void, min?: number, max?: number, step?: number, unit?: string}> = 
@@ -70,7 +69,7 @@ interface PropertiesPanelProps {
     onUpdateTextProperty: (prop: string, value: any) => void;
     onToggleTextStyle: (style: 'bold' | 'italic' | 'underline') => void;
     availableFonts: FontDefinition[];
-    onLoadFont: (fontName: string) => void;
+    onLoadFont: (fontName: string) => Promise<void>;
     onOpenColorPicker: (currentColor: string, onColorChange: (color: string) => void) => void;
     selectionStyles: { color: string | null; bold: boolean; italic: boolean; underline: boolean; };
     isEditingText: boolean;
@@ -143,7 +142,10 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedElement, onUp
                                     availableFonts={availableFonts}
                                     selectedFont={(selectedElement as TextElement).fontFamily}
                                     onSelectFont={(fontName) => {
-                                        onLoadFont(fontName);
+                                        onLoadFont(fontName).catch(err => {
+                                            console.error(`Font load failed: ${err}`);
+                                            toast.error(`Falha ao carregar a fonte ${fontName}.`);
+                                        });
                                         onUpdateTextProperty('fontFamily', fontName);
                                     }}
                                 />

@@ -1,7 +1,3 @@
-
-
-
-
 import React, { useState, useRef, useCallback } from 'react';
 import { Post, AnyElement, FontDefinition } from '../types';
 import LayersPanel from './LayersPanel';
@@ -22,7 +18,7 @@ interface RightPanelProps {
     onTriggerBackgroundUpload: () => void;
     onSetSolidBackground: () => void;
     availableFonts: FontDefinition[];
-    onLoadFont: (fontName: string) => void;
+    onLoadFont: (fontName: string) => Promise<void>;
     onOpenColorPicker: (currentColor: string, onColorChange: (color: string) => void) => void;
     onUpdateTextProperty: (prop: string, value: any) => void;
     onToggleTextStyle: (style: 'bold' | 'italic' | 'underline') => void;
