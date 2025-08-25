@@ -7,7 +7,7 @@ import * as htmlToImage from 'html-to-image';
 import saveAs from 'file-saver';
 import JSZip from 'jszip';
 import StaticPost from './StaticPost';
-import { getFontEmbedCss } from '../utils/fontManager';
+import { getFontEmbedCss, FontSpec } from '../utils/fontManager';
 
 interface ExportModalProps {
     isOpen: boolean;
@@ -20,6 +20,11 @@ interface ExportModalProps {
 
 type ExportScope = 'current' | 'all';
 type ExportFormat = 'png' | 'jpeg' | 'zip';
+
+const FONT_WEIGHT_MAP: Record<string, number> = {
+    'normal': 400,
+    'bold': 700,
+};
 
 const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, posts, postSize, selectedPost, project }) => {
     const [exportScope, setExportScope] = useState<ExportScope>('current');
@@ -73,11 +78,30 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, posts, postS
         }
         
         rendererRootRef.current.render(<StaticPost post={post} postSize={postSize} />);
-        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        // Wait for next tick to ensure DOM is updated
+        await new Promise(resolve => setTimeout(resolve, 50));
 
         const imageTargetNode = rendererRef.current.firstChild as HTMLElement;
         if (!imageTargetNode) throw new Error("Componente renderizado não encontrado para exportação.");
         
+        // Wait for all images inside the node to load to prevent layout shifts
+        const images = Array.from(imageTargetNode.getElementsByTagName('img'));
+        const imagePromises = images.map(img => {
+            if (img.complete && img.naturalHeight !== 0) return Promise.resolve(); // Already loaded and valid
+            return new Promise<void>((resolve) => {
+                img.onload = () => resolve();
+                img.onerror = () => {
+                    console.warn(`Could not load image during export: ${img.src}.`);
+                    resolve(); // Resolve instead of reject to not fail the whole export
+                };
+            });
+        });
+        await Promise.all(imagePromises);
+        
+        // Add a final delay for layout settlement, especially for complex text elements (titles, CTAs).
+        await new Promise(resolve => setTimeout(resolve, 300));
+
         const options = {
             quality: 0.98,
             pixelRatio: 2,
@@ -104,25 +128,45 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, posts, postS
             
             setExportMessage('Analisando fontes...');
             toast.loading('Analisando fontes...', { id: toastId });
-            const allFonts = new Set<string>();
-            const fontRegex = /font-family:\s*['"]([^'"]+)['"]/g;
+
+            const fontSpecKeys = new Set<string>();
+            const uniqueFontSpecs = new Set<FontSpec>();
+            const tempDiv = document.createElement('div');
+
+            const addFontSpec = (spec: FontSpec) => {
+                const key = `${spec.name}-${spec.weight}-${spec.style}`;
+                if (!fontSpecKeys.has(key)) {
+                    fontSpecKeys.add(key);
+                    uniqueFontSpecs.add(spec);
+                }
+            };
 
             postsToExport.forEach(post => {
                 post.elements.forEach(element => {
                     if (element.type === 'text') {
                         const textEl = element as TextElement;
-                        allFonts.add(textEl.fontFamily);
-                        let match;
-                        while ((match = fontRegex.exec(textEl.content)) !== null) {
-                            allFonts.add(match[1].split(',')[0].trim());
-                        }
+                        addFontSpec({ name: textEl.fontFamily, weight: textEl.fontWeight, style: textEl.fontStyle });
+                        
+                        tempDiv.innerHTML = textEl.content;
+                        const styledSpans = tempDiv.querySelectorAll('span[style]');
+                        styledSpans.forEach(span => {
+                            const style = (span as HTMLElement).style;
+                            const family = style.fontFamily?.split(',')[0].replace(/['"]/g, '').trim();
+                            const weightStr = style.fontWeight;
+                            const weight = FONT_WEIGHT_MAP[weightStr] || parseInt(weightStr, 10) || textEl.fontWeight;
+                            const fontStyle = (style.fontStyle as 'normal' | 'italic') || textEl.fontStyle;
+
+                            if (family) {
+                                addFontSpec({ name: family, weight: weight, style: fontStyle });
+                            }
+                        });
                     }
                 });
             });
-
+            
             setExportMessage('Preparando fontes...');
             toast.loading('Preparando fontes...', { id: toastId });
-            const fontEmbedCss = await getFontEmbedCss(allFonts);
+            const fontEmbedCss = await getFontEmbedCss(uniqueFontSpecs);
             
             if (exportScope === 'current' && selectedPost) {
                 setExportMessage(`Renderizando post...`);
