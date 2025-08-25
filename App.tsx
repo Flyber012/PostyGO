@@ -1,6 +1,6 @@
 
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import { Toaster, toast } from 'react-hot-toast';
 import { Post, BrandKit, PostSize, AnyElement, TextElement, ImageElement, BackgroundElement, FontDefinition, LayoutTemplate, BrandAsset, TextStyle, Project, AIGeneratedTextElement, ShapeElement, QRCodeElement } from './types';
@@ -16,7 +16,7 @@ import { GenerationWizard } from './components/GenerationWizard';
 import { BrandKitPanel } from './components/BrandKitPanel';
 import saveAs from 'file-saver';
 import { v4 as uuidv4 } from 'uuid';
-import { ZoomIn, ZoomOut, Maximize, Package, Image as ImageIcon, FileText, X, LayoutTemplate as LayoutTemplateIcon, Plus, Layers, AlignHorizontalJustifyCenter, AlignHorizontalJustifyStart, AlignHorizontalJustifyEnd, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Bold, Italic, Underline, Wand2, RefreshCcw } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize, Package, Image as ImageIcon, FileText, X, LayoutTemplate as LayoutTemplateIcon, Plus, Layers, AlignHorizontalJustifyCenter, AlignHorizontalJustifyStart, AlignHorizontalJustifyEnd, AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd, Bold, Italic, Underline, Wand2, RefreshCcw, ChevronLeft, ChevronRight } from 'lucide-react';
 import AdvancedColorPicker from './components/ColorPicker';
 import { parseColor, rgbToHex } from './utils/color';
 import ExportModal from './components/ExportModal';
@@ -320,7 +320,6 @@ const App: React.FC = () => {
     // Refs
     const viewportRef = useRef<HTMLDivElement>(null);
     const openProjectInputRef = useRef<HTMLInputElement>(null);
-    const importKitRef = useRef<HTMLInputElement>(null);
     const imageUploadRef = useRef<HTMLInputElement>(null);
     const staticPostRef = useRef<HTMLDivElement>(null);
 
@@ -332,9 +331,19 @@ const App: React.FC = () => {
     const postSize = currentProject?.postSize || POST_SIZES[0];
     const activeBrandKitId = currentProject?.activeBrandKitId || null;
     const selectedPost = posts.find(p => p.id === selectedPostId);
-    const selectedElement = selectedPost?.elements.find(el => el.id === selectedElementId);
     const activeBrandKit = brandKits.find(k => k.id === activeBrandKitId);
+    const selectedElement = selectedPost?.elements.find(el => el.id === selectedElementId);
     const isEditingText = !!(activeEditorRef.current && activeEditorRef.current.id === selectedElementId);
+
+    const currentCarouselSlides = useMemo(() => {
+        if (selectedPost?.carouselId) {
+            return posts
+                .filter(p => p.carouselId === selectedPost.carouselId)
+                .sort((a, b) => (a.slideIndex || 0) - (b.slideIndex || 0));
+        }
+        return null;
+    }, [selectedPost, posts]);
+    const currentCarouselIndex = currentCarouselSlides?.findIndex(p => p.id === selectedPostId) ?? -1;
 
     // --- RESPONSIVE & UI LOGIC ---
      useEffect(() => {
@@ -937,6 +946,18 @@ const App: React.FC = () => {
     const handleRemoveBg = () => toast("Remoção de fundo com IA em breve!");
     const handleGenerateVariation = () => toast("Geração de variação com IA em breve!");
 
+    const handleCarouselNav = (direction: 'next' | 'prev') => {
+        if (!currentCarouselSlides || currentCarouselIndex === -1) return;
+    
+        let nextIndex;
+        if (direction === 'next') {
+            nextIndex = (currentCarouselIndex + 1) % currentCarouselSlides.length;
+        } else {
+            nextIndex = (currentCarouselIndex - 1 + currentCarouselSlides.length) % currentCarouselSlides.length;
+        }
+        setSelectedPostId(currentCarouselSlides[nextIndex].id);
+    };
+
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -988,11 +1009,95 @@ const App: React.FC = () => {
         toast.success(`Brand Kit "${name}" salvo!`);
     };
 
+    const handleExportBrandKit = (kitId: string) => {
+        const kitToExport = brandKits.find(k => k.id === kitId);
+        if (!kitToExport) {
+            toast.error("Brand Kit não encontrado.");
+            return;
+        }
+        const kitJson = JSON.stringify(kitToExport, null, 2);
+        const blob = new Blob([kitJson], { type: 'application/json' });
+        saveAs(blob, `${kitToExport.name.replace(/ /g, '_')}.bk.json`);
+        toast.success(`Brand Kit "${kitToExport.name}" exportado!`);
+    };
+
+    const handleImportBrandKit = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const importedKit = JSON.parse(e.target?.result as string) as BrandKit;
+                if (importedKit?.id && importedKit.name && Array.isArray(importedKit.palette)) {
+                    if (brandKits.some(k => k.id === importedKit.id)) {
+                        toast.error(`Um Brand Kit com o ID "${importedKit.id}" já existe.`, { duration: 5000 });
+                        return;
+                    }
+                    setBrandKits(prev => [...prev, importedKit]);
+                    toast.success(`Brand Kit "${importedKit.name}" importado com sucesso!`);
+                } else {
+                    throw new Error("Arquivo de Brand Kit inválido ou corrompido.");
+                }
+            } catch (error) {
+                toast.error(error instanceof Error ? error.message : "Falha ao importar Brand Kit.");
+            } finally {
+                if (event.target) event.target.value = '';
+            }
+        };
+        reader.readAsText(file);
+    };
+
     const handleAddLayoutToActiveKit = () => {
         if (!selectedPost || !activeBrandKitId) return;
         const newLayout: LayoutTemplate = { id: uuidv4(), name: `Layout ${new Date().toLocaleTimeString()}`, elements: JSON.parse(JSON.stringify(selectedPost.elements)) };
         setBrandKits(prev => prev.map(k => k.id === activeBrandKitId ? { ...k, layouts: [...k.layouts, newLayout] } : k));
         toast.success("Layout adicionado ao kit!");
+    };
+
+    const handleAddPostFromLayout = (layoutId: string) => {
+        if (!activeBrandKit) return;
+        const layout = activeBrandKit.layouts.find(l => l.id === layoutId);
+        if (!layout) {
+            toast.error("Layout não encontrado no kit ativo.");
+            return;
+        }
+        const newPostId = uuidv4();
+        const newElements = JSON.parse(JSON.stringify(layout.elements)).map((el: AnyElement) => ({
+            ...el,
+            id: `${newPostId}-${el.id}`
+        }));
+
+        const newPost: Post = {
+            id: newPostId,
+            elements: newElements
+        };
+        setPosts(prev => [...prev, newPost]);
+        setSelectedPostId(newPostId);
+        toast.success("Post criado a partir do layout!");
+    };
+    
+    const handleUpdateLayoutName = (layoutId: string, newName: string) => {
+        if (!activeBrandKitId) return;
+        setBrandKits(prevKits => prevKits.map(kit => {
+            if (kit.id !== activeBrandKitId) return kit;
+            const newLayouts = kit.layouts.map(layout => 
+                layout.id === layoutId ? { ...layout, name: newName } : layout
+            );
+            return { ...kit, layouts: newLayouts };
+        }));
+    };
+    
+    const handleDeleteLayoutFromKit = (layoutId: string) => {
+        if (!activeBrandKitId) return;
+        setBrandKits(prevKits => prevKits.map(kit => {
+            if (kit.id !== activeBrandKitId) return kit;
+            const newLayouts = kit.layouts.filter(layout => layout.id !== layoutId);
+            return { ...kit, layouts: newLayouts };
+        }));
+        if (selectedLayoutId === layoutId) {
+            setSelectedLayoutId(null);
+        }
+        toast.success("Layout deletado do kit.");
     };
 
     return (
@@ -1002,7 +1107,6 @@ const App: React.FC = () => {
             {(isLeftPanelOpen || isRightPanelOpen) && isMobileView && <div className="mobile-backdrop" onClick={() => { setLeftPanelOpen(false); setRightPanelOpen(false); }} />}
             
             <input type="file" ref={openProjectInputRef} onChange={handleOpenProjectFile} accept=".posty" className="hidden" />
-            <input type="file" ref={importKitRef} onChange={() => {}} accept=".json" className="hidden" />
             <input type="file" ref={imageUploadRef} onChange={handleImageUploadForElement} accept="image/*" className="hidden" />
             
             {/* Hidden renderer for exports */}
@@ -1043,15 +1147,15 @@ const App: React.FC = () => {
                             setGenerationType={setGenerationType} textStyle={textStyle} setTextStyle={setTextStyle} backgroundSource={backgroundSource}
                             setBackgroundSource={setBackgroundSource} aiPostCount={aiPostCount} setAiPostCount={setAiPostCount} aiProvider={aiProvider}
                             setAiProvider={setAiProvider} onSaveBrandKit={handleSaveBrandKit} onAddLayoutToActiveKit={handleAddLayoutToActiveKit}
-                            onImportBrandKit={() => {}} onExportBrandKit={() => {}} onDeleteBrandKit={(kitId) => setBrandKits(prev => prev.filter(k => k.id !== kitId))}
-                            onApplyBrandKit={(kitId) => updateCurrentProject({ activeBrandKitId: kitId })} onAddPostFromLayout={() => {}} onUpdateLayoutName={() => {}}
-                            onDeleteLayoutFromKit={() => {}} selectedLayoutId={selectedLayoutId} setSelectedLayoutId={setSelectedLayoutId}
+                            onImportBrandKit={handleImportBrandKit} onExportBrandKit={handleExportBrandKit} onDeleteBrandKit={(kitId) => setBrandKits(prev => prev.filter(k => k.id !== kitId))}
+                            onApplyBrandKit={(kitId) => updateCurrentProject({ activeBrandKitId: kitId })} onAddPostFromLayout={handleAddPostFromLayout} onUpdateLayoutName={handleUpdateLayoutName}
+                            onDeleteLayoutFromKit={handleDeleteLayoutFromKit} selectedLayoutId={selectedLayoutId} setSelectedLayoutId={setSelectedLayoutId}
                         />
                     ) : <EmptyPanelPlaceholder text="Crie ou abra um projeto para começar."/>}
                 </aside>
 
                 <main 
-                    className="main-content" 
+                    className="main-content group" 
                     ref={viewportRef} 
                     onWheel={handleWheel}
                     onMouseDown={handleMouseDown}
@@ -1075,21 +1179,53 @@ const App: React.FC = () => {
                                         <p className="text-gray-400">Aguarde, a mágica está acontecendo...</p>
                                     </div>
                                 ) : selectedPost ? (
-                                    <div style={{
-                                        transform: `translate(${viewState.offset.x}px, ${viewState.offset.y}px) scale(${viewState.zoom})`,
-                                        transformOrigin: 'top left'
-                                    }}>
-                                        <CanvasEditor 
-                                            post={selectedPost} 
-                                            postSize={postSize} 
-                                            onUpdateElement={updatePostElement} 
-                                            selectedElementId={selectedElementId} 
-                                            onSelectElement={setSelectedElementId}
-                                            onStartEditing={handleStartEditing}
-                                            onStopEditing={handleStopEditing}
-                                            onSelectionUpdate={handleSelectionUpdate}
-                                        />
-                                    </div>
+                                    <>
+                                        <div style={{
+                                            transform: `translate(${viewState.offset.x}px, ${viewState.offset.y}px) scale(${viewState.zoom})`,
+                                            transformOrigin: 'top left'
+                                        }}>
+                                            <CanvasEditor 
+                                                post={selectedPost} 
+                                                postSize={postSize} 
+                                                onUpdateElement={updatePostElement} 
+                                                selectedElementId={selectedElementId} 
+                                                onSelectElement={setSelectedElementId}
+                                                onStartEditing={handleStartEditing}
+                                                onStopEditing={handleStopEditing}
+                                                onSelectionUpdate={handleSelectionUpdate}
+                                            />
+                                        </div>
+                                        {currentCarouselSlides && currentCarouselSlides.length > 1 && (
+                                            <>
+                                                <button
+                                                    onClick={() => handleCarouselNav('prev')}
+                                                    className="absolute left-4 top-1/2 -translate-y-1/2 z-10 bg-black/40 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/60"
+                                                    aria-label="Slide anterior"
+                                                >
+                                                    <ChevronLeft className="w-6 h-6" />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleCarouselNav('next')}
+                                                    className="absolute right-4 top-1/2 -translate-y-1/2 z-10 bg-black/40 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/60"
+                                                    aria-label="Próximo slide"
+                                                >
+                                                    <ChevronRight className="w-6 h-6" />
+                                                </button>
+                                                <div className="absolute bottom-16 lg:bottom-4 left-1/2 -translate-x-1/2 z-10 flex space-x-2">
+                                                    {currentCarouselSlides.map((slide, index) => (
+                                                        <button
+                                                            key={slide.id}
+                                                            onClick={() => setSelectedPostId(slide.id)}
+                                                            className={`w-2.5 h-2.5 rounded-full transition-colors ${
+                                                                index === currentCarouselIndex ? 'bg-white' : 'bg-white/40 hover:bg-white/70'
+                                                            }`}
+                                                            aria-label={`Ir para o slide ${index + 1}`}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            </>
+                                        )}
+                                    </>
                                 ) : (
                                     <div className="text-center text-gray-400 p-4">
                                         <h2 className="text-2xl font-bold mb-2">Projeto Vazio</h2>

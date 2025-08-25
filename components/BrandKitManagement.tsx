@@ -99,7 +99,7 @@ export const BrandKitManagement: React.FC<BrandKitManagementProps> = (props) => 
              <button onClick={() => importKitRef.current?.click()} className="w-full flex items-center justify-center bg-zinc-600 hover:bg-zinc-500 text-white font-bold py-2 px-4 rounded-md transition-colors duration-200">
                 <Upload className="mr-2 h-4 w-4"/> Importar Kit de Arquivo
             </button>
-            <input type="file" ref={importKitRef} onChange={onImportBrandKit} accept=".json" className="hidden" />
+            <input type="file" ref={importKitRef} onChange={onImportBrandKit} accept=".json,.bk.json" className="hidden" />
 
             {activeBrandKit && (
                 <div className="pt-3 border-t border-zinc-600">
@@ -135,7 +135,7 @@ export const BrandKitManagement: React.FC<BrandKitManagementProps> = (props) => 
                                             />
                                         ) : (
                                             <span 
-                                                onClick={() => handleStartEditingLayout(layout)}
+                                                onDoubleClick={() => handleStartEditingLayout(layout)}
                                                 className="text-sm truncate cursor-pointer hover:underline"
                                                 title={layout.name}
                                             >
