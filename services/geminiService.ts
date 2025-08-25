@@ -1,6 +1,7 @@
 
 
 
+
 import { GoogleGenAI, Type, Part } from "@google/genai";
 import { AIGeneratedTextElement, PaletteExtractionResult, AIGeneratedCarouselScriptSlide, TextElement, BrandKit, PostSize, TextStyle } from '../types';
 
@@ -256,16 +257,15 @@ export async function generateLayoutAndContentForImage(background: string, topic
     **Estilo do Texto Solicitado: ${textStyle.toUpperCase()}**
     - ${textStyleInstructions[textStyle]}
 
-    **Seu Processo Criativo (Regras Inquebráveis):**
-    1.  **Conteúdo Criativo com Personalidade:** Primeiro, crie o texto. Seja envolvente, use markdown (\`**destaque**\`) para ênfase e emojis relevantes. Use 'Poppins' como a fontFamily padrão se nenhuma outra for especificada.
-    2.  **ANÁLISE VISUAL CRÍTICA:** Depois de ter o texto, analise o fundo. Se for uma imagem, identifique as "zonas seguras" com espaço negativo (céu, paredes, áreas desfocadas). Se for uma cor, a análise é mais simples.
-    3.  **NUNCA OBSTRUA O ESSENCIAL:** Se o fundo for uma imagem, é PROIBIDO posicionar texto sobre rostos, produtos, ou o ponto focal principal. A legibilidade e o respeito pela imagem são fundamentais.
-    4.  **HIERARQUIA E POSICIONAMENTO:** Decomponha seu texto em elementos lógicos (título, corpo, etc.) e distribua-os harmonicamente. O título (use fontSize: 'large') deve ser o mais proeminente. A descrição (use fontSize: 'medium') deve ser claramente secundária e legível. Texto de rodapé ou detalhes (use fontSize: 'small') deve ser discreto.
+    **REGRAS INQUEBRÁVEIS de Design e Composição:**
+    1.  **Conteúdo Criativo:** Primeiro, crie o texto. Seja envolvente, use markdown (\`**destaque**\`) para ênfase e emojis relevantes. Use 'Poppins' como a fontFamily padrão.
+    2.  **ANÁLISE VISUAL CRÍTICA:** Analise o fundo para identificar "zonas seguras" com espaço negativo (céu, paredes, áreas desfocadas). É PROIBIDO posicionar texto sobre rostos, produtos ou o ponto focal principal. A legibilidade e o respeito pela imagem são fundamentais.
+    3.  **HIERARQUIA E POSICIONAMENTO:** Decomponha o texto em elementos lógicos (título, corpo, etc.) e distribua-os harmonicamente. O título (use fontSize: 'large') deve ser o mais proeminente. A descrição (use fontSize: 'medium') deve ser secundária. Texto de rodapé (use fontSize: 'small') deve ser discreto.
+    4.  **MARGENS DE SEGURANÇA:** Todos os elementos de texto DEVEM estar contidos dentro de uma área segura. As coordenadas 'x' e 'y' mais a 'width'/'height' não devem exceder 95% e devem ser maiores que 5%. Exemplo: um elemento em x=90 só pode ter uma largura máxima de 5. Isso evita que o texto seja cortado nas bordas.
     5.  **CONTRASTE É REI:** Analise o tom do fundo (\`backgroundTone\`) *exatamente* onde você vai colocar cada bloco de texto. Use branco ('#FFFFFF') para fundos escuros e um cinza muito escuro/preto ('#0F172A') para fundos claros.
-    6.  **DESIGN INTELIGENTE:**
-        -   Para textos com markdown, sugira uma \`highlightColor\` vibrante do fundo (se for imagem) e uma \`accentFontFamily\` de contraste.
-        -   Se criar uma CTA, use o \`fontSize\` 'cta' e sugira uma \`backgroundColor\` sólida e contrastante.
-        -   Para CTAs, a altura (\`height\`) DEVE ser justa ao conteúdo para que pareçam botões.`;
+    6.  **ALTURA DA LINHA PADRÃO:** OBRIGATORIAMENTE use um \`lineHeight\` de \`1\`.
+    7.  **DESIGN INTELIGENTE:**
+        -   Para CTAs, use o \`fontSize\` 'cta' e sugira uma \`backgroundColor\` sólida e contrastante. A altura (\`height\`) DEVE ser justa ao conteúdo.`;
     
     if (brandKit) {
         const styleGuide = brandKit.styleGuide || '';
@@ -293,9 +293,11 @@ export async function generateLayoutAndContentForImage(background: string, topic
 
         **Seu Processo (Seguindo as Regras):**
         1.  **Conteúdo no Tom Certo:** Crie o texto alinhado com o tópico e a "vibe" do Guia de Estilo.
-        2.  **Análise e Posicionamento:** Analise o fundo para encontrar "zonas seguras" (se for imagem). Posicione os elementos de texto seguindo o Guia de Estilo e criando uma hierarquia visual clara. O título (fontSize: 'large') deve ser proeminente, e a descrição (fontSize: 'medium') secundária. **NUNCA** coloque texto sobre rostos ou pontos focais.
-        3.  **Tipografia e Cores:** Aplique as fontes e cores OBRIGATÓRIAS do Brand Kit.
-        4.  **Contraste:** Use branco ('#FFFFFF') para fundos escuros e preto/cinza escuro ('#0F172A') para fundos claros, a menos que a paleta do Brand Kit forneça outras opções.`;
+        2.  **Análise e Posicionamento:** Analise o fundo para encontrar "zonas seguras". Posicione os elementos de texto seguindo o Guia de Estilo e criando uma hierarquia visual clara. **NUNCA** coloque texto sobre rostos ou pontos focais.
+        3.  **MARGENS DE SEGURANÇA:** Todos os elementos de texto DEVEM estar contidos dentro de uma área segura entre 5% e 95% da tela para evitar cortes.
+        4.  **Tipografia e Cores:** Aplique as fontes e cores OBRIGATÓRIAS do Brand Kit.
+        5.  **Contraste:** Use branco ('#FFFFFF') para fundos escuros e preto/cinza escuro ('#0F172A') para fundos claros, a menos que a paleta do Brand Kit forneça outras opções.
+        6.  **ALTURA DA LINHA PADRÃO:** OBRIGATORIAMENTE use um \`lineHeight\` de \`1\`.`;
     }
 
     parts.push({ text: prompt });
@@ -311,22 +313,22 @@ export async function generateLayoutAndContentForImage(background: string, topic
                     type: Type.OBJECT,
                     properties: {
                         content: { type: Type.STRING, description: "O conteúdo de texto para este elemento, possivelmente incluindo emojis." },
-                        x: { type: Type.NUMBER, description: "A posição horizontal (esquerda) da caixa de texto, como uma porcentagem da largura total (0-100)." },
-                        y: { type: Type.NUMBER, description: "A posição vertical (topo) da caixa de texto, como uma porcentagem da altura total (0-100)." },
+                        x: { type: Type.NUMBER, description: "A posição horizontal (esquerda) da caixa de texto, como uma porcentagem da largura total (5-95)." },
+                        y: { type: Type.NUMBER, description: "A posição vertical (topo) da caixa de texto, como uma porcentagem da altura total (5-95)." },
                         width: { type: Type.NUMBER, description: "A largura da caixa de texto, como uma porcentagem da largura total (10-90)." },
                         height: { type: Type.NUMBER, description: "A altura da caixa de texto, como uma porcentagem da altura total. DEVE ser justa ao conteúdo de texto para evitar espaços vazios." },
                         fontSize: { type: Type.STRING, enum: ['large', 'medium', 'small', 'cta'], description: "Categoria de tamanho de fonte sugerida." },
                         fontFamily: { type: Type.STRING, description: "O nome da fonte a ser usada, OBRIGATORIAMENTE uma das fontes permitidas." },
                         color: { type: Type.STRING, description: "A cor do texto em hexadecimal, OBRIGATORIAMENTE uma da paleta permitida." },
                         textAlign: { type: Type.STRING, enum: ['left', 'center', 'right'], description: "Alinhamento do texto." },
-                        lineHeight: { type: Type.NUMBER, description: "Altura de linha sugerida para o texto (ex: 1.4)." },
+                        lineHeight: { type: Type.NUMBER, description: "Altura de linha sugerida para o texto (OBRIGATORIAMENTE 1)." },
                         rotation: { type: Type.NUMBER, description: "Um leve ângulo de rotação em graus (ex: -2.5) para dinamismo." },
                         backgroundTone: { type: Type.STRING, enum: ['light', 'dark'], description: "O tom da área da imagem atrás do texto." },
                         highlightColor: { type: Type.STRING, description: "Uma cor de destaque vibrante em hexadecimal (ex: '#FF6B6B') da paleta para palavras em markdown." },
                         accentFontFamily: { type: Type.STRING, description: "Uma fonte de exibição/script para palavras em markdown para contraste tipográfico (ex: 'Caveat')." },
                         backgroundColor: { type: Type.STRING, description: "Uma cor de fundo sólida em hexadecimal da paleta para CTAs." },
                     },
-                    required: ["content", "x", "y", "width", "height", "fontSize", "textAlign", "backgroundTone", "fontFamily", "color"],
+                    required: ["content", "x", "y", "width", "height", "fontSize", "textAlign", "backgroundTone", "fontFamily", "color", "lineHeight"],
                 }
             }
         }
@@ -358,21 +360,22 @@ export async function generateCarouselScript(topic: string, slideCount: number, 
     - ${contentLevelInstructions[contentLevel]}
 
     **Diretrizes de Conteúdo e Tom:**
-    - **Narrativa Coesa:** Crie uma história ou um guia que flua logicamente de um slide para o outro. Comece com um gancho forte, desenvolva o meio e termine com uma conclusão e CTA claros.
-    - **Tom Humano:** Escreva como se estivesse conversando com um amigo. Use perguntas para engajar o leitor, use emojis relevantes de forma moderada, e mantenha as frases curtas e impactantes. Evite a todo custo um tom robótico ou corporativo.
+    - **Narrativa Coesa:** Crie uma história que flua logicamente. Cada slide de conteúdo deve construir sobre o anterior e criar antecipação para o próximo, incentivando o usuário a continuar deslizando.
+    - **Tom Humano:** Escreva como se estivesse conversando com um amigo. Use perguntas, emojis relevantes e frases curtas e impactantes. Evite um tom robótico.
     - **Estrutura Clássica de Carrossel:**
       1. **Capa (Slide 1):** Título magnético que gera curiosidade ou promete uma solução.
       2. **Introdução (Slide 2):** Apresente o problema ou o tema e prometa o que o leitor vai aprender. Inclua uma chamada para deslizar (ex: "Arrasta pro lado ➡️").
       3. **Conteúdo (Slides 3 a ${slideCount - 1}):** Entregue o valor principal. Divida a informação em dicas, passos ou pontos-chave, um por slide.
-      4. **Conclusão/CTA (ÚLTIMO SLIDE):** A chamada para ação DEVE estar aqui.
+      4. **Conclusão/CTA (ÚLTIMO SLIDE):** A chamada para ação DEVE estar aqui. Resuma o ponto principal e incentive o engajamento.
 
     **REGRA OBRIGATÓRIA e INQUEBRÁVEL:** A Chamada Para Ação (CTA), que incentiva a curtir, comentar, salvar, seguir, etc., DEVE ser colocada **exclusivamente no último slide** (slide ${slideCount}). Nenhum outro slide pode conter a CTA principal.
 
     **Diretrizes de Imagem:**
     - Para cada slide, crie um prompt de imagem detalhado e artístico para um gerador de IA.
-    - **COESÃO VISUAL É CRÍTICA:** Todos os prompts de imagem devem compartilhar um estilo consistente (ex: 'fotografia cinematográfica com tons quentes', 'ilustração 3D vibrante e minimalista', 'fundo abstrato com gradiente suave'). A paleta de cores deve ser harmoniosa em todos os slides.
+    - **COESÃO VISUAL É CRÍTICA:** Todos os prompts de imagem devem compartilhar um estilo consistente. A paleta de cores deve ser harmoniosa.
+    - **Prompt de Imagem Final (CTA):** Para o último slide, crie um prompt para uma imagem mais simples e minimalista que tenha bastante espaço negativo, ideal para exibir um logotipo da empresa e o texto da CTA. Ex: "fundo minimalista com gradiente suave em tons pastel, com espaço livre na parte inferior".
 
-    Retorne um array JSON de objetos, onde cada objeto representa um slide e contém 'slideContent' (o texto completo para aquele slide) e 'imagePrompt'.`;
+    Retorne um array JSON de objetos, onde cada objeto representa um slide e contém 'slideContent' e 'imagePrompt'.`;
 
      if (styleGuide) {
         prompt = `**REGRA CRÍTICA: Siga estritamente o Guia de Estilo abaixo para TODAS as decisões de conteúdo e imagem.**
@@ -380,20 +383,22 @@ export async function generateCarouselScript(topic: string, slideCount: number, 
         **GUIA DE ESTILO:**
         ${styleGuide}
         ---
-        Você é um criador de conteúdo que deve internalizar o Guia de Estilo acima. Sua missão é criar um roteiro para um carrossel do Instagram de ${slideCount} slides sobre o tópico "${topic}" que pareça ter sido criado pela mesma marca/pessoa.
+        Você é um criador de conteúdo que deve internalizar o Guia de Estilo acima. Sua missão é criar um roteiro para um carrossel do Instagram de ${slideCount} slides sobre o tópico "${topic}" que pareça ter sido criado pela mesma marca.
 
         **Nível de Detalhe do Conteúdo: ${contentLevel.toUpperCase()}**
         - ${contentLevelInstructions[contentLevel]}
 
         **Diretrizes de Conteúdo e Tom:**
-        - **Tom de Voz:** Adapte seu texto para corresponder à "vibe" descrita no Guia de Estilo.
+        - **Tom de Voz:** Adapte seu texto para corresponder à "vibe" do Guia de Estilo.
+        - **Narrativa Coesa:** Crie uma jornada para o leitor, onde cada slide o incentiva a deslizar para o próximo.
         - **Estrutura:** Mantenha a estrutura clássica de carrossel (Capa, Intro, Conteúdo, CTA).
 
-        **REGRA OBRIGATÓRIA e INQUEBRÁVEL:** A Chamada Para Ação (CTA), que incentiva a curtir, comentar, salvar, seguir, etc., DEVE ser colocada **exclusivamente no último slide** (slide ${slideCount}). Nenhum outro slide pode conter a CTA principal.
+        **REGRA OBRIGATÓRIA e INQUEBRÁVEL:** A Chamada Para Ação (CTA) DEVE ser colocada **exclusivamente no último slide** (slide ${slideCount}).
 
         **Diretrizes de Imagem:**
         - Crie um prompt de imagem para cada slide.
-        - **COESÃO VISUAL INQUEBRÁVEL:** Todos os prompts de imagem DEVEM seguir rigorosamente as diretrizes de paleta de cores, tipografia, composição e elementos gráficos do Guia de Estilo. Eles precisam parecer um conjunto coeso.`;
+        - **COESÃO VISUAL INQUEBRÁVEL:** Todos os prompts de imagem DEVEM seguir rigorosamente as diretrizes do Guia de Estilo.
+        - **Prompt de Imagem Final (CTA):** Para o último slide, crie um prompt para uma imagem limpa e alinhada à marca que deixe espaço vago para um logotipo e texto de CTA.`;
     }
 
     const response = await ai.models.generateContent({
@@ -449,12 +454,13 @@ export async function generateLayoutForProvidedText(base64Image: string, textCon
     1.  **ANÁLISE VISUAL PRIMEIRO:** Sua tarefa mais CRÍTICA é analisar a imagem. Identifique as "zonas seguras" com espaço negativo (céu, paredes, áreas desfocadas, etc.). Encontre os melhores locais para o texto que não competem com os elementos principais da imagem.
     2.  **HIERARQUIA É TUDO:** Decomponha o \`textContent\` em elementos lógicos (ex: título, subtítulo, corpo do texto, chamada para ação). Use \`fontSize\` ('large', 'medium', 'small', 'cta') para criar uma hierarquia visual clara. O elemento mais importante deve se destacar.
     3.  **NUNCA OBSTRUA O ESSENCIAL:** É PROIBIDO posicionar texto sobre rostos, produtos, ou o ponto focal principal da imagem. A legibilidade e o respeito pela imagem são fundamentais.
-    4.  **CONTRASTE É REI:** Analise o tom da imagem (\`backgroundTone\`) *exatamente* onde você vai colocar cada bloco de texto. Use branco ('#FFFFFF') para fundos escuros e um cinza muito escuro/preto ('#0F172A') para fundos claros.
-    5.  **DESIGN INTELIGENTE:**
-        -   Use markdown (\`**destaque**\`) no texto para enfatizar palavras-chave. Para essas palavras, sugira uma \`highlightColor\` vibrante extraída da paleta da imagem e uma \`accentFontFamily\` de contraste.
-        -   Se houver uma chamada para ação (CTA), atribua o \`fontSize\` 'cta' e sugira uma \`backgroundColor\` sólida e contrastante, também extraída da imagem, para que pareça um botão clicável.
-        -   Para CTAs, a altura (\`height\`) DEVE ser justa ao conteúdo. Não adicione preenchimento vertical na altura; a aplicação cuidará do preenchimento.
-        -   Adicione uma leve \`rotation\` (-3 a 3 graus) a um ou dois elementos para um toque dinâmico, mas mantenha o texto principal reto (0 graus) para facilitar a leitura.`;
+    4.  **MARGENS DE SEGURANÇA:** Todos os elementos de texto DEVEM estar contidos dentro de uma área segura entre 5% e 95% da tela para evitar cortes.
+    5.  **CONTRASTE É REI:** Analise o tom da imagem (\`backgroundTone\`) *exatamente* onde você vai colocar cada bloco de texto. Use branco ('#FFFFFF') para fundos escuros e um cinza muito escuro/preto ('#0F172A') para fundos claros.
+    6.  **DESIGN INTELIGENTE:**
+        -   Use markdown (\`**destaque**\`) no texto para enfatizar palavras-chave.
+        -   Se houver uma chamada para ação (CTA), atribua o \`fontSize\` 'cta' e sugira uma \`backgroundColor\` sólida e contrastante. Para CTAs, a altura (\`height\`) DEVE ser justa ao conteúdo.
+        -   Adicione uma leve \`rotation\` (-3 a 3 graus) a um ou dois elementos para um toque dinâmico, mas mantenha o texto principal reto (0 graus) para facilitar a leitura.
+        -   OBRIGATORIAMENTE use um \`lineHeight\` de \`1\`.`;
 
     if (brandKit) {
         const styleGuide = brandKit.styleGuide || '';
@@ -471,9 +477,11 @@ export async function generateLayoutForProvidedText(base64Image: string, textCon
 
         **Seu Processo (Seguindo as Regras):**
         1.  **Análise e Posicionamento:** Analise a imagem para encontrar "zonas seguras" e posicione os elementos de texto conforme as regras de composição do Guia de Estilo. **NUNCA** coloque texto sobre rostos ou pontos focais.
-        2.  **Hierarquia e Decomposição:** Decomponha o texto em elementos lógicos (título, corpo, etc.) e aplique a hierarquia visual do Guia de Estilo.
-        3.  **Tipografia e Cores:** Aplique as fontes e cores OBRIGATÓRIAS do Brand Kit.
-        4.  **Contraste:** Use branco ('#FFFFFF') para fundos escuros e preto/cinza escuro ('#0F172A') para fundos claros, a menos que a paleta do Brand Kit forneça outras opções.`;
+        2.  **MARGENS DE SEGURANÇA:** Todos os elementos de texto DEVEM estar contidos dentro de uma área segura entre 5% e 95% da tela para evitar cortes.
+        3.  **Hierarquia e Decomposição:** Decomponha o texto em elementos lógicos (título, corpo, etc.) e aplique a hierarquia visual do Guia de Estilo.
+        4.  **Tipografia e Cores:** Aplique as fontes e cores OBRIGATÓRIAS do Brand Kit.
+        5.  **Contraste:** Use branco ('#FFFFFF') para fundos escuros e preto/cinza escuro ('#0F172A') para fundos claros, a menos que a paleta do Brand Kit forneça outras opções.
+        6.  **ALTURA DA LINHA PADRÃO:** OBRIGATORIAMENTE use um \`lineHeight\` de \`1\`.`;
     }
     
     const response = await ai.models.generateContent({
@@ -487,22 +495,22 @@ export async function generateLayoutForProvidedText(base64Image: string, textCon
                     type: Type.OBJECT,
                     properties: {
                         content: { type: Type.STRING, description: "O conteúdo de texto para este elemento, possivelmente incluindo emojis." },
-                        x: { type: Type.NUMBER, description: "A posição horizontal (esquerda) da caixa de texto, como uma porcentagem da largura total (0-100)." },
-                        y: { type: Type.NUMBER, description: "A posição vertical (topo) da caixa de texto, como uma porcentagem da altura total (0-100)." },
+                        x: { type: Type.NUMBER, description: "A posição horizontal (esquerda) da caixa de texto, como uma porcentagem da largura total (5-95)." },
+                        y: { type: Type.NUMBER, description: "A posição vertical (topo) da caixa de texto, como uma porcentagem da altura total (5-95)." },
                         width: { type: Type.NUMBER, description: "A largura da caixa de texto, como uma porcentagem da largura total (10-90)." },
                         height: { type: Type.NUMBER, description: "A altura da caixa de texto, como uma porcentagem da altura total. DEVE ser justa ao conteúdo de texto para evitar espaços vazios." },
                         fontSize: { type: Type.STRING, enum: ['large', 'medium', 'small', 'cta'], description: "Categoria de tamanho de fonte sugerida." },
                         fontFamily: { type: Type.STRING, description: "O nome da fonte a ser usada, OBRIGATORIAMENTE uma das fontes permitidas." },
                         color: { type: Type.STRING, description: "A cor do texto em hexadecimal, OBRIGATORIAMENTE uma da paleta permitida." },
                         textAlign: { type: Type.STRING, enum: ['left', 'center', 'right'], description: "Alinhamento do texto." },
-                        lineHeight: { type: Type.NUMBER, description: "Altura de linha sugerida para o texto (ex: 1.4)." },
+                        lineHeight: { type: Type.NUMBER, description: "Altura de linha sugerida para o texto (OBRIGATORIAMENTE 1)." },
                         rotation: { type: Type.NUMBER, description: "Um leve ângulo de rotação em graus (ex: -2.5) para dinamismo." },
                         backgroundTone: { type: Type.STRING, enum: ['light', 'dark'], description: "O tom da área da imagem atrás do texto." },
                         highlightColor: { type: Type.STRING, description: "Uma cor de destaque vibrante em hexadecimal (ex: '#FF6B6B') da paleta para palavras em markdown." },
                         accentFontFamily: { type: Type.STRING, description: "Uma fonte de exibição/script para palavras em markdown para contraste tipográfico (ex: 'Caveat')." },
                         backgroundColor: { type: Type.STRING, description: "Uma cor de fundo sólida em hexadecimal da paleta para CTAs." },
                     },
-                    required: ["content", "x", "y", "width", "height", "fontSize", "textAlign", "backgroundTone", "fontFamily", "color"],
+                    required: ["content", "x", "y", "width", "height", "fontSize", "textAlign", "backgroundTone", "fontFamily", "color", "lineHeight"],
                 }
             }
         }
