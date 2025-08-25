@@ -1,6 +1,3 @@
-
-
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Post, AnyElement, TextElement, BackgroundElement, ShapeElement, ForegroundElement } from '../types';
 import { Plus, Trash2, Type, Image as ImageIcon, GitCommitHorizontal, Square, Circle, QrCode, Copy, Eye, EyeOff, Lock, Unlock, ArrowUp, ArrowDown } from 'lucide-react';
@@ -22,17 +19,28 @@ interface LayersPanelProps {
 
 const getElementDisplayName = (element: ForegroundElement): string => {
     if (element.name) return element.name;
-    if (element.type === 'text') {
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = (element as TextElement).content;
-        const text = (tempDiv.textContent || tempDiv.innerText || '').trim();
-        return text.substring(0, 50) || 'Texto Vazio';
+    switch (element.type) {
+        case 'text': {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = (element as TextElement).content;
+            const text = (tempDiv.textContent || tempDiv.innerText || '').trim();
+            return text.substring(0, 50) || 'Texto Vazio';
+        }
+        case 'image':
+            return 'Imagem';
+        case 'gradient':
+            return 'Gradiente';
+        case 'shape':
+            return (element as ShapeElement).shape === 'circle' ? 'Círculo' : 'Retângulo';
+        case 'qrcode':
+            return 'QR Code';
+        default: {
+            // This ensures exhaustiveness. If a new type is added to ForegroundElement,
+            // TypeScript will error here, as the new type cannot be assigned to `never`.
+            const _: never = element;
+            return 'Elemento Desconhecido';
+        }
     }
-    if (element.type === 'image') return 'Imagem';
-    if (element.type === 'gradient') return 'Gradiente';
-    if (element.type === 'shape') return (element as ShapeElement).shape === 'circle' ? 'Círculo' : 'Retângulo';
-    if (element.type === 'qrcode') return 'QR Code';
-    return `Camada ${element.type}`;
 };
 
 const LayersPanel: React.FC<LayersPanelProps> = (props) => {
@@ -113,8 +121,10 @@ const LayersPanel: React.FC<LayersPanelProps> = (props) => {
             )}
 
             <div className={`flex items-center space-x-1 ml-2 transition-opacity ${editingElementId ? 'opacity-0' : 'opacity-100 group-hover:opacity-100'}`}>
-                <button onClick={(e) => { e.stopPropagation(); onMoveElement(element.id, 'up'); }} disabled={index === total - 1} className="p-1 hover:bg-white/20 rounded disabled:opacity-30 disabled:cursor-not-allowed"><ArrowUp className="w-3 h-3"/></button>
-                <button onClick={(e) => { e.stopPropagation(); onMoveElement(element.id, 'down'); }} disabled={index === 0} className="p-1 hover:bg-white/20 rounded disabled:opacity-30 disabled:cursor-not-allowed"><ArrowDown className="w-3 h-3"/></button>
+                {/* Move Up List (decrease index) -> 'down' in z-index */}
+                <button onClick={(e) => { e.stopPropagation(); onMoveElement(element.id, 'down'); }} disabled={index === 0} className="p-1 hover:bg-white/20 rounded disabled:opacity-30 disabled:cursor-not-allowed"><ArrowUp className="w-3 h-3"/></button>
+                {/* Move Down List (increase index) -> 'up' in z-index */}
+                <button onClick={(e) => { e.stopPropagation(); onMoveElement(element.id, 'up'); }} disabled={index === total - 1} className="p-1 hover:bg-white/20 rounded disabled:opacity-30 disabled:cursor-not-allowed"><ArrowDown className="w-3 h-3"/></button>
                 <button onClick={(e) => { e.stopPropagation(); onDuplicateElement(element.id); }} className="p-1 hover:bg-white/20 rounded"><Copy className="w-3 h-3"/></button>
                 <button onClick={(e) => { e.stopPropagation(); onToggleVisibility(element.id); }} className="p-1 hover:bg-white/20 rounded">{element.visible ? <Eye className="w-3 h-3"/> : <EyeOff className="w-3 h-3"/>}</button>
                 <button onClick={(e) => { e.stopPropagation(); onToggleLock(element.id); }} className="p-1 hover:bg-white/20 rounded">{element.locked ? <Lock className="w-3 h-3"/> : <Unlock className="w-3 h-3"/>}</button>
@@ -146,8 +156,8 @@ const LayersPanel: React.FC<LayersPanelProps> = (props) => {
                         Fundo
                     </li>
                  )}
-                {[...foregroundElements].reverse().map((element, index) => (
-                    <LayerItem key={element.id} element={element} index={foregroundElements.length - 1 - index} total={foregroundElements.length} />
+                {foregroundElements.map((element, index) => (
+                    <LayerItem key={element.id} element={element} index={index} total={foregroundElements.length} />
                 ))}
             </ul>
         </div>

@@ -1,7 +1,4 @@
 
-
-
-
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { Toaster, toast } from 'react-hot-toast';
@@ -846,20 +843,15 @@ const App: React.FC = () => {
 
     const handleToggleTextStyle = (style: 'bold' | 'italic' | 'underline') => {
         if (!selectedElement || selectedElement.type !== 'text') return;
-
-        // If in rich text editing mode, apply style only to the selection
+    
         if (isEditingText && activeEditorRef.current) {
             document.execCommand(style);
-            
-            // Persist the change by saving the new HTML content
-            const newContent = activeEditorRef.current.node.innerHTML;
-            updatePostElement(selectedElement.id, { content: newContent });
-
-            // Keep focus and update UI to reflect selection style
-            activeEditorRef.current.node.focus();
-            handleSelectionUpdate();
+            // The change is now in the DOM. The onBlur event in EditableText
+            // will handle persisting the final HTML state when editing is finished.
+            activeEditorRef.current.node.focus(); // Keep focus in the editor
+            handleSelectionUpdate(); // Update toolbar UI to reflect selection
         } else {
-            // Fallback to styling the entire element if not editing
+            // Fallback to styling the entire element if not in rich text edit mode
             const propMap = { bold: 'fontWeight', italic: 'fontStyle', underline: 'textDecoration' };
             const prop = propMap[style];
             let newValue: any;
@@ -875,7 +867,6 @@ const App: React.FC = () => {
     const handleUpdateTextProperty = (prop: string, value: any) => {
         if (!selectedElement || selectedElement.type !== 'text') return;
         
-        // If in rich text editing mode, apply property only to the selection
         if (isEditingText && activeEditorRef.current) {
             const commandMap: Record<string, string> = {
                 fontFamily: 'fontName',
@@ -884,14 +875,9 @@ const App: React.FC = () => {
             const command = commandMap[prop];
             if (command) {
                 document.execCommand(command, false, value);
-
-                // Persist the change by saving the new HTML content
-                const newContent = activeEditorRef.current.node.innerHTML;
-                updatePostElement(selectedElement.id, { content: newContent });
-
-                // Keep focus and update UI to reflect selection style
-                activeEditorRef.current.node.focus();
-                handleSelectionUpdate();
+                // The change is now in the DOM. The onBlur event will persist it.
+                activeEditorRef.current.node.focus(); // Keep focus
+                handleSelectionUpdate(); // Update toolbar UI
             } else {
                  // For properties without a direct execCommand (like letterSpacing), apply to whole element
                  updatePostElement(selectedElement.id, { [prop]: value });
@@ -906,7 +892,6 @@ const App: React.FC = () => {
         if (activeEditorRef.current) {
             const selection = window.getSelection();
 
-            // If there's no selection or it's just a cursor, reset the selection styles in the UI
             if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
                 setSelectionStyles({ color: null, bold: false, italic: false, underline: false });
                 return;
@@ -924,7 +909,6 @@ const App: React.FC = () => {
             }
             setSelectionStyles({ color: hexColor, bold: isBold, italic: isItalic, underline: isUnderline });
         } else {
-             // If not editing at all, ensure styles are reset
              setSelectionStyles({ color: null, bold: false, italic: false, underline: false });
         }
     };
