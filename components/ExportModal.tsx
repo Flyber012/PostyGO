@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createRoot, Root } from 'react-dom/client';
-import { X, Download, FileImage, FileText, Archive, RotateCw } from 'lucide-react';
+import { X, Download, FileImage, Archive, RotateCw } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { Post, PostSize, Project, TextElement } from '../types';
 import * as htmlToImage from 'html-to-image';
 import saveAs from 'file-saver';
 import JSZip from 'jszip';
 import StaticPost from './StaticPost';
-import { loadGoogleFont } from '../utils/fontManager';
+import { getFontEmbedCss } from '../utils/fontManager';
 
 interface ExportModalProps {
     isOpen: boolean;
@@ -16,35 +16,29 @@ interface ExportModalProps {
     postSize: PostSize;
     selectedPost: Post | null;
     project: Project | null;
-    staticPostRendererRef: React.RefObject<HTMLDivElement>;
 }
 
 type ExportScope = 'current' | 'all';
 type ExportFormat = 'png' | 'jpeg' | 'zip';
 
-const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, posts, postSize, selectedPost, project, staticPostRendererRef }) => {
+const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, posts, postSize, selectedPost, project }) => {
     const [exportScope, setExportScope] = useState<ExportScope>('current');
     const [exportFormat, setExportFormat] = useState<ExportFormat>('png');
     const [isExporting, setIsExporting] = useState(false);
+    const [exportMessage, setExportMessage] = useState('');
+    
+    const rendererRef = useRef<HTMLDivElement | null>(null);
     const rendererRootRef = useRef<Root | null>(null);
 
     useEffect(() => {
-        if (!isOpen) {
-            setIsExporting(false);
-            setExportScope('current');
-            setExportFormat('png');
-            if (rendererRootRef.current) {
-                rendererRootRef.current.unmount();
-                rendererRootRef.current = null;
-            }
-            return;
-        }
+        if (!isOpen) return;
+        
         if (!selectedPost) {
             setExportScope('all');
             setExportFormat('zip');
         } else {
-             setExportScope('current');
-             setExportFormat('png');
+            setExportScope('current');
+            setExportFormat('png');
         }
     }, [isOpen, selectedPost]);
     
@@ -55,32 +49,64 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, posts, postS
             if (exportFormat === 'zip') setExportFormat('png');
         }
     }, [exportScope]);
+    
+    const cleanupRenderer = () => {
+        if (rendererRootRef.current) {
+            rendererRootRef.current.unmount();
+            rendererRootRef.current = null;
+        }
+        if (rendererRef.current) {
+            document.body.removeChild(rendererRef.current);
+            rendererRef.current = null;
+        }
+    };
+
+    const generateImageForPost = async (post: Post, postSize: PostSize, fontEmbedCss: string): Promise<string> => {
+        if (!rendererRef.current) {
+            const div = document.createElement('div');
+            div.style.position = 'absolute';
+            div.style.left = '-9999px';
+            div.style.top = '-9999px';
+            document.body.appendChild(div);
+            rendererRef.current = div;
+            rendererRootRef.current = createRoot(div);
+        }
+        
+        rendererRootRef.current.render(<StaticPost post={post} postSize={postSize} />);
+        await new Promise(resolve => setTimeout(resolve, 200));
+
+        const imageTargetNode = rendererRef.current.firstChild as HTMLElement;
+        if (!imageTargetNode) throw new Error("Componente renderizado não encontrado para exportação.");
+        
+        const options = {
+            quality: 0.98,
+            pixelRatio: 2,
+            fontEmbedCss: fontEmbedCss,
+            imagePlaceholder: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+        };
+
+        if (exportFormat === 'jpeg') {
+            return await htmlToImage.toJpeg(imageTargetNode, options);
+        } else {
+            return await htmlToImage.toPng(imageTargetNode, options);
+        }
+    };
 
     const handleExport = async () => {
-        if (!staticPostRendererRef.current || !project) return;
+        if (!project) return;
     
         setIsExporting(true);
-        const rendererContainer = staticPostRendererRef.current;
+        const toastId = toast.loading('Iniciando exportação...');
         const projectName = project.name.replace(/ /g, '_');
-
-        if (!rendererContainer) {
-            toast.error("Erro: Não foi possível encontrar o container para exportar.");
-            setIsExporting(false);
-            return;
-        }
-
-        if (!rendererRootRef.current) {
-            rendererRootRef.current = createRoot(rendererContainer);
-        }
-        const root = rendererRootRef.current;
     
         try {
             const postsToExport = exportScope === 'current' && selectedPost ? [selectedPost] : posts;
-            const toastId = toast.loading('Carregando fontes para exportação...');
-
-            // 1. Collect all fonts from elements and their rich-text content
+            
+            setExportMessage('Analisando fontes...');
+            toast.loading('Analisando fontes...', { id: toastId });
             const allFonts = new Set<string>();
             const fontRegex = /font-family:\s*['"]([^'"]+)['"]/g;
+
             postsToExport.forEach(post => {
                 post.elements.forEach(element => {
                     if (element.type === 'text') {
@@ -88,59 +114,38 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, posts, postS
                         allFonts.add(textEl.fontFamily);
                         let match;
                         while ((match = fontRegex.exec(textEl.content)) !== null) {
-                            allFonts.add(match[1]);
+                            allFonts.add(match[1].split(',')[0].trim());
                         }
                     }
                 });
             });
 
-            // 2. Load all collected fonts and wait for them
-            try {
-                await Promise.all(Array.from(allFonts).map(fontName => loadGoogleFont(fontName)));
-            } catch (error) {
-                console.error("Font loading failed during export:", error);
-                toast.error("Algumas fontes não puderam ser carregadas. A exportação pode não ficar perfeita.", { id: toastId });
-            }
-
-
+            setExportMessage('Preparando fontes...');
+            toast.loading('Preparando fontes...', { id: toastId });
+            const fontEmbedCss = await getFontEmbedCss(allFonts);
+            
             if (exportScope === 'current' && selectedPost) {
-                toast.loading(`Exportando post como ${exportFormat.toUpperCase()}...`, { id: toastId });
-                
-                root.render(<StaticPost post={selectedPost} postSize={postSize} />);
-                await new Promise(resolve => setTimeout(resolve, 750)); // Give React and fonts time to render
+                setExportMessage(`Renderizando post...`);
+                toast.loading(`Renderizando post como ${exportFormat.toUpperCase()}...`, { id: toastId });
 
-                const imageTargetNode = rendererContainer.firstChild as HTMLElement;
-                if (!imageTargetNode) throw new Error("Componente renderizado não encontrado para exportação.");
-
-                let dataUrl;
-                if (exportFormat === 'jpeg') {
-                    dataUrl = await htmlToImage.toJpeg(imageTargetNode, { quality: 0.95, pixelRatio: 2 });
-                } else {
-                    dataUrl = await htmlToImage.toPng(imageTargetNode, { pixelRatio: 2 });
-                }
-                
+                const dataUrl = await generateImageForPost(selectedPost, postSize, fontEmbedCss);
                 saveAs(dataUrl, `${projectName}_post.${exportFormat}`);
                 toast.success('Exportação concluída!', { id: toastId });
 
             } else if (exportScope === 'all') {
-                toast.loading('Preparando para exportar todos os posts...', { id: toastId });
                 const zip = new JSZip();
     
                 for (let i = 0; i < posts.length; i++) {
                     const post = posts[i];
-                    toast.loading(`Processando post ${i + 1} de ${posts.length}...`, { id: toastId });
+                    setExportMessage(`Renderizando post ${i + 1}/${posts.length}...`);
+                    toast.loading(`Renderizando post ${i + 1}/${posts.length}...`, { id: toastId });
                     
-                    root.render(<StaticPost post={post} postSize={postSize} />);
-                    await new Promise(resolve => setTimeout(resolve, 750)); // Allow render time
-
-                    const imageTargetNode = rendererContainer.firstChild as HTMLElement;
-                    if (!imageTargetNode) throw new Error(`Componente renderizado não encontrado para o post ${i + 1}.`);
-
-                    const pngDataUrl = await htmlToImage.toPng(imageTargetNode, { pixelRatio: 2 });
+                    const pngDataUrl = await generateImageForPost(post, postSize, fontEmbedCss);
                     const base64Data = pngDataUrl.split(',')[1];
-                    zip.file(`post_${i + 1}.png`, base64Data, { base64: true });
+                    zip.file(`post_${String(i + 1).padStart(2, '0')}.png`, base64Data, { base64: true });
                 }
                 
+                setExportMessage(`Compactando arquivos...`);
                 toast.loading(`Compactando ${posts.length} posts...`, { id: toastId });
                 const content = await zip.generateAsync({ type: 'blob' });
                 saveAs(content, `${projectName}_all_posts.zip`);
@@ -148,18 +153,15 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, posts, postS
             }
         } catch (error) {
             console.error("Export failed:", error);
-            toast.error(error instanceof Error ? error.message : "Ocorreu um erro durante a exportação.");
+            toast.error(error instanceof Error ? error.message : "Ocorreu um erro durante a exportação.", { id: toastId });
         } finally {
-            if (rendererRootRef.current) {
-                rendererRootRef.current.unmount();
-                rendererRootRef.current = null;
-            }
+            cleanupRenderer();
             setIsExporting(false);
+            setExportMessage('');
             onClose();
         }
     };
     
-
     if (!isOpen) return null;
 
     return (
@@ -220,14 +222,13 @@ const ExportModal: React.FC<ExportModalProps> = ({ isOpen, onClose, posts, postS
                             {isExporting ? (
                                 <>
                                     <RotateCw className="w-5 h-5 mr-2 animate-spin"/>
-                                    Exportando...
+                                    {exportMessage || 'Exportando...'}
                                 </>
                             ) : (
                                  `Exportar como ${exportFormat.toUpperCase()}`
                             )}
                         </button>
                     </div>
-
                 </div>
             </div>
              <style>{`

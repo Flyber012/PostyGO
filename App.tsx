@@ -412,7 +412,6 @@ const App: React.FC = () => {
     const openProjectInputRef = useRef<HTMLInputElement>(null);
     const imageUploadRef = useRef<HTMLInputElement>(null);
     const backgroundUploadRef = useRef<HTMLInputElement>(null);
-    const staticPostRef = useRef<HTMLDivElement>(null);
 
     // --- DERIVED STATE ---
     const currentProject = projects.find(p => p.id === currentProjectId) || null;
@@ -1304,10 +1303,6 @@ const App: React.FC = () => {
             <input type="file" ref={imageUploadRef} onChange={handleImageUploadForElement} accept="image/*" className="hidden" />
             <input type="file" ref={backgroundUploadRef} onChange={handleBackgroundFileChange} accept="image/*" className="hidden" />
             
-            {/* Hidden renderer for exports */}
-            <div ref={staticPostRef} className="absolute -left-[9999px] -top-[9999px]"/>
-
-
             <div className={`app-layout font-sans bg-gray-950 text-gray-100 ${projects.length > 0 && isLeftPanelOpen ? 'left-panel-open' : ''} ${projects.length > 0 && isRightPanelOpen ? 'right-panel-open' : ''}`}>
                  <ExportModal 
                     isOpen={isExportModalOpen}
@@ -1316,7 +1311,6 @@ const App: React.FC = () => {
                     postSize={postSize}
                     selectedPost={selectedPost}
                     project={currentProject}
-                    staticPostRendererRef={staticPostRef}
                  />
                 <Header 
                     onNewProject={handleNewProject} 
