@@ -51,7 +51,6 @@ const LayersPanel: React.FC<LayersPanelProps> = (props) => {
     const [editingElementId, setEditingElementId] = useState<string | null>(null);
     const [tempName, setTempName] = useState('');
     const renameInputRef = useRef<HTMLInputElement>(null);
-    const dragItem = useRef<string | null>(null);
     const [draggingId, setDraggingId] = useState<string | null>(null);
     
     useEffect(() => {
@@ -86,29 +85,29 @@ const LayersPanel: React.FC<LayersPanelProps> = (props) => {
 
     // --- D&D Handlers ---
     const handleDragStart = (e: React.DragEvent, id: string) => {
-        dragItem.current = id;
-        setDraggingId(id);
+        e.dataTransfer.setData('application/posty-layer-id', id);
         e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', id); // For Firefox compatibility
+        // Timeout to allow the browser to start the drag operation before updating state
+        setTimeout(() => {
+            setDraggingId(id);
+        }, 0);
     };
     
     const handleDragOver = (e: React.DragEvent) => {
-        e.preventDefault(); // Necessary to allow dropping
+        e.preventDefault(); // This is essential to allow a drop
     };
     
     const handleDrop = (e: React.DragEvent, dropOnId: string) => {
         e.preventDefault();
-        const draggedId = dragItem.current;
+        const draggedId = e.dataTransfer.getData('application/posty-layer-id');
         if (draggedId && draggedId !== dropOnId) {
             onReorderElements(draggedId, dropOnId);
         }
-        dragItem.current = null;
-        setDraggingId(null);
+        setDraggingId(null); // Clean up on drop
     };
 
     const handleDragEnd = () => {
-        dragItem.current = null;
-        setDraggingId(null);
+        setDraggingId(null); // Always clean up when drag ends
     };
 
     if (!selectedPost) return <div className="p-4 text-sm text-zinc-500">Selecione um post para ver suas camadas.</div>;
