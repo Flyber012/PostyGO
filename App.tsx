@@ -1,4 +1,5 @@
 
+
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { Toaster, toast } from 'react-hot-toast';
@@ -700,20 +701,33 @@ const App: React.FC = () => {
     
     const toggleElementProperty = (elementId: string, prop: 'visible' | 'locked') => updatePostElement(elementId, { [prop]: !selectedPost?.elements.find(e => e.id === elementId)?.[prop] });
     
-    const reorderElements = (sourceId: string, destinationId: string) => {
+    const handleReorderElements = (sourceId: string, destinationId: string, position: 'before' | 'after') => {
         if (!selectedPostId) return;
         setPosts(prev => prev.map(p => {
             if (p.id !== selectedPostId) return p;
-            const elements = p.elements.filter(el => el.type !== 'background');
             const background = p.elements.find(el => el.type === 'background');
-            const sourceIndex = elements.findIndex(el => el.id === sourceId);
-            const destIndex = elements.findIndex(el => el.id === destinationId);
+            const foreground = p.elements.filter(el => el.type !== 'background');
+            const sourceIndex = foreground.findIndex(el => el.id === sourceId);
+            let destIndex = foreground.findIndex(el => el.id === destinationId);
+    
             if (sourceIndex === -1 || destIndex === -1) return p;
-            const [removed] = elements.splice(sourceIndex, 1);
-            elements.splice(destIndex, 0, removed);
-            return { ...p, elements: background ? [background, ...elements] : elements };
+    
+            const [movedElement] = foreground.splice(sourceIndex, 1);
+            
+            // After removing, the destination index might have shifted. Find it again.
+            let newDestIndex = foreground.findIndex(el => el.id === destinationId);
+    
+            if (position === 'before') {
+                foreground.splice(newDestIndex, 0, movedElement);
+            } else { // 'after'
+                foreground.splice(newDestIndex + 1, 0, movedElement);
+            }
+            
+            const newElements = background ? [background, ...foreground] : foreground;
+            return { ...p, elements: newElements };
         }));
     };
+    
 
     const handleMoveElementLayer = (elementId: string, direction: 'up' | 'down') => {
         if (!selectedPostId) return;
@@ -723,7 +737,8 @@ const App: React.FC = () => {
             const foreground = post.elements.filter(el => el.type !== 'background');
             const currentIndex = foreground.findIndex(el => el.id === elementId);
             if (currentIndex === -1) return post;
-            const newIndex = direction === 'up' ? currentIndex + 1 : currentIndex - 1;
+            // 'up' moves to a higher z-index (lower array index), 'down' to a lower z-index (higher array index)
+            const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
             if (newIndex < 0 || newIndex >= foreground.length) return post;
             const [movedElement] = foreground.splice(currentIndex, 1);
             foreground.splice(newIndex, 0, movedElement);
@@ -1147,7 +1162,7 @@ const App: React.FC = () => {
                        <RightPanel
                             selectedPost={selectedPost} selectedElementId={selectedElementId} onSelectElement={setSelectedElementId} onUpdateElement={updatePostElement}
                             onAddElement={handleAddElement} onRemoveElement={removeElement} onDuplicateElement={duplicateElement} onToggleVisibility={(id) => toggleElementProperty(id, 'visible')}
-                            onToggleLock={(id) => toggleElementProperty(id, 'locked')} onReorderElements={reorderElements} onRegenerateBackground={() => {}} onUpdateBackgroundSrc={() => {}}
+                            onToggleLock={(id) => toggleElementProperty(id, 'locked')} onReorderElements={handleReorderElements} onRegenerateBackground={() => {}} onUpdateBackgroundSrc={() => {}}
                             availableFonts={availableFonts} onAddFont={handleAddFont} onOpenColorPicker={handleOpenColorPicker} palettes={{ post: selectedPost?.palette, custom: customPalette }}
                             onUpdateTextProperty={handleUpdateTextProperty}
                             onToggleTextStyle={handleToggleTextStyle}

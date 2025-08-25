@@ -1,3 +1,5 @@
+
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Post, AnyElement, TextElement, BackgroundElement, ShapeElement, ForegroundElement } from '../types';
 import { Plus, Trash2, Type, Image as ImageIcon, GitCommitHorizontal, Square, Circle, QrCode, Copy, Eye, EyeOff, Lock, Unlock, ArrowUp, ArrowDown } from 'lucide-react';
@@ -12,7 +14,7 @@ interface LayersPanelProps {
     onDuplicateElement: (elementId:string) => void;
     onToggleVisibility: (elementId:string) => void;
     onToggleLock: (elementId:string) => void;
-    onReorderElements: (sourceId: string, destinationId: string) => void;
+    onReorderElements: (sourceId: string, destinationId: string, position: 'before' | 'after') => void;
     onMoveElement: (elementId: string, direction: 'up' | 'down') => void;
     onRenameElement: (elementId: string, newName: string) => void;
 }
@@ -35,6 +37,7 @@ const getElementDisplayName = (element: ForegroundElement): string => {
         case 'qrcode':
             return 'QR Code';
         default: {
+            // This should never be reached if all element types are handled
             const _: never = element;
             return 'Elemento Desconhecido';
         }
@@ -51,7 +54,9 @@ const LayersPanel: React.FC<LayersPanelProps> = (props) => {
     const [editingElementId, setEditingElementId] = useState<string | null>(null);
     const [tempName, setTempName] = useState('');
     const renameInputRef = useRef<HTMLInputElement>(null);
-    const [draggingId, setDraggingId] = useState<string | null>(null);
+
+    const [draggedId, setDraggedId] = useState<string | null>(null);
+    const [dropIndicator, setDropIndicator] = useState<{ targetId: string; position: 'before' | 'after' } | null>(null);
     
     useEffect(() => {
         if (editingElementId && renameInputRef.current) {
@@ -83,79 +88,101 @@ const LayersPanel: React.FC<LayersPanelProps> = (props) => {
         else if (e.key === 'Escape') setEditingElementId(null);
     };
 
-    // --- D&D Handlers ---
+    // --- Professional D&D Handlers ---
     const handleDragStart = (e: React.DragEvent, id: string) => {
         e.dataTransfer.setData('application/posty-layer-id', id);
         e.dataTransfer.effectAllowed = 'move';
-        // Timeout to allow the browser to start the drag operation before updating state
-        setTimeout(() => {
-            setDraggingId(id);
-        }, 0);
+        setDraggedId(id);
     };
-    
-    const handleDragOver = (e: React.DragEvent) => {
-        e.preventDefault(); // This is essential to allow a drop
-    };
-    
-    const handleDrop = (e: React.DragEvent, dropOnId: string) => {
+
+    const handleDragOver = (e: React.DragEvent, targetId: string) => {
         e.preventDefault();
-        const draggedId = e.dataTransfer.getData('application/posty-layer-id');
-        if (draggedId && draggedId !== dropOnId) {
-            onReorderElements(draggedId, dropOnId);
+        if (!draggedId || draggedId === targetId) {
+            setDropIndicator(null);
+            return;
+        };
+
+        const rect = (e.currentTarget as HTMLLIElement).getBoundingClientRect();
+        const midpoint = rect.top + rect.height / 2;
+        const position = e.clientY < midpoint ? 'before' : 'after';
+
+        if (dropIndicator?.targetId !== targetId || dropIndicator?.position !== position) {
+            setDropIndicator({ targetId, position });
         }
-        setDraggingId(null); // Clean up on drop
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        const sourceId = e.dataTransfer.getData('application/posty-layer-id');
+        if (sourceId && dropIndicator) {
+            // Because the visual list is reversed from the z-index array,
+            // dropping 'before' an item visually means placing it at a lower z-index,
+            // which corresponds to 'after' it in the array's order.
+            const finalPosition = dropIndicator.position === 'before' ? 'after' : 'before';
+            onReorderElements(sourceId, dropIndicator.targetId, finalPosition);
+        }
+        setDraggedId(null);
+        setDropIndicator(null);
     };
 
     const handleDragEnd = () => {
-        setDraggingId(null); // Always clean up when drag ends
+        setDraggedId(null);
+        setDropIndicator(null);
     };
 
     if (!selectedPost) return <div className="p-4 text-sm text-zinc-500">Selecione um post para ver suas camadas.</div>;
     
     const foregroundElements = selectedPost.elements.filter((e): e is ForegroundElement => e.type !== 'background');
+    const reversedElements = [...foregroundElements].reverse();
 
-    const LayerItem: React.FC<{element: ForegroundElement, index: number, total: number}> = ({ element, index, total }) => (
-        <li
-            draggable={!element.locked && !editingElementId}
-            onDragStart={(e) => handleDragStart(e, element.id)}
-            onDragOver={handleDragOver}
-            onDrop={(e) => handleDrop(e, element.id)}
-            onDragEnd={handleDragEnd}
-            onClick={() => onSelectElement(element.id)}
-            onDoubleClick={() => handleStartEditing(element)}
-            className={`flex items-center p-2 rounded text-sm transition-all duration-200 group 
-                ${!element.locked ? 'cursor-grab' : 'cursor-default'} 
-                ${selectedElementId === element.id ? 'animated-gradient-bg text-white' : 'bg-zinc-800/50 hover:bg-zinc-800'} 
-                ${!element.visible ? 'opacity-50' : ''}
-                ${draggingId === element.id ? 'opacity-30' : 'opacity-100'}
-            `}
-        >
-            {editingElementId === element.id ? (
-                <input
-                    ref={renameInputRef}
-                    type="text"
-                    value={tempName}
-                    onChange={(e) => setTempName(e.target.value)}
-                    onBlur={handleConfirmEdit}
-                    onKeyDown={handleKeyDown}
-                    className="w-full bg-zinc-900 text-white rounded px-1 -mx-1 ring-2 ring-purple-500 outline-none"
-                />
-            ) : (
-                <span className="truncate flex-1">{getElementDisplayName(element)}</span>
-            )}
+    const LayerItem: React.FC<{element: ForegroundElement, index: number, total: number}> = ({ element, index, total }) => {
+        const isDragged = draggedId === element.id;
+        const isDropTargetBefore = dropIndicator?.targetId === element.id && dropIndicator.position === 'before';
+        const isDropTargetAfter = dropIndicator?.targetId === element.id && dropIndicator.position === 'after';
 
-            <div className={`flex items-center space-x-1 ml-2 transition-opacity ${editingElementId || draggingId ? 'opacity-0' : 'opacity-100 group-hover:opacity-100'}`}>
-                {/* Move Up List (decrease index) -> 'down' in z-index */}
-                <button onClick={(e) => { e.stopPropagation(); onMoveElement(element.id, 'down'); }} disabled={index === 0} className="p-1 hover:bg-white/20 rounded disabled:opacity-30 disabled:cursor-not-allowed"><ArrowUp className="w-3 h-3"/></button>
-                {/* Move Down List (increase index) -> 'up' in z-index */}
-                <button onClick={(e) => { e.stopPropagation(); onMoveElement(element.id, 'up'); }} disabled={index === total - 1} className="p-1 hover:bg-white/20 rounded disabled:opacity-30 disabled:cursor-not-allowed"><ArrowDown className="w-3 h-3"/></button>
-                <button onClick={(e) => { e.stopPropagation(); onDuplicateElement(element.id); }} className="p-1 hover:bg-white/20 rounded"><Copy className="w-3 h-3"/></button>
-                <button onClick={(e) => { e.stopPropagation(); onToggleVisibility(element.id); }} className="p-1 hover:bg-white/20 rounded">{element.visible ? <Eye className="w-3 h-3"/> : <EyeOff className="w-3 h-3"/>}</button>
-                <button onClick={(e) => { e.stopPropagation(); onToggleLock(element.id); }} className="p-1 hover:bg-white/20 rounded">{element.locked ? <Lock className="w-3 h-3"/> : <Unlock className="w-3 h-3"/>}</button>
-                <button onClick={(e) => { e.stopPropagation(); onRemoveElement(element.id); }} className="p-1 hover:bg-red-500/50 rounded"><Trash2 className="w-3 h-3"/></button>
-            </div>
-        </li>
-    );
+        return (
+            <li
+                draggable={!element.locked && !editingElementId}
+                onDragStart={(e) => handleDragStart(e, element.id)}
+                onDragOver={(e) => handleDragOver(e, element.id)}
+                onClick={() => onSelectElement(element.id)}
+                onDoubleClick={() => handleStartEditing(element)}
+                className={`relative flex items-center p-2 rounded text-sm transition-all duration-150 group 
+                    ${!element.locked ? 'cursor-grab' : 'cursor-default'} 
+                    ${selectedElementId === element.id ? 'animated-gradient-bg text-white' : 'bg-zinc-800/50 hover:bg-zinc-800'} 
+                    ${!element.visible ? 'opacity-50' : ''}
+                    ${isDragged ? 'opacity-40' : ''}
+                `}
+            >
+                {isDropTargetBefore && <div className="absolute top-[-2px] left-0 right-0 h-1 bg-purple-500 rounded-full z-10" />}
+                
+                {editingElementId === element.id ? (
+                    <input
+                        ref={renameInputRef}
+                        type="text"
+                        value={tempName}
+                        onChange={(e) => setTempName(e.target.value)}
+                        onBlur={handleConfirmEdit}
+                        onKeyDown={handleKeyDown}
+                        className="w-full bg-zinc-900 text-white rounded px-1 -mx-1 ring-2 ring-purple-500 outline-none"
+                    />
+                ) : (
+                    <span className="truncate flex-1">{getElementDisplayName(element)}</span>
+                )}
+    
+                <div className={`flex items-center space-x-1 ml-2 transition-opacity ${editingElementId || draggedId ? 'opacity-0' : 'opacity-100 group-hover:opacity-100'}`}>
+                    <button onClick={(e) => { e.stopPropagation(); onMoveElement(element.id, 'down'); }} disabled={index === 0} className="p-1 hover:bg-white/20 rounded disabled:opacity-30 disabled:cursor-not-allowed"><ArrowUp className="w-3 h-3"/></button>
+                    <button onClick={(e) => { e.stopPropagation(); onMoveElement(element.id, 'up'); }} disabled={index === total - 1} className="p-1 hover:bg-white/20 rounded disabled:opacity-30 disabled:cursor-not-allowed"><ArrowDown className="w-3 h-3"/></button>
+                    <button onClick={(e) => { e.stopPropagation(); onDuplicateElement(element.id); }} className="p-1 hover:bg-white/20 rounded"><Copy className="w-3 h-3"/></button>
+                    <button onClick={(e) => { e.stopPropagation(); onToggleVisibility(element.id); }} className="p-1 hover:bg-white/20 rounded">{element.visible ? <Eye className="w-3 h-3"/> : <EyeOff className="w-3 h-3"/>}</button>
+                    <button onClick={(e) => { e.stopPropagation(); onToggleLock(element.id); }} className="p-1 hover:bg-white/20 rounded">{element.locked ? <Lock className="w-3 h-3"/> : <Unlock className="w-3 h-3"/>}</button>
+                    <button onClick={(e) => { e.stopPropagation(); onRemoveElement(element.id); }} className="p-1 hover:bg-red-500/50 rounded"><Trash2 className="w-3 h-3"/></button>
+                </div>
+
+                {isDropTargetAfter && <div className="absolute bottom-[-2px] left-0 right-0 h-1 bg-purple-500 rounded-full z-10" />}
+            </li>
+        );
+    }
 
     return (
         <div className="p-4 h-full flex flex-col">
@@ -174,13 +201,19 @@ const LayersPanel: React.FC<LayersPanelProps> = (props) => {
                     )}
                 </div>
             </div>
-            <ul className="space-y-1 flex-grow overflow-y-auto layers-scrollbar pr-2">
+            <ul 
+                className="space-y-1 flex-grow overflow-y-auto layers-scrollbar pr-2"
+                onDrop={handleDrop}
+                onDragEnd={handleDragEnd}
+                onDragLeave={() => setDropIndicator(null)}
+            >
                  {selectedPost.elements.find(e => e.type === 'background') && (
                     <li onClick={() => onSelectElement(selectedPost.elements.find(e => e.type === 'background')!.id)} className={`flex justify-between items-center p-2 rounded text-sm cursor-pointer ${selectedElementId === selectedPost.elements.find(e => e.type === 'background')!.id ? 'animated-gradient-bg text-white' : 'bg-zinc-800/50 hover:bg-zinc-800'}`}>
                         Fundo
                     </li>
                  )}
-                {foregroundElements.map((element, index) => (
+                {/* Render layers in reverse order: bottom-most element on top of the list */}
+                {reversedElements.map((element, index) => (
                     <LayerItem key={element.id} element={element} index={index} total={foregroundElements.length} />
                 ))}
             </ul>

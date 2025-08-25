@@ -1,6 +1,7 @@
 
 
 
+
 import React, { useState, useRef, useCallback } from 'react';
 import { Post, AnyElement, FontDefinition } from '../types';
 import LayersPanel from './LayersPanel';
@@ -16,7 +17,7 @@ interface RightPanelProps {
     onDuplicateElement: (elementId: string) => void;
     onToggleVisibility: (elementId: string) => void;
     onToggleLock: (elementId: string) => void;
-    onReorderElements: (sourceId: string, destinationId: string) => void;
+    onReorderElements: (sourceId: string, destinationId: string, position: 'before' | 'after') => void;
     onRegenerateBackground: (elementId: string, prompt: string) => void;
     onUpdateBackgroundSrc: (elementId: string, src: string) => void;
     availableFonts: FontDefinition[];
