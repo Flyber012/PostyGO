@@ -1,6 +1,7 @@
 
 
 
+
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { Toaster, toast } from 'react-hot-toast';
@@ -717,6 +718,27 @@ const App: React.FC = () => {
         }));
     };
 
+    const handleMoveElementLayer = (elementId: string, direction: 'up' | 'down') => {
+        if (!selectedPostId) return;
+        setPosts(prevPosts => prevPosts.map(post => {
+            if (post.id !== selectedPostId) return post;
+            const background = post.elements.find(el => el.type === 'background');
+            const foreground = post.elements.filter(el => el.type !== 'background');
+            const currentIndex = foreground.findIndex(el => el.id === elementId);
+            if (currentIndex === -1) return post;
+            const newIndex = direction === 'up' ? currentIndex + 1 : currentIndex - 1;
+            if (newIndex < 0 || newIndex >= foreground.length) return post;
+            const [movedElement] = foreground.splice(currentIndex, 1);
+            foreground.splice(newIndex, 0, movedElement);
+            const newElements = background ? [background, ...foreground] : foreground;
+            return { ...post, elements: newElements };
+        }));
+    };
+    
+    const handleRenameElement = (elementId: string, newName: string) => {
+        updatePostElement(elementId, { name: newName });
+    };
+
     const addPost = () => {
         if (!currentProject) return;
         const newPostId = uuidv4();
@@ -1147,6 +1169,8 @@ const App: React.FC = () => {
                             onToggleTextStyle={handleToggleTextStyle}
                             selectionStyles={selectionStyles}
                             isEditingText={isEditingText}
+                            onRenameElement={handleRenameElement}
+                            onMoveElement={handleMoveElementLayer}
                         />
                     ) : <EmptyPanelPlaceholder text="Selecione um post para ver suas camadas e propriedades."/>}
                 </aside>

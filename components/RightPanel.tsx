@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useRef, useCallback } from 'react';
 import { Post, AnyElement, FontDefinition } from '../types';
 import LayersPanel from './LayersPanel';
@@ -25,6 +26,8 @@ interface RightPanelProps {
     onToggleTextStyle: (style: 'bold' | 'italic' | 'underline') => void;
     selectionStyles: { color: string | null; bold: boolean; italic: boolean; underline: boolean; };
     isEditingText: boolean;
+    onRenameElement: (elementId: string, newName: string) => void;
+    onMoveElement: (elementId: string, direction: 'up' | 'down') => void;
     palettes: {
         post?: string[];
         custom?: string[];

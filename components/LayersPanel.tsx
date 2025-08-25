@@ -1,8 +1,9 @@
 
 
-import React, { useState, useRef } from 'react';
-import { Post, AnyElement, TextElement, BackgroundElement } from '../types';
-import { Plus, Trash2, Type, Image as ImageIcon, GitCommitHorizontal, Square, Circle, QrCode, Copy, Eye, EyeOff, Lock, Unlock } from 'lucide-react';
+
+import React, { useState, useRef, useEffect } from 'react';
+import { Post, AnyElement, TextElement, BackgroundElement, ShapeElement, ForegroundElement } from '../types';
+import { Plus, Trash2, Type, Image as ImageIcon, GitCommitHorizontal, Square, Circle, QrCode, Copy, Eye, EyeOff, Lock, Unlock, ArrowUp, ArrowDown } from 'lucide-react';
 
 interface LayersPanelProps {
     selectedPost: Post | undefined;
@@ -15,29 +16,75 @@ interface LayersPanelProps {
     onToggleVisibility: (elementId:string) => void;
     onToggleLock: (elementId:string) => void;
     onReorderElements: (sourceId: string, destinationId: string) => void;
+    onMoveElement: (elementId: string, direction: 'up' | 'down') => void;
+    onRenameElement: (elementId: string, newName: string) => void;
 }
+
+const getElementDisplayName = (element: ForegroundElement): string => {
+    if (element.name) return element.name;
+    if (element.type === 'text') {
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = (element as TextElement).content;
+        const text = (tempDiv.textContent || tempDiv.innerText || '').trim();
+        return text.substring(0, 50) || 'Texto Vazio';
+    }
+    if (element.type === 'image') return 'Imagem';
+    if (element.type === 'gradient') return 'Gradiente';
+    if (element.type === 'shape') return (element as ShapeElement).shape === 'circle' ? 'Círculo' : 'Retângulo';
+    if (element.type === 'qrcode') return 'QR Code';
+    return `Camada ${element.type}`;
+};
 
 const LayersPanel: React.FC<LayersPanelProps> = (props) => {
     const { 
         selectedPost, selectedElementId, onSelectElement, onAddElement, onRemoveElement, 
-        onDuplicateElement, onToggleVisibility, onToggleLock, onReorderElements,
+        onDuplicateElement, onToggleVisibility, onToggleLock, onReorderElements, onMoveElement, onRenameElement
     } = props;
     
     const [isAddMenuOpen, setAddMenuOpen] = useState(false);
+    const [editingElementId, setEditingElementId] = useState<string | null>(null);
+    const [tempName, setTempName] = useState('');
     const dragItem = useRef<string | null>(null);
     const dragOverItem = useRef<string | null>(null);
+    const renameInputRef = useRef<HTMLInputElement>(null);
+    
+    useEffect(() => {
+        if (editingElementId && renameInputRef.current) {
+            renameInputRef.current.focus();
+            renameInputRef.current.select();
+        }
+    }, [editingElementId]);
 
     const handleAddClick = (type: 'text' | 'image' | 'shape' | 'qrcode', options?: any) => {
         onAddElement(type, options);
         setAddMenuOpen(false);
     };
 
-    if (!selectedPost) return <div className="p-4 text-sm text-zinc-500">Selecione um post para ver suas camadas.</div>;
+    const handleStartEditing = (element: ForegroundElement) => {
+        setEditingElementId(element.id);
+        setTempName(getElementDisplayName(element));
+    };
 
+    const handleConfirmEdit = () => {
+        if (editingElementId && tempName.trim()) {
+            onRenameElement(editingElementId, tempName.trim());
+        }
+        setEditingElementId(null);
+        setTempName('');
+    };
     
-    const LayerItem: React.FC<{element: Exclude<AnyElement, BackgroundElement>}> = ({ element }) => (
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') handleConfirmEdit();
+        else if (e.key === 'Escape') setEditingElementId(null);
+    };
+
+    if (!selectedPost) return <div className="p-4 text-sm text-zinc-500">Selecione um post para ver suas camadas.</div>;
+    
+    const foregroundElements = selectedPost.elements.filter((e): e is ForegroundElement => e.type !== 'background');
+
+    const LayerItem: React.FC<{element: ForegroundElement, index: number, total: number}> = ({ element, index, total }) => (
         <li
-            draggable={!element.locked}
+            draggable={!element.locked && !editingElementId}
             onDragStart={() => dragItem.current = element.id}
             onDragEnter={() => dragOverItem.current = element.id}
             onDragEnd={() => {
@@ -48,10 +95,26 @@ const LayersPanel: React.FC<LayersPanelProps> = (props) => {
             }}
             onDragOver={(e) => e.preventDefault()}
             onClick={() => onSelectElement(element.id)}
-            className={`flex items-center p-2 rounded text-sm transition-all duration-200 ${!element.locked ? 'cursor-pointer' : 'cursor-default'} ${selectedElementId === element.id ? 'animated-gradient-bg text-white' : 'bg-zinc-800/50 hover:bg-zinc-800'} ${!element.visible ? 'opacity-50' : ''}`}
+            onDoubleClick={() => handleStartEditing(element)}
+            className={`flex items-center p-2 rounded text-sm transition-all duration-200 group ${!element.locked ? 'cursor-pointer' : 'cursor-default'} ${selectedElementId === element.id ? 'animated-gradient-bg text-white' : 'bg-zinc-800/50 hover:bg-zinc-800'} ${!element.visible ? 'opacity-50' : ''}`}
         >
-            <span className="truncate flex-1">{element.type === 'text' ? (element as TextElement).content : `Camada ${element.type.charAt(0).toUpperCase() + element.type.slice(1)}`}</span>
-            <div className="flex items-center space-x-1 ml-2">
+            {editingElementId === element.id ? (
+                <input
+                    ref={renameInputRef}
+                    type="text"
+                    value={tempName}
+                    onChange={(e) => setTempName(e.target.value)}
+                    onBlur={handleConfirmEdit}
+                    onKeyDown={handleKeyDown}
+                    className="w-full bg-zinc-900 text-white rounded px-1 -mx-1 ring-2 ring-purple-500 outline-none"
+                />
+            ) : (
+                <span className="truncate flex-1">{getElementDisplayName(element)}</span>
+            )}
+
+            <div className={`flex items-center space-x-1 ml-2 transition-opacity ${editingElementId ? 'opacity-0' : 'opacity-100 group-hover:opacity-100'}`}>
+                <button onClick={(e) => { e.stopPropagation(); onMoveElement(element.id, 'up'); }} disabled={index === total - 1} className="p-1 hover:bg-white/20 rounded disabled:opacity-30 disabled:cursor-not-allowed"><ArrowUp className="w-3 h-3"/></button>
+                <button onClick={(e) => { e.stopPropagation(); onMoveElement(element.id, 'down'); }} disabled={index === 0} className="p-1 hover:bg-white/20 rounded disabled:opacity-30 disabled:cursor-not-allowed"><ArrowDown className="w-3 h-3"/></button>
                 <button onClick={(e) => { e.stopPropagation(); onDuplicateElement(element.id); }} className="p-1 hover:bg-white/20 rounded"><Copy className="w-3 h-3"/></button>
                 <button onClick={(e) => { e.stopPropagation(); onToggleVisibility(element.id); }} className="p-1 hover:bg-white/20 rounded">{element.visible ? <Eye className="w-3 h-3"/> : <EyeOff className="w-3 h-3"/>}</button>
                 <button onClick={(e) => { e.stopPropagation(); onToggleLock(element.id); }} className="p-1 hover:bg-white/20 rounded">{element.locked ? <Lock className="w-3 h-3"/> : <Unlock className="w-3 h-3"/>}</button>
@@ -83,8 +146,8 @@ const LayersPanel: React.FC<LayersPanelProps> = (props) => {
                         Fundo
                     </li>
                  )}
-                {[...selectedPost.elements].reverse().map(element => (
-                    element.type !== 'background' ? <LayerItem key={element.id} element={element as Exclude<AnyElement, BackgroundElement>} /> : null
+                {[...foregroundElements].reverse().map((element, index) => (
+                    <LayerItem key={element.id} element={element} index={foregroundElements.length - 1 - index} total={foregroundElements.length} />
                 ))}
             </ul>
         </div>

@@ -1,9 +1,11 @@
 
 
+
 export type TextStyle = 'padrão' | 'profissional' | 'amigável' | 'inspirador' | 'divertido';
 
 export interface BaseElement {
     id: string;
+    name?: string;
     type: string;
     x: number;
     y: number;
