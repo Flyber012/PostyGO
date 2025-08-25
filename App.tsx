@@ -4,7 +4,7 @@ import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import ReactDOM from 'react-dom';
 import { Toaster, toast } from 'react-hot-toast';
 import { Post, BrandKit, PostSize, AnyElement, TextElement, ImageElement, BackgroundElement, FontDefinition, LayoutTemplate, BrandAsset, TextStyle, Project, AIGeneratedTextElement, ShapeElement, QRCodeElement } from './types';
-import { POST_SIZES, INITIAL_FONTS, PRESET_BRAND_KITS } from './constants';
+import { POST_SIZES, GOOGLE_FONTS } from './constants';
 import * as geminiService from './services/geminiService';
 import * as freepikService from './services/freepikService';
 import CreationPanel from './components/ControlPanel';
@@ -21,6 +21,7 @@ import AdvancedColorPicker from './components/ColorPicker';
 import { parseColor, rgbToHex } from './utils/color';
 import ExportModal from './components/ExportModal';
 import StaticPost from './components/StaticPost';
+import { loadGoogleFont } from './utils/fontManager';
 
 
 // --- HELPERS ---
@@ -397,14 +398,14 @@ const App: React.FC = () => {
     const [solidColorForGeneration, setSolidColorForGeneration] = useState<string>('#FFFFFF');
     
     // BrandKit & Style State
-    const [brandKits, setBrandKits] = useState<BrandKit[]>(PRESET_BRAND_KITS);
+    const [brandKits, setBrandKits] = useState<BrandKit[]>([]);
     const [styleGuide, setStyleGuide] = useState<string | null>(null);
     const [useStyleGuide, setUseStyleGuide] = useState<boolean>(false);
     const [selectedLayoutId, setSelectedLayoutId] = useState<string | null>(null);
     const [useLayoutToFill, setUseLayoutToFill] = useState<boolean>(false);
     const [colorMode, setColorMode] = useState<'default' | 'custom' | 'extract'>('default');
     const [customPalette, setCustomPalette] = useState<string[]>(['#FFFFFF', '#000000', '#FBBF24', '#3B82F6']);
-    const [availableFonts, setAvailableFonts] = useState<FontDefinition[]>(INITIAL_FONTS);
+    const [availableFonts, setAvailableFonts] = useState<FontDefinition[]>(GOOGLE_FONTS);
     
     // Refs
     const viewportRef = useRef<HTMLDivElement>(null);
@@ -876,18 +877,43 @@ const App: React.FC = () => {
     const addPost = () => {
         if (!currentProject) return;
         const newPostId = uuidv4();
-        const newPost: Post = { id: newPostId, elements: [{ id: `${newPostId}-background`, type: 'background', src: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mN8/x8AAuMB8DtXNJsAAAAASUVORK5CYII=' }] };
+        const newPost: Post = { id: newPostId, elements: [{ id: `${newPostId}-background`, type: 'background', backgroundColor: '#18181b' }] };
         setPosts(prev => [...prev, newPost]);
         setSelectedPostId(newPostId);
     };
 
     const deletePost = ({ postId, carouselId }: { postId?: string, carouselId?: string }) => {
         let remainingPosts: Post[];
-        if (carouselId) remainingPosts = posts.filter(p => p.carouselId !== carouselId);
-        else if (postId) remainingPosts = posts.filter(p => p.id !== postId);
-        else return;
+        let postToDelete = posts.find(p => p.id === postId);
+
+        if (carouselId) { // Deleting a whole carousel
+            remainingPosts = posts.filter(p => p.carouselId !== carouselId);
+        } else if (postId) { // Deleting a single post/slide
+            const deletedPostCarouselId = postToDelete?.carouselId;
+            remainingPosts = posts.filter(p => p.id !== postId);
+
+            // If the deleted post was part of a carousel, re-index the remaining slides
+            if (deletedPostCarouselId) {
+                const remainingSlides = remainingPosts
+                    .filter(p => p.carouselId === deletedPostCarouselId)
+                    .sort((a, b) => (a.slideIndex ?? 0) - (b.slideIndex ?? 0));
+                
+                remainingPosts = remainingPosts.map(p => {
+                    if (p.carouselId === deletedPostCarouselId) {
+                        const newIndex = remainingSlides.findIndex(s => s.id === p.id);
+                        return { ...p, slideIndex: newIndex };
+                    }
+                    return p;
+                });
+            }
+        } else {
+            return;
+        }
+
         setPosts(remainingPosts);
-        if (selectedPostId === postId || posts.find(p => p.id === selectedPostId)?.carouselId === carouselId) {
+
+        // Update selection
+        if (selectedPostId === postId || selectedPost?.carouselId === carouselId) {
             setSelectedPostId(remainingPosts[0]?.id || null);
         }
     };
@@ -1107,7 +1133,6 @@ const App: React.FC = () => {
 
 
     // --- BRANDKIT & FONT HANDLERS ---
-    const handleAddFont = (font: FontDefinition) => setAvailableFonts(prev => [...prev, font]);
     const handleOpenColorPicker = (color: string, onChange: (newColor: string) => void) => setColorPickerState({ isOpen: true, color, onChange });
     
     const handleSaveBrandKit = (name: string) => {
@@ -1371,14 +1396,14 @@ const App: React.FC = () => {
                                             <>
                                                 <button
                                                     onClick={() => handleCarouselNav('prev')}
-                                                    className="absolute left-4 top-1/2 -translate-y-1/2 z-10 bg-black/40 text-white p-2 rounded-full transition-opacity hover:bg-black/60"
+                                                    className="absolute left-4 top-1/2 -translate-y-1/2 z-10 bg-black/40 text-white p-2 rounded-full transition-opacity opacity-0 group-hover:opacity-100 hover:bg-black/60"
                                                     aria-label="Slide anterior"
                                                 >
                                                     <ChevronLeft className="w-6 h-6" />
                                                 </button>
                                                 <button
                                                     onClick={() => handleCarouselNav('next')}
-                                                    className="absolute right-4 top-1/2 -translate-y-1/2 z-10 bg-black/40 text-white p-2 rounded-full transition-opacity hover:bg-black/60"
+                                                    className="absolute right-4 top-1/2 -translate-y-1/2 z-10 bg-black/40 text-white p-2 rounded-full transition-opacity opacity-0 group-hover:opacity-100 hover:bg-black/60"
                                                     aria-label="Próximo slide"
                                                 >
                                                     <ChevronRight className="w-6 h-6" />
@@ -1477,7 +1502,7 @@ const App: React.FC = () => {
                             onAddElement={handleAddElement} onRemoveElement={removeElement} onDuplicateElement={duplicateElement} onToggleVisibility={(id) => toggleElementProperty(id, 'visible')}
                             onToggleLock={(id) => toggleElementProperty(id, 'locked')} onReorderElements={handleReorderElements} onOpenRegenModal={() => setIsRegenModalOpen(true)} 
                             onTriggerBackgroundUpload={handleTriggerBackgroundUpload} onSetSolidBackground={handleSetSolidBackground}
-                            availableFonts={availableFonts} onAddFont={handleAddFont} onOpenColorPicker={handleOpenColorPicker} palettes={{ post: selectedPost?.palette, custom: customPalette }}
+                            availableFonts={availableFonts} onLoadFont={loadGoogleFont} onOpenColorPicker={handleOpenColorPicker} palettes={{ post: selectedPost?.palette, custom: customPalette }}
                             onUpdateTextProperty={handleUpdateTextProperty}
                             onToggleTextStyle={handleToggleTextStyle}
                             selectionStyles={selectionStyles}
@@ -1490,7 +1515,7 @@ const App: React.FC = () => {
 
                 <footer className="footer-gallery">
                     {currentProject && posts.length > 0 && (
-                        <TimelineGallery posts={posts} selectedPostId={selectedPostId} onSelectPost={setSelectedPostId} onAddPost={addPost} onDeletePost={deletePost} />
+                        <TimelineGallery posts={posts} selectedPostId={selectedPostId} onSelectPost={setSelectedPostId} onAddPost={addPost} onDeletePost={deletePost} postSize={postSize}/>
                     )}
                 </footer>
             </div>

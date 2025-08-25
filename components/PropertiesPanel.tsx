@@ -1,9 +1,9 @@
 
 
-import React, { useState, useEffect, useRef } from 'react';
-import { AnyElement, TextElement, ImageElement, GradientElement, ShapeElement, QRCodeElement, FontDefinition, BlendMode, BackgroundElement } from '../types';
-import { Plus, ChevronDown, ArrowUpFromLine, GripVertical, ArrowDownFromLine, FileUp } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import React, { useState } from 'react';
+import { AnyElement, TextElement, ImageElement, ShapeElement, QRCodeElement, FontDefinition, BlendMode, BackgroundElement } from '../types';
+import { ChevronDown, FileUp } from 'lucide-react';
+import FontSelector from './FontSelector';
 
 // Reusable input components
 const NumberInput: React.FC<{label: string, value: number, onChange: (val: string) => void, min?: number, max?: number, step?: number, unit?: string}> = 
@@ -70,7 +70,7 @@ interface PropertiesPanelProps {
     onUpdateTextProperty: (prop: string, value: any) => void;
     onToggleTextStyle: (style: 'bold' | 'italic' | 'underline') => void;
     availableFonts: FontDefinition[];
-    onAddFont: (font: FontDefinition) => void;
+    onLoadFont: (fontName: string) => void;
     onOpenColorPicker: (currentColor: string, onColorChange: (color: string) => void) => void;
     selectionStyles: { color: string | null; bold: boolean; italic: boolean; underline: boolean; };
     isEditingText: boolean;
@@ -81,10 +81,8 @@ const blendModes: BlendMode[] = [
     'hard-light', 'soft-light', 'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity'
 ];
 
-const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedElement, onUpdateElement, onUpdateTextProperty, onToggleTextStyle, availableFonts, onAddFont, onOpenColorPicker, selectionStyles, isEditingText }) => {
+const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedElement, onUpdateElement, onUpdateTextProperty, onToggleTextStyle, availableFonts, onLoadFont, onOpenColorPicker, selectionStyles, isEditingText }) => {
     
-    const fontInputRef = useRef<HTMLInputElement>(null);
-
     const handleInputChange = (key: string, value: any, subKey?: string) => {
         if (!selectedElement) return;
         if (subKey) {
@@ -92,22 +90,6 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedElement, onUp
             onUpdateElement(selectedElement.id, { [subKey]: { ...currentSubObject, [key]: value } });
         } else {
             onUpdateElement(selectedElement.id, { [key]: value });
-        }
-    };
-
-    const handleFontUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const fontName = file.name.split('.')[0];
-                const dataUrl = e.target?.result as string;
-                const newFont: FontDefinition = { name: fontName, dataUrl };
-                onAddFont(newFont);
-                onUpdateTextProperty('fontFamily', fontName);
-                toast.success(`Fonte "${fontName}" adicionada!`);
-            };
-            reader.readAsDataURL(file);
         }
     };
 
@@ -157,27 +139,14 @@ const PropertiesPanel: React.FC<PropertiesPanelProps> = ({ selectedElement, onUp
             
                         {selectedElement.type === 'text' && (
                             <Accordion title="Texto" defaultOpen={true}>
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-400">Conteúdo</label>
-                                    <textarea 
-                                        value={(selectedElement as TextElement).content.replace(/<[^>]*>?/gm, '')} // Show plain text for simplicity
-                                        onChange={e => handleInputChange('content', e.target.value)}
-                                        className="w-full mt-1 bg-black/50 border border-zinc-600 rounded-md px-2 py-1 text-white text-xs"
-                                        rows={3}
-                                    />
-                                </div>
-                                 <div>
-                                    <label className="block text-xs font-medium text-gray-400">Fonte</label>
-                                    <div className="flex space-x-2 mt-1">
-                                        <SelectInput label="" value={(selectedElement as TextElement).fontFamily} onChange={val => onUpdateTextProperty('fontFamily', val)}>
-                                            {availableFonts.map(font => <option key={font.name} value={font.name}>{font.name}</option>)}
-                                        </SelectInput>
-                                        <button onClick={() => fontInputRef.current?.click()} className="p-2 bg-zinc-700 hover:bg-zinc-600 rounded-md" title="Carregar fonte">
-                                            <FileUp className="w-3 h-3" />
-                                        </button>
-                                        <input type="file" ref={fontInputRef} onChange={handleFontUpload} accept=".ttf, .otf, .woff, .woff2" className="hidden" />
-                                    </div>
-                                </div>
+                                <FontSelector 
+                                    availableFonts={availableFonts}
+                                    selectedFont={(selectedElement as TextElement).fontFamily}
+                                    onSelectFont={(fontName) => {
+                                        onLoadFont(fontName);
+                                        onUpdateTextProperty('fontFamily', fontName);
+                                    }}
+                                />
                                  <div className="grid grid-cols-2 gap-2">
                                     <NumberInput label="Tamanho" value={(selectedElement as TextElement).fontSize} onChange={val => onUpdateTextProperty('fontSize', parseInt(val, 10))} min={1} unit="px"/>
                                     <ColorInput label="Cor" color={(isEditingText && selectionStyles.color) ? selectionStyles.color : (selectedElement as TextElement).color} onChange={val => onUpdateTextProperty('color', val)} onOpenColorPicker={onOpenColorPicker} />

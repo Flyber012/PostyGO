@@ -22,7 +22,7 @@ interface RightPanelProps {
     onTriggerBackgroundUpload: () => void;
     onSetSolidBackground: () => void;
     availableFonts: FontDefinition[];
-    onAddFont: (font: FontDefinition) => void;
+    onLoadFont: (fontName: string) => void;
     onOpenColorPicker: (currentColor: string, onColorChange: (color: string) => void) => void;
     onUpdateTextProperty: (prop: string, value: any) => void;
     onToggleTextStyle: (style: 'bold' | 'italic' | 'underline') => void;

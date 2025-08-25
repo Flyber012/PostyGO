@@ -1,9 +1,47 @@
 import { PostSize, BrandKit, FontDefinition } from './types';
 import { v4 as uuidv4 } from 'uuid';
 
-export const INITIAL_FONTS: FontDefinition[] = [
-    { name: 'Roboto' }, { name: 'Open Sans' }, { name: 'Lato' }, { name: 'Montserrat' }, { name: 'Oswald' },
-    { name: 'Poppins' }, { name: 'Inter' }, { name: 'Anton' }, { name: 'Bebas Neue' }, { name: 'Caveat' },
+export const GOOGLE_FONTS: FontDefinition[] = [
+    { name: 'Roboto' }, { name: 'Open Sans' }, { name: 'Lato' }, { name: 'Montserrat' },
+    { name: 'Oswald' }, { name: 'Poppins' }, { name: 'Inter' }, { name: 'Anton' },
+    { name: 'Bebas Neue' }, { name: 'Caveat' }, { name: 'Lobster' }, { name: 'Pacifico' },
+    { name: 'Raleway' }, { name: 'Source Sans Pro' }, { name: 'Merriweather' }, { name: 'PT Sans' },
+    { name: 'Ubuntu' }, { name: 'Nunito' }, { name: 'Playfair Display' }, { name: 'Slabo 27px' },
+    { name: 'Titillium Web' }, { name: 'Fira Sans' }, { name: 'Josefin Sans' }, { name: 'Arimo' },
+    { name: 'Dosis' }, { name: 'Oxygen' }, { name: 'Work Sans' }, { name: 'Yantramanav' },
+    { name: 'Abel' }, { name: 'Abril Fatface' }, { name: 'Alegreya' }, { name: 'Alfa Slab One' },
+    { name: 'Amatic SC' }, { name: 'Archivo Black' }, { name: 'Archivo Narrow' }, { name: 'Arvo' },
+    { name: 'Asap' }, { name: 'Bangers' }, { name: 'Bitter' }, { name: 'Bree Serif' },
+    { name: 'Cabin' }, { name: 'Cantarell' }, { name: 'Cardo' }, { name: 'Catamaran' },
+    { name: 'Comfortaa' }, { name: 'Cormorant Garamond' }, { name: 'Crete Round' }, { name: 'Crimson Text' },
+    { name: 'Cuprum' }, { name: 'Dancing Script' }, { name: 'EB Garamond' }, { name: 'Exo 2' },
+    { name: 'Fjalla One' }, { name: 'Francois One' }, { name: 'Frank Ruhl Libre' }, { name: 'Gloria Hallelujah' },
+    { name: 'Hind' }, { name: 'IBM Plex Sans' }, { name: 'Indie Flower' }, { name: 'Inconsolata' },
+    { name: 'Karla' }, { name: 'Kaushan Script' }, { name: 'Libre Baskerville' }, { name: 'Libre Franklin' },
+    { name: 'Lora' }, { name: 'Mada' }, { name: 'Manrope' }, { name: 'Marcellus' },
+    { name: 'Maven Pro' }, { name: 'Merriweather Sans' }, { name: 'Monda' }, { name: 'Mulish' },
+    { name: 'Nanum Gothic' }, { name: 'Neuton' }, { name: 'Noticia Text' }, { name: 'Noto Sans' },
+    { name: 'Old Standard TT' }, { name: 'Orbitron' }, { name: 'Overpass' }, { name: 'Passion One' },
+    { name: 'Patua One' }, { name: 'Permanent Marker' }, { name: 'Philosopher' }, { name: 'Play' },
+    { name: 'Poiret One' }, { name: 'Prata' }, { name: 'Prompt' }, { name: 'PT Mono' },
+    { name: 'PT Serif' }, { name: 'Quattrocento Sans' }, { name: 'Questrial' }, { name: 'Quicksand' },
+    { name: 'Righteous' }, { name: 'Roboto Condensed' }, { name: 'Roboto Mono' }, { name: 'Roboto Slab' },
+    { name: 'Rokkitt' }, { name: 'Rubik' }, { name: 'Russo One' }, { name: 'Sacramento' },
+    { name: 'Satisfy' }, { name: 'Secular One' }, { name: 'Shadows Into Light' }, { name: 'Signika' },
+    { name: 'Source Code Pro' }, { name: 'Source Serif Pro' }, { name: 'Space Mono' }, { name: 'Special Elite' },
+    { name: 'Spectral' }, { name: 'Syncopate' }, { name: 'Teko' }, { name: 'Tinos' },
+    { name: 'Ultra' }, { name: 'Varela Round' }, { name: 'Vidaloka' }, { name: 'Vollkorn' },
+    { name: 'VT323' }, { name: 'Zilla Slab' }, { name: 'Acme' }, { name: 'Aleo' },
+    { name: 'Athiti' }, { name: 'Average' }, { name: 'Baloo 2' }, { name: 'Barlow' },
+    { name: 'Barlow Condensed' }, { name: 'Basic' }, { name: 'BenchNine' }, { name: 'BioRhyme' },
+    { name: 'Candal' }, { name: 'Cantora One' }, { name: 'Changa' }, { name: 'Chivo' },
+    { name: 'Cinzel' }, { name: 'Concert One' }, { name: 'Copse' }, { name: 'Cousine' },
+    { name: 'Domine' }, { name: 'Economica' }, { name: 'El Messiri' }, { name: 'Encode Sans' },
+    { name: 'Expletus Sans' }, { name: 'Fauna One' }, { name: 'Fira Mono' }, { name: 'Forum' },
+    { name: 'Gentium Book Basic' }, { name: 'Glegoo' }, { name: 'Gothic A1' }, { name: 'Heebo' },
+    { name: 'Istok Web' }, { name: 'Jura' }, { name: 'Kalam' }, { name: 'Kanit' },
+    { name: 'Khand' }, { name: 'Kreon' }, { name: 'La Belle Aurore' }, { name: 'Lalezar' },
+    { name: 'Ledger' }, { name: 'Lexend Deca' }, { name: 'Lilita One' }
 ];
 
 export const POST_SIZES: PostSize[] = [

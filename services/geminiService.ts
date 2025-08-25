@@ -77,7 +77,7 @@ async function generateEnhancedImagePrompt(basePrompt: string, inspirationImages
     const ai = getAIClient(userApiKey);
     const parts: Part[] = [];
 
-    const systemPrompt = `Você é um diretor de arte especialista em engenharia de prompt para IA generativa de imagens. Sua tarefa é analisar as imagens de inspiração fornecidas para entender seu estilo, cor, composição e "vibe" geral. Em seguida, você deve criar um prompt novo, detalhado e artístico para o tópico "${basePrompt}", incorporando o estilo analisado. O prompt resultante deve ser rico em detalhes visuais e pronto para ser usado por um modelo de texto para imagem como Imagen.`;
+    const systemPrompt = `Você é um diretor de arte especialista em engenharia de prompt para IA generativa de imagens. Sua tarefa é analisar as imagens de inspiração fornecidas para entender seu estilo, cor, composição e "vibe" geral. Em seguida, você deve criar um prompt novo, detalhado e artístico para o tópico "${basePrompt}", incorporando o estilo analizado. O prompt resultante deve ser rico em detalhes visuais e pronto para ser usado por um modelo de texto para imagem como Imagen.`;
     parts.push({ text: systemPrompt });
 
     inspirationImages.forEach(base64Image => {
@@ -364,7 +364,9 @@ export async function generateCarouselScript(topic: string, slideCount: number, 
       1. **Capa (Slide 1):** Título magnético que gera curiosidade ou promete uma solução.
       2. **Introdução (Slide 2):** Apresente o problema ou o tema e prometa o que o leitor vai aprender. Inclua uma chamada para deslizar (ex: "Arrasta pro lado ➡️").
       3. **Conteúdo (Slides 3 a ${slideCount - 1}):** Entregue o valor principal. Divida a informação em dicas, passos ou pontos-chave, um por slide.
-      4. **Conclusão/CTA (Slide ${slideCount}):** Resuma a ideia principal e diga ao leitor o que fazer a seguir (curtir, comentar, salvar, seguir).
+      4. **Conclusão/CTA (ÚLTIMO SLIDE):** A chamada para ação DEVE estar aqui.
+
+    **REGRA OBRIGATÓRIA e INQUEBRÁVEL:** A Chamada Para Ação (CTA), que incentiva a curtir, comentar, salvar, seguir, etc., DEVE ser colocada **exclusivamente no último slide** (slide ${slideCount}). Nenhum outro slide pode conter a CTA principal.
 
     **Diretrizes de Imagem:**
     - Para cada slide, crie um prompt de imagem detalhado e artístico para um gerador de IA.
@@ -386,6 +388,8 @@ export async function generateCarouselScript(topic: string, slideCount: number, 
         **Diretrizes de Conteúdo e Tom:**
         - **Tom de Voz:** Adapte seu texto para corresponder à "vibe" descrita no Guia de Estilo.
         - **Estrutura:** Mantenha a estrutura clássica de carrossel (Capa, Intro, Conteúdo, CTA).
+
+        **REGRA OBRIGATÓRIA e INQUEBRÁVEL:** A Chamada Para Ação (CTA), que incentiva a curtir, comentar, salvar, seguir, etc., DEVE ser colocada **exclusivamente no último slide** (slide ${slideCount}). Nenhum outro slide pode conter a CTA principal.
 
         **Diretrizes de Imagem:**
         - Crie um prompt de imagem para cada slide.
