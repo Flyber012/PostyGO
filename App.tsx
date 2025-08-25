@@ -737,11 +737,16 @@ const App: React.FC = () => {
             const foreground = post.elements.filter(el => el.type !== 'background');
             const currentIndex = foreground.findIndex(el => el.id === elementId);
             if (currentIndex === -1) return post;
-            // 'up' moves to a higher z-index (lower array index), 'down' to a lower z-index (higher array index)
-            const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    
+            // 'up' moves toward the top of the canvas (higher z-index, higher array index).
+            // 'down' moves toward the bottom of the canvas (lower z-index, lower array index).
+            const newIndex = direction === 'up' ? currentIndex + 1 : currentIndex - 1;
+    
             if (newIndex < 0 || newIndex >= foreground.length) return post;
+    
             const [movedElement] = foreground.splice(currentIndex, 1);
             foreground.splice(newIndex, 0, movedElement);
+            
             const newElements = background ? [background, ...foreground] : foreground;
             return { ...post, elements: newElements };
         }));

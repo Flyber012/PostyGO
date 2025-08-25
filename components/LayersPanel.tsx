@@ -88,11 +88,13 @@ const LayersPanel: React.FC<LayersPanelProps> = (props) => {
         else if (e.key === 'Escape') setEditingElementId(null);
     };
 
-    // --- Professional D&D Handlers ---
     const handleDragStart = (e: React.DragEvent, id: string) => {
         e.dataTransfer.setData('application/posty-layer-id', id);
         e.dataTransfer.effectAllowed = 'move';
-        setDraggedId(id);
+        // Use a timeout to allow the browser to render the drag image before updating state
+        setTimeout(() => {
+            setDraggedId(id);
+        }, 0);
     };
 
     const handleDragOver = (e: React.DragEvent, targetId: string) => {
@@ -116,7 +118,7 @@ const LayersPanel: React.FC<LayersPanelProps> = (props) => {
         const sourceId = e.dataTransfer.getData('application/posty-layer-id');
         if (sourceId && dropIndicator) {
             // Because the visual list is reversed from the z-index array,
-            // dropping 'before' an item visually means placing it at a lower z-index,
+            // dropping 'before' an item visually means placing it at a higher z-index,
             // which corresponds to 'after' it in the array's order.
             const finalPosition = dropIndicator.position === 'before' ? 'after' : 'before';
             onReorderElements(sourceId, dropIndicator.targetId, finalPosition);
@@ -124,7 +126,7 @@ const LayersPanel: React.FC<LayersPanelProps> = (props) => {
         setDraggedId(null);
         setDropIndicator(null);
     };
-
+    
     const handleDragEnd = () => {
         setDraggedId(null);
         setDropIndicator(null);
@@ -133,56 +135,9 @@ const LayersPanel: React.FC<LayersPanelProps> = (props) => {
     if (!selectedPost) return <div className="p-4 text-sm text-zinc-500">Selecione um post para ver suas camadas.</div>;
     
     const foregroundElements = selectedPost.elements.filter((e): e is ForegroundElement => e.type !== 'background');
-    const reversedElements = [...foregroundElements].reverse();
-
-    const LayerItem: React.FC<{element: ForegroundElement, index: number, total: number}> = ({ element, index, total }) => {
-        const isDragged = draggedId === element.id;
-        const isDropTargetBefore = dropIndicator?.targetId === element.id && dropIndicator.position === 'before';
-        const isDropTargetAfter = dropIndicator?.targetId === element.id && dropIndicator.position === 'after';
-
-        return (
-            <li
-                draggable={!element.locked && !editingElementId}
-                onDragStart={(e) => handleDragStart(e, element.id)}
-                onDragOver={(e) => handleDragOver(e, element.id)}
-                onClick={() => onSelectElement(element.id)}
-                onDoubleClick={() => handleStartEditing(element)}
-                className={`relative flex items-center p-2 rounded text-sm transition-all duration-150 group 
-                    ${!element.locked ? 'cursor-grab' : 'cursor-default'} 
-                    ${selectedElementId === element.id ? 'animated-gradient-bg text-white' : 'bg-zinc-800/50 hover:bg-zinc-800'} 
-                    ${!element.visible ? 'opacity-50' : ''}
-                    ${isDragged ? 'opacity-40' : ''}
-                `}
-            >
-                {isDropTargetBefore && <div className="absolute top-[-2px] left-0 right-0 h-1 bg-purple-500 rounded-full z-10" />}
-                
-                {editingElementId === element.id ? (
-                    <input
-                        ref={renameInputRef}
-                        type="text"
-                        value={tempName}
-                        onChange={(e) => setTempName(e.target.value)}
-                        onBlur={handleConfirmEdit}
-                        onKeyDown={handleKeyDown}
-                        className="w-full bg-zinc-900 text-white rounded px-1 -mx-1 ring-2 ring-purple-500 outline-none"
-                    />
-                ) : (
-                    <span className="truncate flex-1">{getElementDisplayName(element)}</span>
-                )}
-    
-                <div className={`flex items-center space-x-1 ml-2 transition-opacity ${editingElementId || draggedId ? 'opacity-0' : 'opacity-100 group-hover:opacity-100'}`}>
-                    <button onClick={(e) => { e.stopPropagation(); onMoveElement(element.id, 'down'); }} disabled={index === 0} className="p-1 hover:bg-white/20 rounded disabled:opacity-30 disabled:cursor-not-allowed"><ArrowUp className="w-3 h-3"/></button>
-                    <button onClick={(e) => { e.stopPropagation(); onMoveElement(element.id, 'up'); }} disabled={index === total - 1} className="p-1 hover:bg-white/20 rounded disabled:opacity-30 disabled:cursor-not-allowed"><ArrowDown className="w-3 h-3"/></button>
-                    <button onClick={(e) => { e.stopPropagation(); onDuplicateElement(element.id); }} className="p-1 hover:bg-white/20 rounded"><Copy className="w-3 h-3"/></button>
-                    <button onClick={(e) => { e.stopPropagation(); onToggleVisibility(element.id); }} className="p-1 hover:bg-white/20 rounded">{element.visible ? <Eye className="w-3 h-3"/> : <EyeOff className="w-3 h-3"/>}</button>
-                    <button onClick={(e) => { e.stopPropagation(); onToggleLock(element.id); }} className="p-1 hover:bg-white/20 rounded">{element.locked ? <Lock className="w-3 h-3"/> : <Unlock className="w-3 h-3"/>}</button>
-                    <button onClick={(e) => { e.stopPropagation(); onRemoveElement(element.id); }} className="p-1 hover:bg-red-500/50 rounded"><Trash2 className="w-3 h-3"/></button>
-                </div>
-
-                {isDropTargetAfter && <div className="absolute bottom-[-2px] left-0 right-0 h-1 bg-purple-500 rounded-full z-10" />}
-            </li>
-        );
-    }
+    // Render layers in reverse z-index order (item at index 0 is bottom-most, rendered last in the list)
+    // This is the standard for layer panels (Photoshop, Figma, etc.)
+    const visualElements = [...foregroundElements].reverse();
 
     return (
         <div className="p-4 h-full flex flex-col">
@@ -205,17 +160,67 @@ const LayersPanel: React.FC<LayersPanelProps> = (props) => {
                 className="space-y-1 flex-grow overflow-y-auto layers-scrollbar pr-2"
                 onDrop={handleDrop}
                 onDragEnd={handleDragEnd}
+                onDragOver={(e) => e.preventDefault()} // Allow dropping on the container itself
                 onDragLeave={() => setDropIndicator(null)}
             >
-                 {selectedPost.elements.find(e => e.type === 'background') && (
+                {/* Render layers: Top-most layer (highest z-index) appears at the top of the list */}
+                {visualElements.map((element, visualIndex) => {
+                     const isDragged = draggedId === element.id;
+                     const isDropTargetBefore = dropIndicator?.targetId === element.id && dropIndicator.position === 'before';
+                     const isDropTargetAfter = dropIndicator?.targetId === element.id && dropIndicator.position === 'after';
+
+                    return (
+                        <li
+                            key={element.id}
+                            draggable={!element.locked && !editingElementId}
+                            onDragStart={(e) => handleDragStart(e, element.id)}
+                            onDragOver={(e) => handleDragOver(e, element.id)}
+                            onClick={() => onSelectElement(element.id)}
+                            onDoubleClick={() => handleStartEditing(element)}
+                            className={`relative flex items-center p-2 rounded text-sm transition-all duration-150 group 
+                                ${!element.locked && !editingElementId ? 'cursor-grab' : 'cursor-default'} 
+                                ${selectedElementId === element.id ? 'animated-gradient-bg text-white' : 'bg-zinc-800/50 hover:bg-zinc-800'} 
+                                ${!element.visible ? 'opacity-50' : ''}
+                                ${isDragged ? 'opacity-40' : ''}
+                            `}
+                        >
+                            {isDropTargetBefore && <div className="absolute top-[-2px] left-0 right-0 h-1 bg-purple-500 rounded-full z-10" />}
+                            
+                            {editingElementId === element.id ? (
+                                <input
+                                    ref={renameInputRef}
+                                    type="text"
+                                    value={tempName}
+                                    onChange={(e) => setTempName(e.target.value)}
+                                    onBlur={handleConfirmEdit}
+                                    onKeyDown={handleKeyDown}
+                                    className="w-full bg-zinc-900 text-white rounded px-1 -mx-1 ring-2 ring-purple-500 outline-none"
+                                />
+                            ) : (
+                                <span className="truncate flex-1">{getElementDisplayName(element)}</span>
+                            )}
+                
+                            <div className={`flex items-center space-x-1 ml-2 transition-opacity ${editingElementId || isDragged ? 'opacity-0' : 'opacity-100 group-hover:opacity-100'}`}>
+                                <button onClick={(e) => { e.stopPropagation(); onMoveElement(element.id, 'up'); }} disabled={visualIndex === 0} className="p-1 hover:bg-white/20 rounded disabled:opacity-30 disabled:cursor-not-allowed"><ArrowUp className="w-3 h-3"/></button>
+                                <button onClick={(e) => { e.stopPropagation(); onMoveElement(element.id, 'down'); }} disabled={visualIndex === visualElements.length - 1} className="p-1 hover:bg-white/20 rounded disabled:opacity-30 disabled:cursor-not-allowed"><ArrowDown className="w-3 h-3"/></button>
+                                <button onClick={(e) => { e.stopPropagation(); onDuplicateElement(element.id); }} className="p-1 hover:bg-white/20 rounded"><Copy className="w-3 h-3"/></button>
+                                <button onClick={(e) => { e.stopPropagation(); onToggleVisibility(element.id); }} className="p-1 hover:bg-white/20 rounded">{element.visible ? <Eye className="w-3 h-3"/> : <EyeOff className="w-3 h-3"/>}</button>
+                                <button onClick={(e) => { e.stopPropagation(); onToggleLock(element.id); }} className="p-1 hover:bg-white/20 rounded">{element.locked ? <Lock className="w-3 h-3"/> : <Unlock className="w-3 h-3"/>}</button>
+                                <button onClick={(e) => { e.stopPropagation(); onRemoveElement(element.id); }} className="p-1 hover:bg-red-500/50 rounded"><Trash2 className="w-3 h-3"/></button>
+                            </div>
+
+                            {isDropTargetAfter && <div className="absolute bottom-[-2px] left-0 right-0 h-1 bg-purple-500 rounded-full z-10" />}
+                        </li>
+                    )
+                })}
+
+                {/* Background Layer */}
+                {selectedPost.elements.find(e => e.type === 'background') && (
                     <li onClick={() => onSelectElement(selectedPost.elements.find(e => e.type === 'background')!.id)} className={`flex justify-between items-center p-2 rounded text-sm cursor-pointer ${selectedElementId === selectedPost.elements.find(e => e.type === 'background')!.id ? 'animated-gradient-bg text-white' : 'bg-zinc-800/50 hover:bg-zinc-800'}`}>
                         Fundo
+                        <Lock className="w-3 h-3 text-zinc-400" />
                     </li>
                  )}
-                {/* Render layers in reverse order: bottom-most element on top of the list */}
-                {reversedElements.map((element, index) => (
-                    <LayerItem key={element.id} element={element} index={index} total={foregroundElements.length} />
-                ))}
             </ul>
         </div>
     );
