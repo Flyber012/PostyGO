@@ -1,6 +1,7 @@
 
 
 
+
 import React from 'react';
 import { Post, PostSize, AnyElement, TextElement, ImageElement, GradientElement, BackgroundElement, ShapeElement, QRCodeElement } from '../types';
 import QRCodeDisplay from './QRCodeDisplay';
@@ -47,7 +48,7 @@ const getElementStyles = (element: AnyElement): React.CSSProperties => {
         boxSizing: 'border-box',
         overflow: 'hidden',
         opacity: element.opacity,
-        transform: `rotate(${element.rotation || 0}deg)`,
+        transform: `rotate(${Number(element.rotation) || 0}deg)`,
         mixBlendMode: 'blendMode' in element ? element.blendMode : 'normal',
     };
 

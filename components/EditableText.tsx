@@ -1,6 +1,7 @@
 
 
 
+
 import React, { useRef, useState, useEffect } from 'react';
 import Draggable from 'react-draggable';
 import { AnyElement, TextElement, ImageElement, GradientElement, ShapeElement, QRCodeElement, ForegroundElement } from '../types';
@@ -98,7 +99,7 @@ const EditableText: React.FC<EditableElementProps> = ({ element, onUpdate, isSel
     const containerStyles: React.CSSProperties = {
         width: element.width,
         height: element.height,
-        transform: `rotate(${element.rotation || 0}deg)`,
+        transform: `rotate(${Number(element.rotation) || 0}deg)`,
         opacity: element.opacity,
         boxSizing: 'border-box',
         display: 'flex',

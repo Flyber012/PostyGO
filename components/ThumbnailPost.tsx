@@ -34,7 +34,7 @@ const ThumbnailPost: React.FC<ThumbnailPostProps> = ({ post, postSize }) => {
               top: `${(element.y / postSize.height) * 100}%`,
               width: `${(element.width / postSize.width) * 100}%`,
               height: `${(element.height / postSize.height) * 100}%`,
-              transform: `rotate(${element.rotation || 0}deg)`,
+              transform: `rotate(${Number(element.rotation) || 0}deg)`,
             }}
           />
         ))}

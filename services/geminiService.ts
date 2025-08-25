@@ -2,6 +2,7 @@
 
 
 
+
 import { GoogleGenAI, Type, Part } from "@google/genai";
 import { AIGeneratedTextElement, PaletteExtractionResult, AIGeneratedCarouselScriptSlide, TextElement, BrandKit, PostSize, TextStyle } from '../types';
 
@@ -349,31 +350,41 @@ export async function generateLayoutAndContentForImage(background: string, topic
 export async function generateCarouselScript(topic: string, slideCount: number, contentLevel: 'mínimo' | 'médio' | 'detalhado', styleGuide: string | null, userApiKey?: string): Promise<AIGeneratedCarouselScriptSlide[]> {
     const ai = getAIClient(userApiKey);
     const contentLevelInstructions = {
-        mínimo: 'Seja muito sucinto em cada slide. Use frases curtas e palavras de impacto. Ideal para mensagens rápidas.',
-        médio: 'Forneça uma quantidade equilibrada de informação em cada slide. Um título e uma breve explicação ou 1-2 pontos principais.',
-        detalhado: 'Elabore mais em cada slide de conteúdo. Use parágrafos curtos, listas de pontos mais completas. Entregue o máximo de valor possível em cada slide.'
+        mínimo: 'Seja muito sucinto. Frases curtas, palavras de impacto. Ideal para mensagens rápidas.',
+        médio: 'Equilibre informação e brevidade. Um título e uma breve explicação ou 1-2 pontos principais por slide.',
+        detalhado: 'Elabore mais. Use parágrafos curtos ou listas mais completas. Entregue o máximo de valor em cada slide.'
     };
 
-    let prompt = `Você é um criador de conteúdo viral e copywriter especialista em mídias sociais, com um tom humano, envolvente e levemente informal. Sua missão é criar o roteiro para um carrossel do Instagram de ${slideCount} slides sobre o tópico "${topic}".
+    let prompt = `Você é um copywriter de elite e estrategista de conteúdo para mídias sociais, mestre em criar carrosséis virais. Sua missão é criar o roteiro COMPLETO para um carrossel do Instagram de ${slideCount} slides sobre o tópico "${topic}".
 
     **Nível de Detalhe do Conteúdo: ${contentLevel.toUpperCase()}**
     - ${contentLevelInstructions[contentLevel]}
 
-    **Diretrizes de Conteúdo e Tom:**
-    - **Narrativa Coesa:** Crie uma história que flua logicamente. Cada slide de conteúdo deve construir sobre o anterior e criar antecipação para o próximo, incentivando o usuário a continuar deslizando.
-    - **Tom Humano:** Escreva como se estivesse conversando com um amigo. Use perguntas, emojis relevantes e frases curtas e impactantes. Evite um tom robótico.
-    - **Estrutura Clássica de Carrossel:**
-      1. **Capa (Slide 1):** Título magnético que gera curiosidade ou promete uma solução.
-      2. **Introdução (Slide 2):** Apresente o problema ou o tema e prometa o que o leitor vai aprender. Inclua uma chamada para deslizar (ex: "Arrasta pro lado ➡️").
-      3. **Conteúdo (Slides 3 a ${slideCount - 1}):** Entregue o valor principal. Divida a informação em dicas, passos ou pontos-chave, um por slide.
-      4. **Conclusão/CTA (ÚLTIMO SLIDE):** A chamada para ação DEVE estar aqui. Resuma o ponto principal e incentive o engajamento.
+    **ESTRUTURA NARRATIVA OBRIGATÓRIA (SEGUIR À RISCA):**
 
-    **REGRA OBRIGATÓRIA e INQUEBRÁVEL:** A Chamada Para Ação (CTA), que incentiva a curtir, comentar, salvar, seguir, etc., DEVE ser colocada **exclusivamente no último slide** (slide ${slideCount}). Nenhum outro slide pode conter a CTA principal.
+    *   **Slide 1: A Capa de Impacto**
+        *   **Conteúdo:** Crie um título principal (um "gancho") que seja extremamente curioso, prometa um grande benefício ou apresente um problema chocante. Adicione um subtítulo curto de apoio. O objetivo é PARAR a rolagem.
+        *   **Exemplo:** Título: "Você está cometendo estes 5 erros de produtividade?". Subtítulo: "O #3 vai te surpreender."
+
+    *   **Slide 2: A Ponte (Opcional, se > 3 slides)**
+        *   **Conteúdo:** Se houver mais de 3 slides, use este para contextualizar o problema ou a promessa da capa. Crie uma conexão e termine com uma chamada CLARA para a ação de deslizar. Ex: "Descubra como virar o jogo... ➡️"
+
+    *   **Slides de Conteúdo (do 2 ou 3 até o penúltimo):**
+        *   **Conteúdo:** Entregue o valor prometido. Divida a informação em dicas, passos ou pontos-chave. **UM PONTO PRINCIPAL POR SLIDE.** Mantenha o texto conciso e fácil de ler. Use **negrito** para destacar termos importantes. Termine o texto de cada slide com uma frase que crie uma ponte para o próximo, como "Mas isso não é tudo...", "A seguir, o mais importante...", etc.
+
+    *   **ÚLTIMO Slide: A Chamada Para Ação (CTA)**
+        *   **Conteúdo:** Faça um resumo de uma frase da solução ou do benefício principal. Em seguida, adicione uma CTA clara e direta para engajamento.
+        *   **Exemplo de CTA:** "Gostou? Salve este post para não esquecer e comente qual dica você vai usar hoje! 👇"
+
+    **REGRAS INQUEBRÁVEIS:**
+    1.  **A ESTRUTURA ACIMA É LEI:** Você DEVE seguir a sequência e o propósito de cada tipo de slide.
+    2.  **CTA APENAS NO FINAL:** A chamada para ação principal (curtir, comentar, salvar) é PERMITIDA **EXCLUSIVAMENTE** no último slide.
+    3.  **CONECTIVIDADE:** O texto deve fluir de um slide para o outro, criando uma narrativa que prenda o leitor.
 
     **Diretrizes de Imagem:**
-    - Para cada slide, crie um prompt de imagem detalhado e artístico para um gerador de IA.
-    - **COESÃO VISUAL É CRÍTICA:** Todos os prompts de imagem devem compartilhar um estilo consistente. A paleta de cores deve ser harmoniosa.
-    - **Prompt de Imagem Final (CTA):** Para o último slide, crie um prompt para uma imagem mais simples e minimalista que tenha bastante espaço negativo, ideal para exibir um logotipo da empresa e o texto da CTA. Ex: "fundo minimalista com gradiente suave em tons pastel, com espaço livre na parte inferior".
+    - Para cada slide, crie um prompt de imagem detalhado e artístico.
+    - **COESÃO VISUAL:** Todos os prompts de imagem devem compartilhar um estilo e paleta de cores consistentes.
+    - **PROMPT PARA O SLIDE FINAL (CTA):** OBRIGATORIAMENTE, crie um prompt para uma imagem de fundo mais simples, minimalista e com bastante espaço negativo (ex: "fundo de gradiente suave em tons pastel, com uma textura sutil, muito espaço livre na parte inferior"). Isso é crucial para que o usuário possa adicionar seu logotipo.
 
     Retorne um array JSON de objetos, onde cada objeto representa um slide e contém 'slideContent' e 'imagePrompt'.`;
 
@@ -383,22 +394,20 @@ export async function generateCarouselScript(topic: string, slideCount: number, 
         **GUIA DE ESTILO:**
         ${styleGuide}
         ---
-        Você é um criador de conteúdo que deve internalizar o Guia de Estilo acima. Sua missão é criar um roteiro para um carrossel do Instagram de ${slideCount} slides sobre o tópico "${topic}" que pareça ter sido criado pela mesma marca.
+        Você é um criador de conteúdo de marca que deve seguir o guia de estilo acima. Sua missão é criar um roteiro para um carrossel do Instagram de ${slideCount} slides sobre o tópico "${topic}" que seja perfeitamente alinhado à marca.
+        
+        **A ESTRUTURA NARRATIVA ABAIXO É OBRIGATÓRIA:**
+        
+        *   **Slide 1: A Capa de Impacto:** Crie um título "gancho" alinhado com o tom da marca.
+        *   **Slides de Conteúdo (até o penúltimo):** Entregue o valor principal. Cada slide deve ser um passo lógico na narrativa e terminar incentivando o deslize.
+        *   **ÚLTIMO Slide: A Chamada Para Ação (CTA):** Resuma a mensagem e adicione uma CTA que corresponda à voz da marca.
 
-        **Nível de Detalhe do Conteúdo: ${contentLevel.toUpperCase()}**
-        - ${contentLevelInstructions[contentLevel]}
-
-        **Diretrizes de Conteúdo e Tom:**
-        - **Tom de Voz:** Adapte seu texto para corresponder à "vibe" do Guia de Estilo.
-        - **Narrativa Coesa:** Crie uma jornada para o leitor, onde cada slide o incentiva a deslizar para o próximo.
-        - **Estrutura:** Mantenha a estrutura clássica de carrossel (Capa, Intro, Conteúdo, CTA).
-
-        **REGRA OBRIGATÓRIA e INQUEBRÁVEL:** A Chamada Para Ação (CTA) DEVE ser colocada **exclusivamente no último slide** (slide ${slideCount}).
-
-        **Diretrizes de Imagem:**
-        - Crie um prompt de imagem para cada slide.
-        - **COESÃO VISUAL INQUEBRÁVEL:** Todos os prompts de imagem DEVEM seguir rigorosamente as diretrizes do Guia de Estilo.
-        - **Prompt de Imagem Final (CTA):** Para o último slide, crie um prompt para uma imagem limpa e alinhada à marca que deixe espaço vago para um logotipo e texto de CTA.`;
+        **REGRAS INQUEBRÁVEIS:**
+        1.  **A ESTRUTURA ACIMA É LEI.**
+        2.  **CTA APENAS NO FINAL.**
+        3.  **PROMPT DE IMAGEM PARA O SLIDE FINAL (CTA):** OBRIGATORIAMENTE, crie um prompt para uma imagem de fundo limpa, alinhada à marca, e com muito espaço negativo para um logotipo.
+        
+        O tom, o conteúdo e os prompts de imagem devem seguir o Guia de Estilo.`;
     }
 
     const response = await ai.models.generateContent({
@@ -414,11 +423,11 @@ export async function generateCarouselScript(topic: string, slideCount: number, 
                     properties: {
                         slideContent: {
                             type: Type.STRING,
-                            description: "O conteúdo de texto completo para este slide, escrito de forma envolvente e humana."
+                            description: "O conteúdo de texto completo para este slide, seguindo a estrutura narrativa e o tom definidos."
                         },
                         imagePrompt: {
                             type: Type.STRING,
-                            description: "Um prompt de imagem detalhado e artisticamente consistente para este slide."
+                            description: "Um prompt de imagem detalhado e artisticamente consistente para este slide, alinhado ao estilo geral."
                         }
                     },
                     required: ["slideContent", "imagePrompt"]
