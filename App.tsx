@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import { Toaster, toast } from 'react-hot-toast';
@@ -84,7 +85,7 @@ const convertAILayoutToElements = (aiLayout: AIGeneratedTextElement[], postSize:
             color: aiEl.color || (aiEl.backgroundTone === 'dark' ? '#FFFFFF' : '#0F172A'),
             textAlign: aiEl.textAlign,
             verticalAlign: 'middle',
-            rotation: aiEl.rotation || 0,
+            rotation: 0,
             opacity: 1, locked: false, visible: true, letterSpacing: 0,
             lineHeight: aiEl.lineHeight || 1.3,
             backgroundColor: aiEl.backgroundColor,

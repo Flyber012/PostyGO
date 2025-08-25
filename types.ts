@@ -174,7 +174,6 @@ export interface AIGeneratedTextElement {
     fontSize: 'large' | 'medium' | 'small' | 'cta';
     textAlign: 'left' | 'center' | 'right';
     lineHeight?: number; // e.g. 1.4
-    rotation?: number; // degrees
     backgroundTone: 'light' | 'dark'; // AI's analysis of the background behind this text
     highlightColor?: string; // e.g., "#FF6B6B" for markdown text
     accentFontFamily?: string; // e.g., "Caveat" for markdown text

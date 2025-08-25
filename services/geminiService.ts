@@ -323,7 +323,6 @@ export async function generateLayoutAndContentForImage(background: string, topic
                         color: { type: Type.STRING, description: "A cor do texto em hexadecimal, OBRIGATORIAMENTE uma da paleta permitida." },
                         textAlign: { type: Type.STRING, enum: ['left', 'center', 'right'], description: "Alinhamento do texto." },
                         lineHeight: { type: Type.NUMBER, description: "Altura de linha sugerida para o texto (OBRIGATORIAMENTE 1)." },
-                        rotation: { type: Type.NUMBER, description: "Um leve ângulo de rotação em graus (ex: -2.5) para dinamismo." },
                         backgroundTone: { type: Type.STRING, enum: ['light', 'dark'], description: "O tom da área da imagem atrás do texto." },
                         highlightColor: { type: Type.STRING, description: "Uma cor de destaque vibrante em hexadecimal (ex: '#FF6B6B') da paleta para palavras em markdown." },
                         accentFontFamily: { type: Type.STRING, description: "Uma fonte de exibição/script para palavras em markdown para contraste tipográfico (ex: 'Caveat')." },
@@ -468,7 +467,6 @@ export async function generateLayoutForProvidedText(base64Image: string, textCon
     6.  **DESIGN INTELIGENTE:**
         -   Use markdown (\`**destaque**\`) no texto para enfatizar palavras-chave.
         -   Se houver uma chamada para ação (CTA), atribua o \`fontSize\` 'cta' e sugira uma \`backgroundColor\` sólida e contrastante. Para CTAs, a altura (\`height\`) DEVE ser justa ao conteúdo.
-        -   Adicione uma leve \`rotation\` (-3 a 3 graus) a um ou dois elementos para um toque dinâmico, mas mantenha o texto principal reto (0 graus) para facilitar a leitura.
         -   OBRIGATORIAMENTE use um \`lineHeight\` de \`1\`.`;
 
     if (brandKit) {
@@ -513,7 +511,6 @@ export async function generateLayoutForProvidedText(base64Image: string, textCon
                         color: { type: Type.STRING, description: "A cor do texto em hexadecimal, OBRIGATORIAMENTE uma da paleta permitida." },
                         textAlign: { type: Type.STRING, enum: ['left', 'center', 'right'], description: "Alinhamento do texto." },
                         lineHeight: { type: Type.NUMBER, description: "Altura de linha sugerida para o texto (OBRIGATORIAMENTE 1)." },
-                        rotation: { type: Type.NUMBER, description: "Um leve ângulo de rotação em graus (ex: -2.5) para dinamismo." },
                         backgroundTone: { type: Type.STRING, enum: ['light', 'dark'], description: "O tom da área da imagem atrás do texto." },
                         highlightColor: { type: Type.STRING, description: "Uma cor de destaque vibrante em hexadecimal (ex: '#FF6B6B') da paleta para palavras em markdown." },
                         accentFontFamily: { type: Type.STRING, description: "Uma fonte de exibição/script para palavras em markdown para contraste tipográfico (ex: 'Caveat')." },
