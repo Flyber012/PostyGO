@@ -846,10 +846,10 @@ const App: React.FC = () => {
     
         if (isEditingText && activeEditorRef.current) {
             document.execCommand(style);
-            // The change is now in the DOM. The onBlur event in EditableText
-            // will handle persisting the final HTML state when editing is finished.
+            // DO NOT call handleSelectionUpdate() here. It causes a re-render
+            // which makes the contentEditable lose its selection. The toolbar
+            // will update on the next mouse/selection event inside the editor.
             activeEditorRef.current.node.focus(); // Keep focus in the editor
-            handleSelectionUpdate(); // Update toolbar UI to reflect selection
         } else {
             // Fallback to styling the entire element if not in rich text edit mode
             const propMap = { bold: 'fontWeight', italic: 'fontStyle', underline: 'textDecoration' };
@@ -875,9 +875,9 @@ const App: React.FC = () => {
             const command = commandMap[prop];
             if (command) {
                 document.execCommand(command, false, value);
-                // The change is now in the DOM. The onBlur event will persist it.
+                 // DO NOT call handleSelectionUpdate() here. It causes a re-render
+                // which makes the contentEditable lose its selection.
                 activeEditorRef.current.node.focus(); // Keep focus
-                handleSelectionUpdate(); // Update toolbar UI
             } else {
                  // For properties without a direct execCommand (like letterSpacing), apply to whole element
                  updatePostElement(selectedElement.id, { [prop]: value });

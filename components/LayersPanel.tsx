@@ -35,8 +35,6 @@ const getElementDisplayName = (element: ForegroundElement): string => {
         case 'qrcode':
             return 'QR Code';
         default: {
-            // This ensures exhaustiveness. If a new type is added to ForegroundElement,
-            // TypeScript will error here, as the new type cannot be assigned to `never`.
             const _: never = element;
             return 'Elemento Desconhecido';
         }
@@ -52,9 +50,9 @@ const LayersPanel: React.FC<LayersPanelProps> = (props) => {
     const [isAddMenuOpen, setAddMenuOpen] = useState(false);
     const [editingElementId, setEditingElementId] = useState<string | null>(null);
     const [tempName, setTempName] = useState('');
-    const dragItem = useRef<string | null>(null);
-    const dragOverItem = useRef<string | null>(null);
     const renameInputRef = useRef<HTMLInputElement>(null);
+    const dragItem = useRef<string | null>(null);
+    const [draggingId, setDraggingId] = useState<string | null>(null);
     
     useEffect(() => {
         if (editingElementId && renameInputRef.current) {
@@ -86,6 +84,33 @@ const LayersPanel: React.FC<LayersPanelProps> = (props) => {
         else if (e.key === 'Escape') setEditingElementId(null);
     };
 
+    // --- D&D Handlers ---
+    const handleDragStart = (e: React.DragEvent, id: string) => {
+        dragItem.current = id;
+        setDraggingId(id);
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', id); // For Firefox compatibility
+    };
+    
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault(); // Necessary to allow dropping
+    };
+    
+    const handleDrop = (e: React.DragEvent, dropOnId: string) => {
+        e.preventDefault();
+        const draggedId = dragItem.current;
+        if (draggedId && draggedId !== dropOnId) {
+            onReorderElements(draggedId, dropOnId);
+        }
+        dragItem.current = null;
+        setDraggingId(null);
+    };
+
+    const handleDragEnd = () => {
+        dragItem.current = null;
+        setDraggingId(null);
+    };
+
     if (!selectedPost) return <div className="p-4 text-sm text-zinc-500">Selecione um post para ver suas camadas.</div>;
     
     const foregroundElements = selectedPost.elements.filter((e): e is ForegroundElement => e.type !== 'background');
@@ -93,18 +118,18 @@ const LayersPanel: React.FC<LayersPanelProps> = (props) => {
     const LayerItem: React.FC<{element: ForegroundElement, index: number, total: number}> = ({ element, index, total }) => (
         <li
             draggable={!element.locked && !editingElementId}
-            onDragStart={() => dragItem.current = element.id}
-            onDragEnter={() => dragOverItem.current = element.id}
-            onDragEnd={() => {
-                if(dragItem.current && dragOverItem.current && dragItem.current !== dragOverItem.current) {
-                    onReorderElements(dragItem.current, dragOverItem.current);
-                }
-                dragItem.current = null; dragOverItem.current = null;
-            }}
-            onDragOver={(e) => e.preventDefault()}
+            onDragStart={(e) => handleDragStart(e, element.id)}
+            onDragOver={handleDragOver}
+            onDrop={(e) => handleDrop(e, element.id)}
+            onDragEnd={handleDragEnd}
             onClick={() => onSelectElement(element.id)}
             onDoubleClick={() => handleStartEditing(element)}
-            className={`flex items-center p-2 rounded text-sm transition-all duration-200 group ${!element.locked ? 'cursor-pointer' : 'cursor-default'} ${selectedElementId === element.id ? 'animated-gradient-bg text-white' : 'bg-zinc-800/50 hover:bg-zinc-800'} ${!element.visible ? 'opacity-50' : ''}`}
+            className={`flex items-center p-2 rounded text-sm transition-all duration-200 group 
+                ${!element.locked ? 'cursor-grab' : 'cursor-default'} 
+                ${selectedElementId === element.id ? 'animated-gradient-bg text-white' : 'bg-zinc-800/50 hover:bg-zinc-800'} 
+                ${!element.visible ? 'opacity-50' : ''}
+                ${draggingId === element.id ? 'opacity-30' : 'opacity-100'}
+            `}
         >
             {editingElementId === element.id ? (
                 <input
@@ -120,7 +145,7 @@ const LayersPanel: React.FC<LayersPanelProps> = (props) => {
                 <span className="truncate flex-1">{getElementDisplayName(element)}</span>
             )}
 
-            <div className={`flex items-center space-x-1 ml-2 transition-opacity ${editingElementId ? 'opacity-0' : 'opacity-100 group-hover:opacity-100'}`}>
+            <div className={`flex items-center space-x-1 ml-2 transition-opacity ${editingElementId || draggingId ? 'opacity-0' : 'opacity-100 group-hover:opacity-100'}`}>
                 {/* Move Up List (decrease index) -> 'down' in z-index */}
                 <button onClick={(e) => { e.stopPropagation(); onMoveElement(element.id, 'down'); }} disabled={index === 0} className="p-1 hover:bg-white/20 rounded disabled:opacity-30 disabled:cursor-not-allowed"><ArrowUp className="w-3 h-3"/></button>
                 {/* Move Down List (increase index) -> 'up' in z-index */}
