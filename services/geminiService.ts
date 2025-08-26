@@ -1,8 +1,3 @@
-
-
-
-
-
 import { GoogleGenAI, Type, Part } from "@google/genai";
 import { AIGeneratedTextElement, PaletteExtractionResult, AIGeneratedCarouselScriptSlide, TextElement, BrandKit, PostSize, TextStyle } from '../types';
 
@@ -259,7 +254,7 @@ export async function generateLayoutAndContentForImage(background: string, topic
     - ${textStyleInstructions[textStyle]}
 
     **REGRAS INQUEBRÁVEIS de Design e Composição:**
-    1.  **Conteúdo Criativo:** Primeiro, crie o texto. Seja envolvente, use markdown (\`**destaque**\`) para ênfase e emojis relevantes. Use 'Poppins' como a fontFamily padrão.
+    1.  **Conteúdo Criativo:** Primeiro, crie o texto. Seja envolvente, use markdown (\`**destaque**\`) para ênfase e emojis relevantes. Para a \`fontFamily\`, escolha uma fonte moderna e limpa da seguinte lista, que melhor se adapte à "vibe" da imagem: 'Poppins', 'Inter', 'Sora', 'Plus Jakarta Sans', 'Outfit', 'Lexend', 'Manrope'.
     2.  **ANÁLISE VISUAL CRÍTICA:** Analise o fundo para identificar "zonas seguras" com espaço negativo (céu, paredes, áreas desfocadas). É PROIBIDO posicionar texto sobre rostos, produtos ou o ponto focal principal. A legibilidade e o respeito pela imagem são fundamentais.
     3.  **HIERARQUIA E POSICIONAMENTO:** Decomponha o texto em elementos lógicos (título, corpo, etc.) e distribua-os harmonicamente. O título (use fontSize: 'large') deve ser o mais proeminente. A descrição (use fontSize: 'medium') deve ser secundária. Texto de rodapé (use fontSize: 'small') deve ser discreto.
     4.  **MARGENS DE SEGURANÇA:** Todos os elementos de texto DEVEM estar contidos dentro de uma área segura. As coordenadas 'x' e 'y' mais a 'width'/'height' não devem exceder 95% e devem ser maiores que 5%. Exemplo: um elemento em x=90 só pode ter uma largura máxima de 5. Isso evita que o texto seja cortado nas bordas.
@@ -460,7 +455,7 @@ export async function generateLayoutForProvidedText(base64Image: string, textCon
 
     **Seu Processo Criativo (Regras Inquebráveis):**
     1.  **ANÁLISE VISUAL PRIMEIRO:** Sua tarefa mais CRÍTICA é analisar a imagem. Identifique as "zonas seguras" com espaço negativo (céu, paredes, áreas desfocadas, etc.). Encontre os melhores locais para o texto que não competem com os elementos principais da imagem.
-    2.  **HIERARQUIA É TUDO:** Decomponha o \`textContent\` em elementos lógicos (ex: título, subtítulo, corpo do texto, chamada para ação). Use \`fontSize\` ('large', 'medium', 'small', 'cta') para criar uma hierarquia visual clara. O elemento mais importante deve se destacar.
+    2.  **HIERARQUIA E TIPOGRAFIA:** Decomponha o \`textContent\` em elementos lógicos (ex: título, subtítulo, corpo do texto, chamada para ação). Use \`fontSize\` ('large', 'medium', 'small', 'cta') para criar uma hierarquia visual clara. O elemento mais importante deve se destacar. Para a \`fontFamily\`, escolha uma fonte moderna e limpa da seguinte lista, que melhor se adapte à "vibe" da imagem: 'Poppins', 'Inter', 'Sora', 'Plus Jakarta Sans', 'Outfit', 'Lexend', 'Manrope'.
     3.  **NUNCA OBSTRUA O ESSENCIAL:** É PROIBIDO posicionar texto sobre rostos, produtos, ou o ponto focal principal da imagem. A legibilidade e o respeito pela imagem são fundamentais.
     4.  **MARGENS DE SEGURANÇA:** Todos os elementos de texto DEVEM estar contidos dentro de uma área segura entre 5% e 95% da tela para evitar cortes.
     5.  **CONTRASTE É REI:** Analise o tom da imagem (\`backgroundTone\`) *exatamente* onde você vai colocar cada bloco de texto. Use branco ('#FFFFFF') para fundos escuros e um cinza muito escuro/preto ('#0F172A') para fundos claros.
