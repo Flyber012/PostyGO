@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@google/genai": "^1.15.0",
+    "openai": "^4.40.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "lucide-react": "^0.541.0",
@@ -20,7 +20,8 @@
     "html-to-image": "^1.11.11",
     "jszip": "^3.10.1",
     "qrcode": "^1.5.3",
-    "crypto": "^1.0.1"
+    "crypto": "^1.0.1",
+    "@google/genai": "^1.16.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

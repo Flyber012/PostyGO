@@ -1,12 +1,15 @@
 
 
 
+
+
+
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import { Toaster, toast } from 'react-hot-toast';
 import { Post, BrandKit, PostSize, AnyElement, TextElement, ImageElement, BackgroundElement, FontDefinition, LayoutTemplate, BrandAsset, TextStyle, Project, AIGeneratedTextElement, ShapeElement, QRCodeElement } from './types';
 import { POST_SIZES, GOOGLE_FONTS } from './constants';
-import * as geminiService from './services/geminiService';
+import * as openaiService from './services/geminiService';
 import * as freepikService from './services/freepikService';
 import CreationPanel from './components/ControlPanel';
 import CanvasEditor from './components/CanvasEditor';
@@ -384,6 +387,7 @@ const App: React.FC = () => {
     const [generationType, setGenerationType] = useState<'post' | 'carousel'>('post');
     const [textStyle, setTextStyle] = useState<TextStyle>('padrão');
     const [backgroundSource, setBackgroundSource] = useState<'upload' | 'ai' | 'solid'>('upload');
+    // FIX: Changed aiProvider state to use 'gemini' instead of 'openai' to match the expected types and reflect the use of Gemini API.
     const [aiProvider, setAiProvider] = useState<'gemini' | 'freepik'>('gemini');
     const [aiPostCount, setAiPostCount] = useState(4);
     const [customBackgrounds, setCustomBackgrounds] = useState<string[]>([]);
@@ -624,7 +628,7 @@ const App: React.FC = () => {
         }
         const toastId = toast.loading('Analisando seu estilo...');
         try {
-            const analysis = await geminiService.analyzeStyleFromImages(styleInspirationImages);
+            const analysis = await openaiService.analyzeStyleFromImages(styleInspirationImages);
             setStyleGuide(analysis);
             setUseStyleGuide(true);
             toast.success('Guia de Estilo criado com sucesso!', { id: toastId });
@@ -664,7 +668,7 @@ const App: React.FC = () => {
                 });
                 for (let i = 0; i < backgroundSources.length; i++) {
                     setLoadingMessage(`Gerando texto para o post ${i + 1}/${backgroundSources.length}...`);
-                    const newContentMap = await geminiService.generateTextForLayout(textElementsToFill, genTopic, genContentLevel, activeStyleGuide, undefined, genTextStyle);
+                    const newContentMap = await openaiService.generateTextForLayout(textElementsToFill, genTopic, genContentLevel, activeStyleGuide, genTextStyle);
                     const newPostId = uuidv4();
                     const backgroundElement: BackgroundElement = { id: `${newPostId}-background`, type: 'background', src: backgroundSources[i].src };
                     const newElements: AnyElement[] = JSON.parse(JSON.stringify(layout.elements.filter(el => el.type !== 'background'))).map((el: AnyElement) => {
@@ -681,11 +685,12 @@ const App: React.FC = () => {
                 let backgroundSources: { src?: string; backgroundColor?: string; prompt?: string; provider?: 'gemini' | 'freepik' }[] = [];
                  if (genBackgroundSource === 'ai') {
                     setLoadingMessage('Gerando prompts de imagem...'); toast.loading('Gerando prompts de imagem...', { id: toastId });
-                    const imagePrompts = await geminiService.generateImagePrompts(genTopic, count, activeStyleGuide, generationInspirationImages);
+                    const imagePrompts = await openaiService.generateImagePrompts(genTopic, count, activeStyleGuide, generationInspirationImages);
                     setLoadingMessage(`Gerando ${imagePrompts.length} imagens...`); toast.loading(`Gerando ${imagePrompts.length} imagens...`, { id: toastId });
-                    const imageGenerator = genAiProvider === 'freepik' ? freepikService.generateBackgroundImages : geminiService.generateBackgroundImages;
+                    const imageGenerator = genAiProvider === 'freepik' ? freepikService.generateBackgroundImages : openaiService.generateBackgroundImages;
                     const generatedImages = await imageGenerator(imagePrompts, postSize);
-                    backgroundSources = generatedImages.map((src, i) => ({ src: `data:image/png;base64,${src}`, prompt: imagePrompts[i], provider: genAiProvider }));
+                    const imageMimeType = genAiProvider === 'gemini' ? 'jpeg' : 'png';
+                    backgroundSources = generatedImages.map((src, i) => ({ src: `data:image/${imageMimeType};base64,${src}`, prompt: imagePrompts[i], provider: genAiProvider }));
                 } else if (genBackgroundSource === 'upload') {
                     if (customBackgrounds.length === 0) throw new Error("Nenhuma imagem de fundo foi enviada.");
                     backgroundSources = customBackgrounds.map(src => ({ src }));
@@ -694,7 +699,7 @@ const App: React.FC = () => {
                 }
 
                 setLoadingMessage('Criando layouts inteligentes...'); toast.loading('Criando layouts inteligentes...', { id: toastId });
-                const layoutPromises = backgroundSources.map(bg => geminiService.generateLayoutAndContentForImage(bg.src || bg.backgroundColor!, genTopic, genContentLevel, activeKit, undefined, genTextStyle));
+                const layoutPromises = backgroundSources.map(bg => openaiService.generateLayoutAndContentForImage(bg.src || bg.backgroundColor!, genTopic, genContentLevel, activeKit, genTextStyle));
                 const allLayouts = await Promise.all(layoutPromises);
                 const newPosts: Post[] = [];
                 const carouselId = genType === 'carousel' ? uuidv4() : undefined;
@@ -1268,7 +1273,7 @@ const App: React.FC = () => {
         setIsLoading(true);
         const toastId = toast.loading('Gerando novo fundo com IA...');
         try {
-            const newSrc = await geminiService.generateSingleBackgroundImage(prompt, postSize, undefined, inspirationImages);
+            const newSrc = await openaiService.generateSingleBackgroundImage(prompt, postSize, inspirationImages);
             updatePostElement(bgElement.id, { src: newSrc, backgroundColor: undefined });
             toast.success('Fundo regenerado com sucesso!', { id: toastId });
         } catch(error) {

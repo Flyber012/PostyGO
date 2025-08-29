@@ -1,59 +1,37 @@
-import { GoogleGenAI, Type, Part } from "@google/genai";
+import { GoogleGenAI, GenerateContentResponse, Part, Type } from "@google/genai";
 import { AIGeneratedTextElement, PaletteExtractionResult, AIGeneratedCarouselScriptSlide, TextElement, BrandKit, PostSize, TextStyle } from '../types';
 
-// Conforme solicitado, esta chave será usada como padrão.
-// A geração de imagens pode falhar se não estiver vinculada a uma conta com faturamento.
-const DEFAULT_API_KEY = "AIzaSyCfPECJaa9lVtmn-fXUDPTGncJYAkvkrYQ";
-
-const getAIClient = (userApiKey?: string) => {
-    const apiKey = userApiKey || DEFAULT_API_KEY;
-    if (!apiKey) {
-        throw new Error("Chave de API do Google Gemini não encontrada. Por favor, adicione sua chave em 'Gerenciar Contas' para usar esta funcionalidade.");
+// The API key must be obtained exclusively from the environment variable `process.env.API_KEY`.
+// Assume this variable is pre-configured, valid, and accessible.
+const getAIClient = () => {
+    if (!process.env.API_KEY) {
+        throw new Error("Chave de API do Google GenAI não encontrada. Por favor, configure a variável de ambiente API_KEY.");
     }
-    return new GoogleGenAI({ apiKey });
+    return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
 
-export async function verifyApiKey(apiKey: string): Promise<boolean> {
-    if (!apiKey) return false;
-    const ai = new GoogleGenAI({ apiKey });
-    try {
-        await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: 'hi',
-            config: {
-                maxOutputTokens: 1, 
-                thinkingConfig: { thinkingBudget: 0 }
-            }
-        });
-        return true;
-    } catch (error) {
-        console.error("Gemini API key verification failed:", error);
-        return false;
-    }
-}
-
-const getAspectRatio = (postSize: PostSize): '1:1' | '4:3' | '3:4' | '16:9' | '9:16' => {
+const getGeminiAspectRatio = (postSize: PostSize): "1:1" | "3:4" | "4:3" | "9:16" | "16:9" => {
     const ratio = postSize.width / postSize.height;
-    if (ratio === 1) return '1:1';
-    if (ratio > 1.7) return '16:9'; 
-    if (ratio > 1.3) return '4:3';
-    if (ratio < 0.6) return '9:16';
-    if (ratio < 0.85) return '3:4';
+    if (Math.abs(ratio - 1) < 0.01) return '1:1';
+    if (Math.abs(ratio - (4/5)) < 0.05) return '3:4';
+    if (Math.abs(ratio - (9/16)) < 0.01) return '9:16';
+    if (Math.abs(ratio - (5/4)) < 0.05) return '4:3';
+    if (Math.abs(ratio - (16/9)) < 0.01) return '16:9';
     return '1:1';
-}
+};
 
-export async function generateBackgroundImages(prompts: string[], postSize: PostSize, userApiKey?: string): Promise<string[]> {
-    const ai = getAIClient(userApiKey);
-    const aspectRatio = getAspectRatio(postSize);
+export async function generateBackgroundImages(prompts: string[], postSize: PostSize): Promise<string[]> {
+    const ai = getAIClient();
+    const aspectRatio = getGeminiAspectRatio(postSize);
 
     const imagePromises = prompts.map(prompt => {
         return ai.models.generateImages({
-            model: 'imagen-3.0-generate-002',
+            model: 'imagen-4.0-generate-001',
             prompt: prompt,
             config: {
                 numberOfImages: 1,
-                outputMimeType: 'image/png',
                 aspectRatio: aspectRatio,
+                outputMimeType: 'image/jpeg',
             },
         });
     });
@@ -61,7 +39,7 @@ export async function generateBackgroundImages(prompts: string[], postSize: Post
     const responses = await Promise.all(imagePromises);
 
     const base64Images = responses.map(response => {
-        if (response.generatedImages && response.generatedImages.length > 0) {
+        if (response.generatedImages && response.generatedImages.length > 0 && response.generatedImages[0].image.imageBytes) {
             return response.generatedImages[0].image.imageBytes;
         }
         throw new Error('Falha ao gerar imagem com a API Gemini.');
@@ -70,58 +48,60 @@ export async function generateBackgroundImages(prompts: string[], postSize: Post
     return base64Images;
 }
 
-async function generateEnhancedImagePrompt(basePrompt: string, inspirationImages: string[], userApiKey?: string): Promise<string> {
-    const ai = getAIClient(userApiKey);
-    const parts: Part[] = [];
+async function generateEnhancedImagePrompt(basePrompt: string, inspirationImages: string[]): Promise<string> {
+    const ai = getAIClient();
 
-    const systemPrompt = `Você é um diretor de arte especialista em engenharia de prompt para IA generativa de imagens. Sua tarefa é analisar as imagens de inspiração fornecidas para entender seu estilo, cor, composição e "vibe" geral. Em seguida, você deve criar um prompt novo, detalhado e artístico para o tópico "${basePrompt}", incorporando o estilo analizado. O prompt resultante deve ser rico em detalhes visuais e pronto para ser usado por um modelo de texto para imagem como Imagen.`;
-    parts.push({ text: systemPrompt });
-
-    inspirationImages.forEach(base64Image => {
+    const textPart = {
+        text: `Você é um diretor de arte especialista em engenharia de prompt para IA generativa de imagens. Sua tarefa é analisar as imagens de inspiração fornecidas para entender seu estilo, cor, composição e "vibe" geral. Em seguida, você deve criar um prompt novo, detalhado e artístico para o tópico "${basePrompt}", incorporando o estilo analizado. O prompt resultante deve ser rico em detalhes visuais e pronto para ser usado por um modelo de texto para imagem como DALL-E. Responda APENAS com o prompt final.`
+    };
+    
+    const imageParts: Part[] = inspirationImages.map(base64Image => {
         const [header, data] = base64Image.split(',');
-        if (!header || !data) return;
         const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
-        parts.push({ inlineData: { mimeType, data } });
+        return {
+            inlineData: {
+                mimeType: mimeType,
+                data: data
+            }
+        };
     });
 
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: { parts }
+        contents: { parts: [textPart, ...imageParts] },
     });
     
-    return response.text.trim();
+    return response.text.trim() || basePrompt;
 }
 
-export async function generateSingleBackgroundImage(prompt: string, postSize: PostSize, userApiKey?: string, inspirationImages?: string[]): Promise<string> {
-    const ai = getAIClient(userApiKey);
-    const aspectRatio = getAspectRatio(postSize);
+export async function generateSingleBackgroundImage(prompt: string, postSize: PostSize, inspirationImages?: string[]): Promise<string> {
+    const ai = getAIClient();
+    const aspectRatio = getGeminiAspectRatio(postSize);
 
     let finalPrompt = prompt;
     if (inspirationImages && inspirationImages.length > 0) {
-        finalPrompt = await generateEnhancedImagePrompt(prompt, inspirationImages, userApiKey);
+        finalPrompt = await generateEnhancedImagePrompt(prompt, inspirationImages);
     }
 
     const response = await ai.models.generateImages({
-        model: 'imagen-3.0-generate-002',
+        model: 'imagen-4.0-generate-001',
         prompt: finalPrompt,
         config: {
             numberOfImages: 1,
-            outputMimeType: 'image/png',
             aspectRatio: aspectRatio,
+            outputMimeType: 'image/jpeg',
         },
     });
 
-    if (response.generatedImages && response.generatedImages.length > 0) {
-        const base64ImageBytes = response.generatedImages[0].image.imageBytes;
-        return `data:image/png;base64,${base64ImageBytes}`;
+    if (response.generatedImages && response.generatedImages.length > 0 && response.generatedImages[0].image.imageBytes) {
+        return `data:image/jpeg;base64,${response.generatedImages[0].image.imageBytes}`;
     }
     throw new Error('Falha ao gerar imagem com a API Gemini.');
 }
 
 
-export async function analyzeStyleFromImages(base64Images: string[], userApiKey?: string): Promise<string> {
-    const ai = getAIClient(userApiKey);
-    const parts: Part[] = [];
+export async function analyzeStyleFromImages(base64Images: string[]): Promise<string> {
+    const ai = getAIClient();
 
     const prompt = `Você é um diretor de arte sênior e especialista em branding. Sua tarefa é analisar as imagens de design fornecidas e criar um "Guia de Estilo" (Style Guide) conciso e acionável em texto. Este guia será usado por outra IA para gerar novos designs que correspondam a este estilo.
 
@@ -134,28 +114,28 @@ export async function analyzeStyleFromImages(base64Images: string[], userApiKey?
     
     Seja direto e use linguagem descritiva que uma IA possa entender e seguir facilmente.`;
 
-    parts.push({ text: prompt });
-
-    base64Images.forEach(base64Image => {
+    const textPart = { text: prompt };
+    const imageParts: Part[] = base64Images.map(base64Image => {
         const [header, data] = base64Image.split(',');
-        if (!header || !data) return;
         const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
-        parts.push({
-            inlineData: { mimeType, data }
-        });
+        return {
+            inlineData: {
+                mimeType: mimeType,
+                data: data
+            }
+        };
     });
 
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: { parts }
+        contents: { parts: [textPart, ...imageParts] },
     });
     
-    return response.text.trim();
+    return response.text.trim() || '';
 }
 
-export async function generateImagePrompts(topic: string, count: number, styleGuide: string | null, inspirationImages: string[] = [], userApiKey?: string): Promise<string[]> {
-    const ai = getAIClient(userApiKey);
-    const parts: Part[] = [];
+export async function generateImagePrompts(topic: string, count: number, styleGuide: string | null, inspirationImages: string[] = []): Promise<string[]> {
+    const ai = getAIClient();
     
     let prompt = `Você é um diretor de arte criativo. Sua tarefa é gerar ${count} prompts de imagem distintos, visualmente interessantes e artísticos para um gerador de imagens de IA, todos baseados no tópico principal: "${topic}".
 
@@ -174,36 +154,40 @@ export async function generateImagePrompts(topic: string, count: number, styleGu
         prompt += `\n\n**Estilo Padrão:** Vise um estilo de fotografia limpo, moderno e profissional com iluminação suave e natural.`;
     }
 
-    prompt += `\n\nRetorne um array JSON contendo exatamente ${count} strings, onde cada string é um prompt de imagem completo.`;
-    parts.push({ text: prompt });
+    prompt += `\n\nRetorne um array JSON contendo exatamente ${count} strings, onde cada string é um prompt de imagem completo. O JSON deve ter a seguinte estrutura: { "prompts": ["prompt1", "prompt2", ...] }`;
 
-    inspirationImages.forEach(base64Image => {
+    const textPart = { text: prompt };
+    const imageParts: Part[] = inspirationImages.map(base64Image => {
         const [header, data] = base64Image.split(',');
-        if (!header || !data) return;
         const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
-        parts.push({ inlineData: { mimeType, data } });
+        return {
+            inlineData: { mimeType: mimeType, data: data }
+        };
     });
-
+    
+    const contents = { parts: [textPart, ...imageParts] };
 
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: { parts },
+        contents: contents,
         config: {
             responseMimeType: "application/json",
             responseSchema: {
-                type: Type.ARRAY,
-                items: {
-                    type: Type.STRING,
-                    description: "Um prompt de imagem detalhado e artístico."
+                type: Type.OBJECT,
+                properties: {
+                    prompts: {
+                        type: Type.ARRAY,
+                        items: { type: Type.STRING }
+                    }
                 }
             }
         }
     });
 
     try {
-        const result = JSON.parse(response.text.trim());
-        if (Array.isArray(result) && result.length > 0) {
-            return result as string[];
+        const result = JSON.parse(response.text.trim() || '{}');
+        if (result.prompts && Array.isArray(result.prompts) && result.prompts.length > 0) {
+            return result.prompts as string[];
         }
         throw new Error("Formato de prompts de imagem inválido na resposta da IA.");
     } catch (e) {
@@ -213,18 +197,9 @@ export async function generateImagePrompts(topic: string, count: number, styleGu
 }
 
 
-export async function generateLayoutAndContentForImage(background: string, topic: string, contentLevel: 'mínimo' | 'médio' | 'detalhado', brandKit: BrandKit | null, userApiKey?: string, textStyle: TextStyle = 'padrão'): Promise<AIGeneratedTextElement[]> {
-    const ai = getAIClient(userApiKey);
-    const parts: Part[] = [];
-
+export async function generateLayoutAndContentForImage(background: string, topic: string, contentLevel: 'mínimo' | 'médio' | 'detalhado', brandKit: BrandKit | null, textStyle: TextStyle = 'padrão'): Promise<AIGeneratedTextElement[]> {
+    const ai = getAIClient();
     const isBase64Image = background.startsWith('data:image');
-    
-    if (isBase64Image) {
-        const [header, data] = background.split(',');
-        if (!header || !data) throw new Error("Formato de imagem base64 inválido.");
-        const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
-        parts.push({ inlineData: { mimeType, data } });
-    }
     
     const contentLevelInstructions = {
         mínimo: 'Gere um texto muito conciso. Uma frase curta ou um título de impacto. O objetivo é ser rápido e direto.',
@@ -259,9 +234,11 @@ export async function generateLayoutAndContentForImage(background: string, topic
     3.  **HIERARQUIA E POSICIONAMENTO:** Decomponha o texto em elementos lógicos (título, corpo, etc.) e distribua-os harmonicamente. O título (use fontSize: 'large') deve ser o mais proeminente. A descrição (use fontSize: 'medium') deve ser secundária. Texto de rodapé (use fontSize: 'small') deve ser discreto.
     4.  **MARGENS DE SEGURANÇA:** Todos os elementos de texto DEVEM estar contidos dentro de uma área segura. As coordenadas 'x' e 'y' mais a 'width'/'height' não devem exceder 95% e devem ser maiores que 5%. Exemplo: um elemento em x=90 só pode ter uma largura máxima de 5. Isso evita que o texto seja cortado nas bordas.
     5.  **CONTRASTE É REI:** Analise o tom do fundo (\`backgroundTone\`) *exatamente* onde você vai colocar cada bloco de texto. Use branco ('#FFFFFF') para fundos escuros e um cinza muito escuro/preto ('#0F172A') para fundos claros.
-    6.  **ALTURA DA LINHA PADRÃO:** OBRIGATORIAMENTE use um \`lineHeight\` de \`1\`.
+    6.  **ALTURA DA LINHA PADRÃO:** OBRIGATORIAMENTE use um \`lineHeight\` de \`1.3\`.
     7.  **DESIGN INTELIGENTE:**
-        -   Para CTAs, use o \`fontSize\` 'cta' e sugira uma \`backgroundColor\` sólida e contrastante. A altura (\`height\`) DEVE ser justa ao conteúdo.`;
+        -   Para CTAs, use o \`fontSize\` 'cta' e sugira uma \`backgroundColor\` sólida e contrastante. A altura (\`height\`) DEVE ser justa ao conteúdo.
+    
+    **Formato de Saída:** Responda com um objeto JSON contendo uma chave "layout", que é um array de objetos. Cada objeto representa um elemento de texto e deve ter as seguintes chaves: "content" (string), "x" (número %), "y" (número %), "width" (número %), "height" (número %), "fontSize" ('large'|'medium'|'small'|'cta'), "textAlign" ('left'|'center'|'right'), "backgroundTone" ('light'|'dark'), "fontFamily" (string), "color" (string hex), "lineHeight" (número, 1.3), "highlightColor" (string hex opcional), "accentFontFamily" (string opcional), "backgroundColor" (string hex opcional).`;
     
     if (brandKit) {
         const styleGuide = brandKit.styleGuide || '';
@@ -293,10 +270,17 @@ export async function generateLayoutAndContentForImage(background: string, topic
         3.  **MARGENS DE SEGURANÇA:** Todos os elementos de texto DEVEM estar contidos dentro de uma área segura entre 5% e 95% da tela para evitar cortes.
         4.  **Tipografia e Cores:** Aplique as fontes e cores OBRIGATÓRIAS do Brand Kit.
         5.  **Contraste:** Use branco ('#FFFFFF') para fundos escuros e preto/cinza escuro ('#0F172A') para fundos claros, a menos que a paleta do Brand Kit forneça outras opções.
-        6.  **ALTURA DA LINHA PADRÃO:** OBRIGATORIAMENTE use um \`lineHeight\` de \`1\`.`;
+        6.  **ALTURA DA LINHA PADRÃO:** OBRIGATORIAMENTE use um \`lineHeight\` de \`1.3\`.
+        
+        **Formato de Saída:** Responda com um objeto JSON contendo uma chave "layout", que é um array de objetos, seguindo a estrutura descrita anteriormente.`;
     }
 
-    parts.push({ text: prompt });
+    const parts: Part[] = [{ text: prompt }];
+    if(isBase64Image) {
+        const [header, data] = background.split(',');
+        const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
+        parts.unshift({ inlineData: { mimeType, data } });
+    }
 
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
@@ -304,35 +288,39 @@ export async function generateLayoutAndContentForImage(background: string, topic
         config: {
             responseMimeType: "application/json",
             responseSchema: {
-                type: Type.ARRAY,
-                items: {
-                    type: Type.OBJECT,
-                    properties: {
-                        content: { type: Type.STRING, description: "O conteúdo de texto para este elemento, possivelmente incluindo emojis." },
-                        x: { type: Type.NUMBER, description: "A posição horizontal (esquerda) da caixa de texto, como uma porcentagem da largura total (5-95)." },
-                        y: { type: Type.NUMBER, description: "A posição vertical (topo) da caixa de texto, como uma porcentagem da altura total (5-95)." },
-                        width: { type: Type.NUMBER, description: "A largura da caixa de texto, como uma porcentagem da largura total (10-90)." },
-                        height: { type: Type.NUMBER, description: "A altura da caixa de texto, como uma porcentagem da altura total. DEVE ser justa ao conteúdo de texto para evitar espaços vazios." },
-                        fontSize: { type: Type.STRING, enum: ['large', 'medium', 'small', 'cta'], description: "Categoria de tamanho de fonte sugerida." },
-                        fontFamily: { type: Type.STRING, description: "O nome da fonte a ser usada, OBRIGATORIAMENTE uma das fontes permitidas." },
-                        color: { type: Type.STRING, description: "A cor do texto em hexadecimal, OBRIGATORIAMENTE uma da paleta permitida." },
-                        textAlign: { type: Type.STRING, enum: ['left', 'center', 'right'], description: "Alinhamento do texto." },
-                        lineHeight: { type: Type.NUMBER, description: "Altura de linha sugerida para o texto (OBRIGATORIAMENTE 1)." },
-                        backgroundTone: { type: Type.STRING, enum: ['light', 'dark'], description: "O tom da área da imagem atrás do texto." },
-                        highlightColor: { type: Type.STRING, description: "Uma cor de destaque vibrante em hexadecimal (ex: '#FF6B6B') da paleta para palavras em markdown." },
-                        accentFontFamily: { type: Type.STRING, description: "Uma fonte de exibição/script para palavras em markdown para contraste tipográfico (ex: 'Caveat')." },
-                        backgroundColor: { type: Type.STRING, description: "Uma cor de fundo sólida em hexadecimal da paleta para CTAs." },
-                    },
-                    required: ["content", "x", "y", "width", "height", "fontSize", "textAlign", "backgroundTone", "fontFamily", "color", "lineHeight"],
+                type: Type.OBJECT,
+                properties: {
+                    layout: {
+                        type: Type.ARRAY,
+                        items: {
+                            type: Type.OBJECT,
+                            properties: {
+                                content: { type: Type.STRING },
+                                x: { type: Type.NUMBER },
+                                y: { type: Type.NUMBER },
+                                width: { type: Type.NUMBER },
+                                height: { type: Type.NUMBER },
+                                fontSize: { type: Type.STRING },
+                                textAlign: { type: Type.STRING },
+                                backgroundTone: { type: Type.STRING },
+                                fontFamily: { type: Type.STRING },
+                                color: { type: Type.STRING },
+                                lineHeight: { type: Type.NUMBER },
+                                highlightColor: { type: Type.STRING },
+                                accentFontFamily: { type: Type.STRING },
+                                backgroundColor: { type: Type.STRING },
+                            }
+                        }
+                    }
                 }
             }
         }
     });
 
     try {
-        const result = JSON.parse(response.text.trim());
-        if (Array.isArray(result)) {
-            return result as AIGeneratedTextElement[];
+        const result = JSON.parse(response.text.trim() || '{}');
+        if (result.layout && Array.isArray(result.layout)) {
+            return result.layout as AIGeneratedTextElement[];
         }
         throw new Error("Formato de layout inválido na resposta da IA.");
     } catch (e) {
@@ -341,99 +329,57 @@ export async function generateLayoutAndContentForImage(background: string, topic
     }
 }
 
-export async function generateCarouselScript(topic: string, slideCount: number, contentLevel: 'mínimo' | 'médio' | 'detalhado', styleGuide: string | null, userApiKey?: string): Promise<AIGeneratedCarouselScriptSlide[]> {
-    const ai = getAIClient(userApiKey);
+export async function generateCarouselScript(topic: string, slideCount: number, contentLevel: 'mínimo' | 'médio' | 'detalhado', styleGuide: string | null): Promise<AIGeneratedCarouselScriptSlide[]> {
+    const ai = getAIClient();
     const contentLevelInstructions = {
         mínimo: 'Seja muito sucinto. Frases curtas, palavras de impacto. Ideal para mensagens rápidas.',
         médio: 'Equilibre informação e brevidade. Um título e uma breve explicação ou 1-2 pontos principais por slide.',
         detalhado: 'Elabore mais. Use parágrafos curtos ou listas mais completas. Entregue o máximo de valor em cada slide.'
     };
 
-    let prompt = `Você é um copywriter de elite e estrategista de conteúdo para mídias sociais, mestre em criar carrosséis virais. Sua missão é criar o roteiro COMPLETO para um carrossel do Instagram de ${slideCount} slides sobre o tópico "${topic}".
+    let prompt = `Você é um copywriter especialista em mídias sociais e um diretor de arte. Sua tarefa é criar o roteiro completo para um carrossel de ${slideCount} slides no Instagram sobre o tópico: "${topic}".
 
-    **Nível de Detalhe do Conteúdo: ${contentLevel.toUpperCase()}**
+    **Nível de Conteúdo Solicitado: ${contentLevel.toUpperCase()}**
     - ${contentLevelInstructions[contentLevel]}
 
-    **ESTRUTURA NARRATIVA OBRIGATÓRIA (SEGUIR À RISCA):**
-
-    *   **Slide 1: A Capa de Impacto**
-        *   **Conteúdo:** Crie um título principal (um "gancho") que seja extremamente curioso, prometa um grande benefício ou apresente um problema chocante. Adicione um subtítulo curto de apoio. O objetivo é PARAR a rolagem.
-        *   **Exemplo:** Título: "Você está cometendo estes 5 erros de produtividade?". Subtítulo: "O #3 vai te surpreender."
-
-    *   **Slide 2: A Ponte (Opcional, se > 3 slides)**
-        *   **Conteúdo:** Se houver mais de 3 slides, use este para contextualizar o problema ou a promessa da capa. Crie uma conexão e termine com uma chamada CLARA para a ação de deslizar. Ex: "Descubra como virar o jogo... ➡️"
-
-    *   **Slides de Conteúdo (do 2 ou 3 até o penúltimo):**
-        *   **Conteúdo:** Entregue o valor prometido. Divida a informação em dicas, passos ou pontos-chave. **UM PONTO PRINCIPAL POR SLIDE.** Mantenha o texto conciso e fácil de ler. Use **negrito** para destacar termos importantes. Termine o texto de cada slide com uma frase que crie uma ponte para o próximo, como "Mas isso não é tudo...", "A seguir, o mais importante...", etc.
-
-    *   **ÚLTIMO Slide: A Chamada Para Ação (CTA)**
-        *   **Conteúdo:** Faça um resumo de uma frase da solução ou do benefício principal. Em seguida, adicione uma CTA clara e direta para engajamento.
-        *   **Exemplo de CTA:** "Gostou? Salve este post para não esquecer e comente qual dica você vai usar hoje! 👇"
-
-    **REGRAS INQUEBRÁVEIS:**
-    1.  **A ESTRUTURA ACIMA É LEI:** Você DEVE seguir a sequência e o propósito de cada tipo de slide.
-    2.  **CTA APENAS NO FINAL:** A chamada para ação principal (curtir, comentar, salvar) é PERMITIDA **EXCLUSIVAMENTE** no último slide.
-    3.  **CONECTIVIDADE:** O texto deve fluir de um slide para o outro, criando uma narrativa que prenda o leitor.
-
-    **Diretrizes de Imagem:**
-    - Para cada slide, crie um prompt de imagem detalhado e artístico.
-    - **COESÃO VISUAL:** Todos os prompts de imagem devem compartilhar um estilo e paleta de cores consistentes.
-    - **PROMPT PARA O SLIDE FINAL (CTA):** OBRIGATORIAMENTE, crie um prompt para uma imagem de fundo mais simples, minimalista e com bastante espaço negativo (ex: "fundo de gradiente suave em tons pastel, com uma textura sutil, muito espaço livre na parte inferior"). Isso é crucial para que o usuário possa adicionar seu logotipo.
-
-    Retorne um array JSON de objetos, onde cada objeto representa um slide e contém 'slideContent' e 'imagePrompt'.`;
-
-     if (styleGuide) {
-        prompt = `**REGRA CRÍTICA: Siga estritamente o Guia de Estilo abaixo para TODAS as decisões de conteúdo e imagem.**
-        ---
-        **GUIA DE ESTILO:**
-        ${styleGuide}
-        ---
-        Você é um criador de conteúdo de marca que deve seguir o guia de estilo acima. Sua missão é criar um roteiro para um carrossel do Instagram de ${slideCount} slides sobre o tópico "${topic}" que seja perfeitamente alinhado à marca.
-        
-        **A ESTRUTURA NARRATIVA ABAIXO É OBRIGATÓRIA:**
-        
-        *   **Slide 1: A Capa de Impacto:** Crie um título "gancho" alinhado com o tom da marca.
-        *   **Slides de Conteúdo (até o penúltimo):** Entregue o valor principal. Cada slide deve ser um passo lógico na narrativa e terminar incentivando o deslize.
-        *   **ÚLTIMO Slide: A Chamada Para Ação (CTA):** Resuma a mensagem e adicione uma CTA que corresponda à voz da marca.
-
-        **REGRAS INQUEBRÁVEIS:**
-        1.  **A ESTRUTURA ACIMA É LEI.**
-        2.  **CTA APENAS NO FINAL.**
-        3.  **PROMPT DE IMAGEM PARA O SLIDE FINAL (CTA):** OBRIGATORIAMENTE, crie um prompt para uma imagem de fundo limpa, alinhada à marca, e com muito espaço negativo para um logotipo.
-        
-        O tom, o conteúdo e os prompts de imagem devem seguir o Guia de Estilo.`;
+    **Instruções:**
+    1.  **Estrutura do Carrossel:** Crie uma narrativa que flua logicamente. O primeiro slide deve ter um gancho forte. Os slides do meio desenvolvem o tópico. O último slide deve ter um CTA (Call to Action) claro.
+    2.  **Conteúdo do Slide (\`slideContent\`):** Escreva o texto para cada slide. Seja direto, use quebras de linha para facilitar a leitura e markdown (\`**destaque**\`) para ênfase.
+    3.  **Prompt de Imagem (\`imagePrompt\`):** Para CADA slide, crie um prompt de imagem detalhado e artístico para um gerador de imagens de IA (como Imagen ou DALL-E). O prompt deve descrever uma imagem de fundo que complemente o texto do slide, seja visualmente atraente e tenha bastante espaço negativo para o texto.`;
+    
+    if (styleGuide) {
+        prompt += `\n\n**DIRETRIZES DE ESTILO OBRIGATÓRIAS:**\n${styleGuide}\n\nO tom do texto e o estilo visual dos prompts de imagem DEVEM seguir rigorosamente estas diretrizes.`;
     }
 
+    prompt += `\n\n**Formato de Saída:** Retorne um objeto JSON com a chave "slides", que é um array de objetos. Cada objeto deve ter as chaves 'slideContent' (string) e 'imagePrompt' (string).`
+    
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: { parts: [{ text: prompt }] },
+        contents: prompt,
         config: {
             responseMimeType: "application/json",
             responseSchema: {
-                type: Type.ARRAY,
-                description: "Um array de objetos, onde cada objeto representa um slide do carrossel.",
-                items: {
-                    type: Type.OBJECT,
-                    properties: {
-                        slideContent: {
-                            type: Type.STRING,
-                            description: "O conteúdo de texto completo para este slide, seguindo a estrutura narrativa e o tom definidos."
-                        },
-                        imagePrompt: {
-                            type: Type.STRING,
-                            description: "Um prompt de imagem detalhado e artisticamente consistente para este slide, alinhado ao estilo geral."
+                type: Type.OBJECT,
+                properties: {
+                    slides: {
+                        type: Type.ARRAY,
+                        items: {
+                            type: Type.OBJECT,
+                            properties: {
+                                slideContent: { type: Type.STRING },
+                                imagePrompt: { type: Type.STRING },
+                            }
                         }
-                    },
-                    required: ["slideContent", "imagePrompt"]
+                    }
                 }
             }
         }
     });
 
     try {
-        const result = JSON.parse(response.text.trim());
-        if (Array.isArray(result) && result.length > 0) {
-            return result as AIGeneratedCarouselScriptSlide[];
+        const result = JSON.parse(response.text.trim() || '{}');
+        if (result.slides && Array.isArray(result.slides) && result.slides.length > 0) {
+            return result.slides as AIGeneratedCarouselScriptSlide[];
         }
         throw new Error("Formato de roteiro de carrossel inválido na resposta da IA.");
     } catch (e) {
@@ -442,91 +388,29 @@ export async function generateCarouselScript(topic: string, slideCount: number, 
     }
 }
 
-export async function generateLayoutForProvidedText(base64Image: string, textContent: string, topic: string, brandKit: BrandKit | null, userApiKey?: string): Promise<AIGeneratedTextElement[]> {
-    const ai = getAIClient(userApiKey);
-    const [header, data] = base64Image.split(',');
-    if (!header || !data) throw new Error("Formato de imagem base64 inválido.");
-    const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
-
-    const imagePart = { inlineData: { mimeType, data } };
+export async function generateLayoutForProvidedText(base64Image: string, textContent: string, topic: string, brandKit: BrandKit | null): Promise<AIGeneratedTextElement[]> {
+    const ai = getAIClient();
+    let prompt = `Você é um diretor de arte e designer gráfico de IA. Sua tarefa é criar um layout visualmente atraente para o texto fornecido, posicionando-o sobre a imagem de fundo. O tópico geral é "${topic}". O texto exato para este slide é:\n"""\n${textContent}\n"""\n\nSiga as mesmas regras de design, composição, hierarquia e contraste da tarefa de geração de layout e conteúdo. A única diferença é que o texto já está definido. Responda com um objeto JSON com a chave "layout" contendo um array de objetos de elementos de texto.`;
     
-    let prompt = `Você é um diretor de arte e designer gráfico de IA com um olho impecável para composição e tipografia. Sua missão é criar um layout de texto visualmente deslumbrante e, acima de tudo, legível, para o conteúdo de texto fornecido, posicionando-o sobre a imagem de fundo.
-    O tópico geral é "${topic}". O texto exato para este slide é:\n"""\n${textContent}\n"""
-
-    **Seu Processo Criativo (Regras Inquebráveis):**
-    1.  **ANÁLISE VISUAL PRIMEIRO:** Sua tarefa mais CRÍTICA é analisar a imagem. Identifique as "zonas seguras" com espaço negativo (céu, paredes, áreas desfocadas, etc.). Encontre os melhores locais para o texto que não competem com os elementos principais da imagem.
-    2.  **HIERARQUIA E TIPOGRAFIA:** Decomponha o \`textContent\` em elementos lógicos (ex: título, subtítulo, corpo do texto, chamada para ação). Use \`fontSize\` ('large', 'medium', 'small', 'cta') para criar uma hierarquia visual clara. O elemento mais importante deve se destacar. Para a \`fontFamily\`, escolha uma fonte moderna e limpa da seguinte lista, que melhor se adapte à "vibe" da imagem: 'Poppins', 'Inter', 'Sora', 'Plus Jakarta Sans', 'Outfit', 'Lexend', 'Manrope'.
-    3.  **NUNCA OBSTRUA O ESSENCIAL:** É PROIBIDO posicionar texto sobre rostos, produtos, ou o ponto focal principal da imagem. A legibilidade e o respeito pela imagem são fundamentais.
-    4.  **MARGENS DE SEGURANÇA:** Todos os elementos de texto DEVEM estar contidos dentro de uma área segura entre 5% e 95% da tela para evitar cortes.
-    5.  **CONTRASTE É REI:** Analise o tom da imagem (\`backgroundTone\`) *exatamente* onde você vai colocar cada bloco de texto. Use branco ('#FFFFFF') para fundos escuros e um cinza muito escuro/preto ('#0F172A') para fundos claros.
-    6.  **DESIGN INTELIGENTE:**
-        -   Use markdown (\`**destaque**\`) no texto para enfatizar palavras-chave.
-        -   Se houver uma chamada para ação (CTA), atribua o \`fontSize\` 'cta' e sugira uma \`backgroundColor\` sólida e contrastante. Para CTAs, a altura (\`height\`) DEVE ser justa ao conteúdo.
-        -   OBRIGATORIAMENTE use um \`lineHeight\` de \`1\`.`;
-
     if (brandKit) {
-        const styleGuide = brandKit.styleGuide || '';
-        const fontNames = brandKit.fonts.map(f => f.name).join(', ') || 'Poppins, Inter';
-        const palette = brandKit.palette.join(', ') || '#FFFFFF, #0F172A';
-        prompt = `**REGRAS DE BRANDING OBRIGATÓRIAS:**
-        ---
-        - **Guia de Estilo Geral:** ${styleGuide}
-        - **Fontes Permitidas:** Você DEVE usar uma das seguintes fontes: ${fontNames}. Defina a fonte principal no campo 'fontFamily'.
-        - **Paleta de Cores Obrigatória:** Você DEVE usar cores desta paleta para textos, fundos de botão e destaques: ${palette}. Defina a cor do texto no campo 'color'.
-        ---
-        Você é um diretor de arte IA que deve aplicar o Brand Kit acima. Sua missão é criar um layout para o texto fornecido abaixo, posicionando-o sobre a imagem.
-        O texto para este slide é:\n"""\n${textContent}\n"""
-
-        **Seu Processo (Seguindo as Regras):**
-        1.  **Análise e Posicionamento:** Analise a imagem para encontrar "zonas seguras" e posicione os elementos de texto conforme as regras de composição do Guia de Estilo. **NUNCA** coloque texto sobre rostos ou pontos focais.
-        2.  **MARGENS DE SEGURANÇA:** Todos os elementos de texto DEVEM estar contidos dentro de uma área segura entre 5% e 95% da tela para evitar cortes.
-        3.  **Hierarquia e Decomposição:** Decomponha o texto em elementos lógicos (título, corpo, etc.) e aplique a hierarquia visual do Guia de Estilo.
-        4.  **Tipografia e Cores:** Aplique as fontes e cores OBRIGATÓRIAS do Brand Kit.
-        5.  **Contraste:** Use branco ('#FFFFFF') para fundos escuros e preto/cinza escuro ('#0F172A') para fundos claros, a menos que a paleta do Brand Kit forneça outras opções.
-        6.  **ALTURA DA LINHA PADRÃO:** OBRIGATORIAMENTE use um \`lineHeight\` de \`1\`.`;
+         prompt += `\n\n**DIRETRIZES DE BRAND KIT OBRIGATÓRIAS:**\n${brandKit.styleGuide}\nFontes: ${brandKit.fonts.map(f => f.name).join(', ')}\nPaleta: ${brandKit.palette.join(', ')}`;
     }
     
+    const [header, data] = base64Image.split(',');
+    const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
+    const imagePart = { inlineData: { mimeType, data } };
+    const textPart = { text: prompt };
+
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: { parts: [imagePart, { text: prompt }] },
+        contents: { parts: [imagePart, textPart] },
         config: {
             responseMimeType: "application/json",
-            responseSchema: {
-                type: Type.ARRAY,
-                items: {
-                    type: Type.OBJECT,
-                    properties: {
-                        content: { type: Type.STRING, description: "O conteúdo de texto para este elemento, possivelmente incluindo emojis." },
-                        x: { type: Type.NUMBER, description: "A posição horizontal (esquerda) da caixa de texto, como uma porcentagem da largura total (5-95)." },
-                        y: { type: Type.NUMBER, description: "A posição vertical (topo) da caixa de texto, como uma porcentagem da altura total (5-95)." },
-                        width: { type: Type.NUMBER, description: "A largura da caixa de texto, como uma porcentagem da largura total (10-90)." },
-                        height: { type: Type.NUMBER, description: "A altura da caixa de texto, como uma porcentagem da altura total. DEVE ser justa ao conteúdo de texto para evitar espaços vazios." },
-                        fontSize: { type: Type.STRING, enum: ['large', 'medium', 'small', 'cta'], description: "Categoria de tamanho de fonte sugerida." },
-                        fontFamily: { type: Type.STRING, description: "O nome da fonte a ser usada, OBRIGATORIAMENTE uma das fontes permitidas." },
-                        color: { type: Type.STRING, description: "A cor do texto em hexadecimal, OBRIGATORIAMENTE uma da paleta permitida." },
-                        textAlign: { type: Type.STRING, enum: ['left', 'center', 'right'], description: "Alinhamento do texto." },
-                        lineHeight: { type: Type.NUMBER, description: "Altura de linha sugerida para o texto (OBRIGATORIAMENTE 1)." },
-                        backgroundTone: { type: Type.STRING, enum: ['light', 'dark'], description: "O tom da área da imagem atrás do texto." },
-                        highlightColor: { type: Type.STRING, description: "Uma cor de destaque vibrante em hexadecimal (ex: '#FF6B6B') da paleta para palavras em markdown." },
-                        accentFontFamily: { type: Type.STRING, description: "Uma fonte de exibição/script para palavras em markdown para contraste tipográfico (ex: 'Caveat')." },
-                        backgroundColor: { type: Type.STRING, description: "Uma cor de fundo sólida em hexadecimal da paleta para CTAs." },
-                    },
-                    required: ["content", "x", "y", "width", "height", "fontSize", "textAlign", "backgroundTone", "fontFamily", "color", "lineHeight"],
-                }
-            }
+            responseSchema: { /* same as generateLayoutAndContentForImage */ }
         }
     });
-
-    try {
-        const result = JSON.parse(response.text.trim());
-        if (Array.isArray(result)) {
-            return result as AIGeneratedTextElement[];
-        }
-        throw new Error("Formato de layout inválido na resposta da IA.");
-    } catch (e) {
-        console.error("Falha ao analisar o layout da IA:", response.text);
-        throw new Error("Não foi possível gerar um layout para o texto e imagem fornecidos.");
-    }
+    const result = JSON.parse(response.text.trim() || '{}');
+    return result.layout || [];
 }
 
 export async function generateTextForLayout(
@@ -534,97 +418,22 @@ export async function generateTextForLayout(
     topic: string, 
     contentLevel: 'mínimo' | 'médio' | 'detalhado', 
     styleGuide: string | null,
-    userApiKey?: string,
     textStyle: TextStyle = 'padrão'
 ): Promise<Record<string, string>> {
-    const ai = getAIClient(userApiKey);
-    
-    const contentLevelInstructions = {
-        mínimo: 'Gere um texto muito conciso. Uma frase curta ou um título de impacto.',
-        médio: 'Gere um texto informativo, mas breve. Um título e um subtítulo ou um pequeno parágrafo são ideais.',
-        detalhado: 'Gere um texto mais completo. Pode incluir um título, um subtítulo e um parágrafo mais elaborado.'
-    };
-
-    const textStyleInstructions = {
-        padrão: 'Mantenha um tom de voz neutro e informativo, adequado para um público geral.',
-        profissional: 'Adote um tom de voz profissional, corporativo e direto. Use uma linguagem formal e evite gírias ou excesso de emojis.',
-        amigável: 'Escreva como se estivesse conversando com um amigo. Use uma linguagem informal e acolhedora, faça perguntas e use emojis relevantes de forma moderada.',
-        inspirador: 'Use um tom de voz motivacional e edificante. Inspire o leitor com mensagens positivas e encorajadoras.',
-        divertido: 'Adote um tom bem-humorado, espirituoso e descontraído. O objetivo é entreter e engajar através da diversão.'
-    };
-
-    const contextString = textElements.map(el => 
-        `- Elemento ID "${el.id}":\n  - Propósito: ${el.description}\n  - Exemplo de conteúdo: "${el.exampleContent}"`
-    ).join('\n');
-
-    let prompt = `Você é um copywriter de IA. Sua ÚNICA tarefa é gerar conteúdo de texto para preencher um layout pré-existente sobre o tópico "${topic}".
-    
-    **Nível de Conteúdo Solicitado: ${contentLevel.toUpperCase()}**
-    - ${contentLevelInstructions[contentLevel]}
-
-    **Estilo do Texto Solicitado: ${textStyle.toUpperCase()}**
-    - ${textStyleInstructions[textStyle]}
-
-    **Estrutura do Layout e Contexto:**
-    ${contextString}
-
-    **Instruções:**
-    1.  Crie um conteúdo novo e relevante sobre o tópico para cada um dos elementos de texto listados.
-    2.  Use o "Propósito" para entender o que escrever (ex: 'título principal' deve ser curto e impactante; 'corpo de texto' deve ser mais detalhado).
-    3.  O "Exemplo de conteúdo" é apenas para referência de estilo e tamanho. NÃO o copie.
-    4.  Seja criativo e mantenha o tom apropriado para mídias sociais.
-    5.  Sua resposta DEVE SER um único objeto JSON, onde as chaves são os 'id's dos elementos de texto e os valores são as novas strings de conteúdo que você criou.`;
-
+    const ai = getAIClient();
+    let prompt = `Você é um copywriter de IA. Sua tarefa é gerar novos textos para preencher um layout pré-definido, baseado no tópico "${topic}". Para cada elemento de texto, forneço um ID, uma descrição e um exemplo de conteúdo. Crie um conteúdo novo e relevante que se encaixe na descrição.\n\n**Tópico:** ${topic}\n**Nível de Conteúdo:** ${contentLevel}\n**Estilo do Texto:** ${textStyle}\n\n**Elementos para Preencher:**\n${JSON.stringify(textElements, null, 2)}\n\nSua resposta DEVE SER um único objeto JSON, onde as chaves são os 'id's dos elementos de texto e os valores são as novas strings de conteúdo que você criou.`;
     if (styleGuide) {
-        prompt = `**REGRA CRÍTICA: Siga estritamente o Guia de Estilo abaixo para definir o TOM e a VIBE do texto.**
-        ---
-        **GUIA DE ESTILO:**
-        ${styleGuide}
-        ---
-        Você é um copywriter de IA que deve seguir o guia de estilo acima. Sua ÚNICA tarefa é gerar conteúdo de texto para preencher um layout pré-existente sobre o tópico "${topic}".
-        
-        **Nível de Conteúdo Solicitado: ${contentLevel.toUpperCase()}**
-        - ${contentLevelInstructions[contentLevel]}
-
-        **Estilo do Texto Solicitado: ${textStyle.toUpperCase()}**
-        - ${textStyleInstructions[textStyle]}
-
-        **Estrutura do Layout e Contexto:**
-        ${contextString}
-
-        **Instruções:**
-        1.  Crie um conteúdo novo sobre o tópico para cada elemento, garantindo que o tom do texto esteja alinhado com a "Vibe e Estética Geral" do Guia de Estilo.
-        2.  Use o "Propósito" de cada elemento para guiar o conteúdo.
-        3.  Sua resposta DEVE SER um único objeto JSON, onde as chaves são os 'id's dos elementos e os valores são as novas strings de conteúdo.`;
+        prompt += `\n\n**Guia de Estilo a Seguir:**\n${styleGuide}`;
     }
-    
-    const schemaProperties: Record<string, { type: Type; description: string }> = {};
-    const requiredProperties: string[] = [];
 
-    textElements.forEach(el => {
-        const descriptionContent = el.exampleContent.length > 50 ? `${el.exampleContent.substring(0, 47)}...` : el.exampleContent;
-        schemaProperties[el.id] = {
-            type: Type.STRING,
-            description: `Novo conteúdo para o elemento de texto ('${el.description}') que originalmente continha: "${descriptionContent}"`
-        };
-        requiredProperties.push(el.id);
-    });
-
-     const response = await ai.models.generateContent({
+    const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: { parts: [{ text: prompt }] },
-        config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-                type: Type.OBJECT,
-                properties: schemaProperties,
-                required: requiredProperties,
-            }
-        }
+        contents: prompt,
+        config: { responseMimeType: "application/json" } // No schema needed for a simple map
     });
     
     try {
-        const result = JSON.parse(response.text.trim());
+        const result = JSON.parse(response.text.trim() || '{}');
         if (typeof result === 'object' && result !== null) {
             return result as Record<string, string>;
         }
@@ -635,41 +444,32 @@ export async function generateTextForLayout(
     }
 }
 
-export async function extractPaletteFromImage(base64Image: string, userApiKey?: string): Promise<PaletteExtractionResult> {
-    const ai = getAIClient(userApiKey);
-    const [header, data] = base64Image.split(',');
-    if (!header || !data) throw new Error("Formato de imagem base64 inválido.");
-    const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
+export async function extractPaletteFromImage(base64Image: string): Promise<PaletteExtractionResult> {
+    const ai = getAIClient();
+    const prompt = "A partir da imagem fornecida, extraia uma paleta de cores harmoniosa de 2 a 4 cores. Analise também se o tom geral da imagem é claro ('light') ou escuro ('dark'). Responda com um objeto JSON com as chaves 'palette' (array de strings hex) e 'imageTone' ('light' ou 'dark').";
 
+    const [header, data] = base64Image.split(',');
+    const mimeType = header.match(/:(.*?);/)?.[1] || 'image/png';
     const imagePart = { inlineData: { mimeType, data } };
-    const prompt = "A partir da imagem fornecida, extraia uma paleta de cores harmoniosa de 2 a 4 cores adequadas para um design de postagem de mídia social (por exemplo, para texto, destaques). A primeira cor deve ser a mais vibrante para destaques. Além disso, analise se a imagem é predominantemente 'clara' ou 'escura' para garantir o contraste do texto.";
+    const textPart = { text: prompt };
 
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: { parts: [imagePart, { text: prompt }] },
+        contents: { parts: [imagePart, textPart] },
         config: {
             responseMimeType: "application/json",
             responseSchema: {
                 type: Type.OBJECT,
                 properties: {
-                    palette: {
-                        type: Type.ARRAY,
-                        description: "Uma matriz de 2 a 4 strings de cores hexadecimais.",
-                        items: { type: Type.STRING }
-                    },
-                    imageTone: {
-                        type: Type.STRING,
-                        description: "O tom geral da imagem, ou 'light' ou 'dark'.",
-                        enum: ['light', 'dark']
-                    }
-                },
-                required: ["palette", "imageTone"]
+                    palette: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    imageTone: { type: Type.STRING }
+                }
             }
         }
     });
 
     try {
-        const result = JSON.parse(response.text.trim());
+        const result = JSON.parse(response.text.trim() || '{}');
         if (result.palette && Array.isArray(result.palette) && result.palette.length > 0 && result.imageTone) {
             return result as PaletteExtractionResult;
         }

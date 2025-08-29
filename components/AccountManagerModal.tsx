@@ -1,11 +1,13 @@
 
 
 
+
+
+
 import React, { useState } from 'react';
 import { User } from '../types';
 import { X, CheckCircle, Link, XCircle, Key, Eye, EyeOff, RotateCw } from 'lucide-react';
 import { toast } from 'react-hot-toast';
-import * as geminiService from '../services/geminiService';
 import * as freepikService from '../services/freepikService';
 
 
@@ -13,11 +15,11 @@ interface AccountManagerModalProps {
     isOpen: boolean;
     onClose: () => void;
     user: User | null;
-    onLinkAccount: (service: 'google' | 'freepik', apiKey: string) => void;
-    onUnlinkAccount: (service: 'google' | 'freepik') => void;
+    onLinkAccount: (service: 'freepik', apiKey: string) => void;
+    onUnlinkAccount: (service: 'freepik') => void;
 }
 
-type Service = 'google' | 'freepik';
+type Service = 'freepik';
 
 interface ServiceRowProps {
     service: Service;
@@ -155,24 +157,13 @@ const AccountManagerModal: React.FC<AccountManagerModalProps> = ({ isOpen, onClo
                 <div className="space-y-4">
                     <p className="text-sm text-zinc-400">Conecte suas próprias chaves de API para obter gerações ilimitadas e usar seus próprios créditos.</p>
                     <ServiceRow 
-                        service="google"
-                        name="Google Gemini"
-                        description="Para geração de textos, imagens e análise de estilo."
-                        icon={<img src="https://www.gstatic.com/images/branding/product/2x/gemini_48dp.png" alt="Google Gemini" className="w-6 h-6"/>}
-                        user={user}
-                        onLink={onLinkAccount}
-                        onUnlink={onUnlinkAccount}
-                        getApiKeyUrl="https://aistudio.google.com/app/apikey"
-                        verificationFn={geminiService.verifyApiKey}
-                    />
-                    <ServiceRow 
                         service="freepik"
                         name="Freepik"
                         description="Para geração de imagens (pode falhar no navegador)."
                         icon={<img src="https://freepik.cdnpk.net/img/logo/freepik-company-dark.svg" alt="Freepik" className="w-6 h-auto invert"/>}
                         user={user}
-                        onLink={onLinkAccount}
-                        onUnlink={onUnlinkAccount}
+                        onLink={onLinkAccount as any}
+                        onUnlink={onUnlinkAccount as any}
                         getApiKeyUrl="https://www.freepik.com/profile/api-keys"
                         verificationFn={freepikService.verifyApiKey}
                     />
