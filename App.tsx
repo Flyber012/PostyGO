@@ -8,8 +8,9 @@ import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import ReactDOM from 'react-dom';
 import { Toaster, toast } from 'react-hot-toast';
 import { Post, BrandKit, PostSize, AnyElement, TextElement, ImageElement, BackgroundElement, FontDefinition, LayoutTemplate, BrandAsset, TextStyle, Project, AIGeneratedTextElement, ShapeElement, QRCodeElement } from './types';
+import { UserProfile } from './components/Auth';
 import { POST_SIZES, GOOGLE_FONTS } from './constants';
-import * as openaiService from './services/geminiService';
+import * as apiService from './services/apiService';
 import * as freepikService from './services/freepikService';
 import CreationPanel from './components/ControlPanel';
 import CanvasEditor from './components/CanvasEditor';
@@ -371,10 +372,73 @@ const App: React.FC = () => {
     const [isMobileView, setIsMobileView] = useState(window.innerWidth <= 1024);
     const [colorPickerState, setColorPickerState] = useState<{ isOpen: boolean, color: string, onChange: (color: string) => void }>({ isOpen: false, color: '#FFFFFF', onChange: () => {} });
     
+    // Auth State
+    const [user, setUser] = useState<UserProfile | null>(null);
+    const [isAuthLoading, setIsAuthLoading] = useState(true);
+
     // Canvas View State
     const [viewState, setViewState] = useState({ zoom: 1, offset: { x: 0, y: 0 } });
     const [isPanning, setIsPanning] = useState(false);
     const panStart = useRef<{x: number, y: number, ox: number, oy: number} | null>(null);
+
+    // --- AUTHENTICATION LOGIC ---
+    useEffect(() => {
+        const checkUserStatus = async () => {
+            setIsAuthLoading(true);
+            const urlParams = new URLSearchParams(window.location.search);
+            const userEmailFromUrl = urlParams.get('user');
+            const authError = urlParams.get('auth_error');
+
+            if (authError) {
+                toast.error("Falha na autenticação com o Google.");
+                window.history.replaceState({}, document.title, window.location.pathname);
+                setIsAuthLoading(false);
+                return;
+            }
+
+            let userEmail = userEmailFromUrl;
+
+            if (userEmailFromUrl) {
+                // User just logged in, store email and clean URL
+                localStorage.setItem('posty_user_email', userEmailFromUrl);
+                window.history.replaceState({}, document.title, window.location.pathname);
+            } else {
+                // Check for existing session
+                userEmail = localStorage.getItem('posty_user_email');
+            }
+
+            if (userEmail) {
+                try {
+                    const { user: profile } = await apiService.getUserProfile(userEmail);
+                    if (profile) {
+                        setUser(profile);
+                    } else {
+                        // Session expired on backend, clear local
+                        localStorage.removeItem('posty_user_email');
+                        setUser(null);
+                    }
+                } catch (error) {
+                    console.error("Failed to fetch user profile:", error);
+                    localStorage.removeItem('posty_user_email');
+                    setUser(null);
+                }
+            }
+            setIsAuthLoading(false);
+        };
+        checkUserStatus();
+    }, []);
+
+    const handleLogout = async () => {
+        if (!user || !user.email) return;
+        try {
+            await apiService.logout(user.email);
+            localStorage.removeItem('posty_user_email');
+            setUser(null);
+            toast.success("Você foi desconectado.");
+        } catch (error) {
+            toast.error("Falha ao fazer logout.");
+        }
+    };
 
     // Rich Text Editing State
     const activeEditorRef = useRef<{ id: string, node: HTMLDivElement } | null>(null);
@@ -622,13 +686,17 @@ const App: React.FC = () => {
     };
 
     const handleAnalyzeStyle = async () => {
+        if (!user?.email) {
+            toast.error("Por favor, faça login com o Google para usar esta funcionalidade.");
+            return;
+        }
         if (styleInspirationImages.length === 0) {
             toast.error("Por favor, envie suas imagens de exemplo primeiro.");
             return;
         }
         const toastId = toast.loading('Analisando seu estilo...');
         try {
-            const analysis = await openaiService.analyzeStyleFromImages(styleInspirationImages);
+            const analysis = await apiService.analyzeStyleFromImages(user.email, styleInspirationImages);
             setStyleGuide(analysis);
             setUseStyleGuide(true);
             toast.success('Guia de Estilo criado com sucesso!', { id: toastId });
@@ -641,84 +709,85 @@ const App: React.FC = () => {
         genTopic: string, count: number, genType: 'post' | 'carousel', genContentLevel: 'mínimo' | 'médio' | 'detalhado',
         genBackgroundSource: 'upload' | 'ai' | 'solid', genAiProvider: 'gemini' | 'freepik', genTextStyle: TextStyle
     ) => {
-        if (!currentProject || !postSize) { toast.error("Por favor, crie ou abra um projeto primeiro."); return; }
-        
+        if (!user?.email) {
+            toast.error("Por favor, faça login com o Google para gerar posts.");
+            return;
+        }
+        if (!currentProject || !postSize) {
+            toast.error("Por favor, crie ou abra um projeto primeiro.");
+            return;
+        }
+
         setIsLoading(true);
         setPosts([]);
         setSelectedPostId(null);
         const toastId = toast.loading('Iniciando geração...');
         const activeKit = useStyleGuide ? brandKits.find(k => k.id === activeBrandKitId) : null;
         const activeStyleGuide = useStyleGuide ? styleGuide : null;
-        
-        try {
-             if (useLayoutToFill && selectedLayoutId && activeBrandKitId) {
-                const kit = brandKits.find(k => k.id === activeBrandKitId);
-                const layout = kit?.layouts.find(l => l.id === selectedLayoutId);
-                if (!kit || !layout) throw new Error("Layout ou Brand Kit selecionado não foi encontrado.");
-                if (customBackgrounds.length === 0) throw new Error("Por favor, envie as imagens de fundo que você deseja usar com este layout.");
-                
-                const backgroundSources = customBackgrounds.map(src => ({ src }));
-                setLoadingMessage(`Preenchendo seu layout com conteúdo...`);
-                toast.loading(`Preenchendo seu layout...`, { id: toastId });
-                const newPosts: Post[] = [];
-                const textElementsToFill = layout.elements.filter(el => el.type === 'text').map(el => {
-                    const textEl = el as TextElement;
-                    let description = textEl.fontSize > 48 ? 'título principal' : textEl.fontSize < 20 ? 'texto de rodapé' : 'corpo de texto';
-                    return { id: el.id, description, exampleContent: textEl.content };
-                });
-                for (let i = 0; i < backgroundSources.length; i++) {
-                    setLoadingMessage(`Gerando texto para o post ${i + 1}/${backgroundSources.length}...`);
-                    const newContentMap = await openaiService.generateTextForLayout(textElementsToFill, genTopic, genContentLevel, activeStyleGuide, genTextStyle);
-                    const newPostId = uuidv4();
-                    const backgroundElement: BackgroundElement = { id: `${newPostId}-background`, type: 'background', src: backgroundSources[i].src };
-                    const newElements: AnyElement[] = JSON.parse(JSON.stringify(layout.elements.filter(el => el.type !== 'background'))).map((el: AnyElement) => {
-                        const newEl = { ...el, id: `${newPostId}-${el.id}` };
-                        if (newEl.type === 'text' && newContentMap[el.id]) (newEl as TextElement).content = newContentMap[el.id];
-                        return newEl;
-                    });
-                    newPosts.push({ id: newPostId, elements: [backgroundElement, ...newElements] });
-                }
-                setPosts(newPosts);
-                if (newPosts.length > 0) setSelectedPostId(newPosts[0].id);
-                toast.success(`${newPosts.length} posts criados com seu layout!`, { id: toastId });
-            } else { 
-                let backgroundSources: { src?: string; backgroundColor?: string; prompt?: string; provider?: 'gemini' | 'freepik' }[] = [];
-                 if (genBackgroundSource === 'ai') {
-                    setLoadingMessage('Gerando prompts de imagem...'); toast.loading('Gerando prompts de imagem...', { id: toastId });
-                    const imagePrompts = await openaiService.generateImagePrompts(genTopic, count, activeStyleGuide, generationInspirationImages);
-                    setLoadingMessage(`Gerando ${imagePrompts.length} imagens...`); toast.loading(`Gerando ${imagePrompts.length} imagens...`, { id: toastId });
-                    const imageGenerator = genAiProvider === 'freepik' ? freepikService.generateBackgroundImages : openaiService.generateBackgroundImages;
-                    const generatedImages = await imageGenerator(imagePrompts, postSize);
-                    const imageMimeType = genAiProvider === 'gemini' ? 'jpeg' : 'png';
-                    backgroundSources = generatedImages.map((src, i) => ({ src: `data:image/${imageMimeType};base64,${src}`, prompt: imagePrompts[i], provider: genAiProvider }));
-                } else if (genBackgroundSource === 'upload') {
-                    if (customBackgrounds.length === 0) throw new Error("Nenhuma imagem de fundo foi enviada.");
-                    backgroundSources = customBackgrounds.map(src => ({ src }));
-                } else { // 'solid'
-                    backgroundSources = Array(count).fill({ backgroundColor: solidColorForGeneration });
-                }
 
-                setLoadingMessage('Criando layouts inteligentes...'); toast.loading('Criando layouts inteligentes...', { id: toastId });
-                const layoutPromises = backgroundSources.map(bg => openaiService.generateLayoutAndContentForImage(bg.src || bg.backgroundColor!, genTopic, genContentLevel, activeKit, genTextStyle));
-                const allLayouts = await Promise.all(layoutPromises);
-                const newPosts: Post[] = [];
-                const carouselId = genType === 'carousel' ? uuidv4() : undefined;
-                for (let i = 0; i < backgroundSources.length; i++) {
-                    const bgData = backgroundSources[i];
-                    const layout = allLayouts[i];
-                    const newPostId = uuidv4();
-                    setLoadingMessage(`Montando post ${i + 1}/${backgroundSources.length}...`);
-                    const backgroundElement: BackgroundElement = { 
-                        id: `${newPostId}-background`, type: 'background', src: bgData.src, 
-                        backgroundColor: bgData.backgroundColor, prompt: bgData.prompt, provider: bgData.provider 
-                    };
-                    const textElements = convertAILayoutToElements(layout, postSize, newPostId);
-                    newPosts.push({ id: newPostId, elements: [backgroundElement, ...textElements], carouselId: carouselId, slideIndex: carouselId ? i : undefined });
-                }
-                setPosts(newPosts);
-                if (newPosts.length > 0) setSelectedPostId(newPosts[0].id);
-                toast.success('Posts criados com sucesso!', { id: toastId });
+        try {
+            // NOTE: The logic for `useLayoutToFill` has been removed as the primary flow
+            // now goes through `generateLayoutAndContentForImage` which is more robust.
+            // This simplifies the UI and aligns with the backend capabilities.
+
+            let backgroundSources: { src?: string; backgroundColor?: string; prompt?: string; provider?: 'gemini' | 'freepik' }[] = [];
+            if (genBackgroundSource === 'ai') {
+                setLoadingMessage('Gerando prompts de imagem...');
+                toast.loading('Gerando prompts de imagem...', { id: toastId });
+                const imagePrompts = await apiService.generateImagePrompts(user.email, genTopic, count, activeStyleGuide, generationInspirationImages);
+
+                setLoadingMessage(`Gerando ${imagePrompts.length} imagens...`);
+                toast.loading(`Gerando ${imagePrompts.length} imagens...`, { id: toastId });
+                
+                // Image generation now goes through our backend. We can decide which provider to use there,
+                // but for now, we'll stick to the single `generateBackgroundImages` endpoint.
+                const generatedImages = await apiService.generateBackgroundImages(user.email, imagePrompts, postSize);
+                const imageMimeType = 'jpeg'; // Our backend will standardize the output
+                backgroundSources = generatedImages.map((src, i) => ({
+                    src: `data:image/${imageMimeType};base64,${src}`,
+                    prompt: imagePrompts[i],
+                    provider: 'gemini' // Provider is now determined by backend
+                }));
+            } else if (genBackgroundSource === 'upload') {
+                if (customBackgrounds.length === 0) throw new Error("Nenhuma imagem de fundo foi enviada.");
+                backgroundSources = customBackgrounds.map(src => ({ src }));
+            } else { // 'solid'
+                backgroundSources = Array(count).fill({ backgroundColor: solidColorForGeneration });
             }
+
+            setLoadingMessage('Criando layouts inteligentes...');
+            toast.loading('Criando layouts inteligentes...', { id: toastId });
+
+            const layoutPromises = backgroundSources.map(bg =>
+                apiService.generateLayoutAndContentForImage(
+                    user.email!, // We already checked for user.email
+                    bg.src || bg.backgroundColor!,
+                    genTopic,
+                    genContentLevel,
+                    activeKit,
+                    genTextStyle
+                )
+            );
+            const allLayouts = await Promise.all(layoutPromises);
+
+            const newPosts: Post[] = [];
+            const carouselId = genType === 'carousel' ? uuidv4() : undefined;
+            for (let i = 0; i < backgroundSources.length; i++) {
+                const bgData = backgroundSources[i];
+                const layout = allLayouts[i];
+                const newPostId = uuidv4();
+                setLoadingMessage(`Montando post ${i + 1}/${backgroundSources.length}...`);
+                const backgroundElement: BackgroundElement = {
+                    id: `${newPostId}-background`, type: 'background', src: bgData.src,
+                    backgroundColor: bgData.backgroundColor, prompt: bgData.prompt, provider: bgData.provider
+                };
+                const textElements = convertAILayoutToElements(layout, postSize, newPostId);
+                newPosts.push({ id: newPostId, elements: [backgroundElement, ...textElements], carouselId: carouselId, slideIndex: carouselId ? i : undefined });
+            }
+            setPosts(newPosts);
+            if (newPosts.length > 0) setSelectedPostId(newPosts[0].id);
+            toast.success('Posts criados com sucesso!', { id: toastId });
+
         } catch (error) {
             console.error(error);
             toast.error(error instanceof Error ? error.message : 'Falha ao gerar conteúdo.', { id: toastId, duration: 6000 });
@@ -1266,6 +1335,11 @@ const App: React.FC = () => {
     };
 
     const handleRegenerateBackground = async ({ prompt, inspirationImages }: { prompt: string, inspirationImages: string[] }) => {
+        if (!user?.email) {
+            toast.error("Por favor, faça login com o Google para usar esta funcionalidade.");
+            setIsRegenModalOpen(false);
+            return;
+        }
         if (!selectedPost || !postSize) return;
         const bgElement = selectedPost.elements.find(e => e.type === 'background');
         if (!bgElement) return;
@@ -1273,7 +1347,7 @@ const App: React.FC = () => {
         setIsLoading(true);
         const toastId = toast.loading('Gerando novo fundo com IA...');
         try {
-            const newSrc = await openaiService.generateSingleBackgroundImage(prompt, postSize, inspirationImages);
+            const newSrc = await apiService.generateSingleBackgroundImage(user.email, prompt, postSize, inspirationImages);
             updatePostElement(bgElement.id, { src: newSrc, backgroundColor: undefined });
             toast.success('Fundo regenerado com sucesso!', { id: toastId });
         } catch(error) {
@@ -1321,6 +1395,9 @@ const App: React.FC = () => {
                     isMobileView={isMobileView}
                     onToggleLeftPanel={() => setLeftPanelOpen(!isLeftPanelOpen)}
                     onToggleRightPanel={() => setRightPanelOpen(!isRightPanelOpen)}
+                    user={user}
+                    onLogout={handleLogout}
+                    isAuthLoading={isAuthLoading}
                 />
 
                 <aside className={`left-panel ${isMobileView && isLeftPanelOpen ? 'mobile-panel-open' : ''}`}>

@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Sparkles, ChevronDown, File, Save, FolderOpen, Download, HardDriveDownload, Menu, Layers } from 'lucide-react';
+import Auth, { UserProfile } from './Auth';
 
 interface HeaderProps {
     onNewProject: () => void;
@@ -11,12 +12,16 @@ interface HeaderProps {
     isMobileView: boolean;
     onToggleLeftPanel: () => void;
     onToggleRightPanel: () => void;
+    user: UserProfile | null;
+    onLogout: () => void;
+    isAuthLoading: boolean;
 }
 
 const Header: React.FC<HeaderProps> = (props) => {
     const { 
         onNewProject, onSaveProject, onSaveAsProject, onOpenProject, onExport, hasProject, 
-        isMobileView, onToggleLeftPanel, onToggleRightPanel 
+        isMobileView, onToggleLeftPanel, onToggleRightPanel,
+        user, onLogout, isAuthLoading
     } = props;
 
     const [isProjectMenuOpen, setProjectMenuOpen] = useState(false);
@@ -74,6 +79,7 @@ const Header: React.FC<HeaderProps> = (props) => {
                     <button onClick={onExport} disabled={!hasProject} className="p-2 text-zinc-300 hover:bg-zinc-700 rounded-md disabled:opacity-50" aria-label="Export posts">
                         <Download className="w-5 h-5"/>
                     </button>
+                    <Auth user={user} onLogout={onLogout} isLoading={isAuthLoading} />
                     <button onClick={onToggleRightPanel} className="p-2 text-zinc-300 hover:bg-zinc-700 rounded-md" aria-label="Open layers panel">
                         <Layers className="w-5 h-5"/>
                     </button>
@@ -104,6 +110,8 @@ const Header: React.FC<HeaderProps> = (props) => {
                     <Download className="w-4 h-4"/>
                     <span className="hidden md:inline">Exportar Posts</span>
                 </button>
+                <div className="w-px h-6 bg-zinc-700"></div>
+                <Auth user={user} onLogout={onLogout} isLoading={isAuthLoading} />
             </div>
         </header>
     );
